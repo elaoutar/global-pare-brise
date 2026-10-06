@@ -485,14 +485,20 @@ export const DossiersView: React.FC<Props> = ({
 
       {/* Modal Upload Fichier / Document Assurance */}
       {showUploadModal && selectedDossier && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="flex justify-between items-center px-6 py-4 bg-slate-900 text-white">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-6 backdrop-blur-sm flex justify-center items-start">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="sticky top-0 z-30 flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 bg-slate-900 text-white shadow-sm">
               <div className="flex items-center gap-2">
                 <Paperclip className="w-5 h-5 text-brand-400" />
                 <h3 className="font-bold text-sm">Joindre Document Sinistre</h3>
               </div>
-              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <button 
+                onClick={() => setShowUploadModal(false)} 
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                title="Fermer"
+              >
+                ✕
+              </button>
             </div>
 
             <form

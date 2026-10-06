@@ -277,16 +277,17 @@ export const PartenairesView: React.FC<Props> = ({
 
       {/* Modal Add / Edit Partenaire */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-6 backdrop-blur-sm flex justify-center items-start">
+          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-slate-900 text-white shadow-sm">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Users className="w-4 h-4 text-brand-400" />
                 {editingPartenaire ? "Modifier le Partenaire" : "Nouveau Partenaire / Apporteur d'Affaires"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                title="Fermer"
               >
                 <X className="w-5 h-5" />
               </button>

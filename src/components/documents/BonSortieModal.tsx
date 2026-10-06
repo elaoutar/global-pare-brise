@@ -19,8 +19,8 @@ export const BonSortieModal: React.FC<Props> = ({ bonSortie, dossier, onClose })
   const shareMsg = `Bonjour, voici le Bon de Sortie Stock N° ${bonSortie.numeroBS} pour l'intervention sur le dossier ${dossier.numeroDossier} (${dossier.vehicule.immatriculation} - Poseur: ${bonSortie.poseur}) chez GLOBAL PARE-BRISE Marrakech.`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-4 sm:my-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in duration-200">
         
         {/* Modern Document Action Bar */}
         <DocumentActionBar

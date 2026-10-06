@@ -443,21 +443,26 @@ export const NewDossierModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-8">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
+      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in duration-200">
+        {/* Header (Sticky at top of modal) */}
+        <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 bg-slate-900 text-white shadow-sm">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-brand-400" />
-            <h3 className="font-semibold text-base">Nouveau Dossier Pare-Brise & Sinistre</h3>
+            <h3 className="font-bold text-sm sm:text-base">Nouveau Dossier Pare-Brise & Sinistre</h3>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-800 rounded">
-            <X className="w-5 h-5 text-slate-400" />
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
+            title="Fermer"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Step Tabs with Option B Validation Guards */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-6 py-2.5 text-xs font-medium">
+        <div className="sticky top-[52px] sm:top-[56px] z-20 flex border-b border-slate-200 bg-slate-50 px-3 sm:px-6 py-2 text-xs font-medium shadow-xs overflow-x-auto">
           <button
             type="button"
             onClick={() => goToStep(1)}

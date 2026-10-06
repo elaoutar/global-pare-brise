@@ -277,16 +277,17 @@ export const AssurancesView: React.FC<Props> = ({
 
       {/* Modal Add / Edit Assurance */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-6 backdrop-blur-sm flex justify-center items-start">
+          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-slate-900 text-white shadow-sm">
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <Shield className="w-4 h-4 text-brand-400" />
                 {editingAssurance ? "Modifier la Compagnie d'Assurance" : "Ajouter une Nouvelle Assurance"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                title="Fermer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -417,28 +418,29 @@ export const AssurancesView: React.FC<Props> = ({
 
       {/* Bordereau Modal (Printable) */}
       {selectedAssuranceForBordereau && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-8">
-            <div className="no-print flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-brand-600 rounded-lg">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
+          <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="no-print sticky top-0 z-40 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-slate-900 text-white shadow-md backdrop-blur-md">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-2 bg-brand-600 rounded-lg shrink-0">
                   <FileSpreadsheet className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base">Bordereau d'Envoi des Dossiers Sinistres</h3>
-                  <p className="text-xs text-slate-400">Compagnie : {selectedAssuranceForBordereau.nom}</p>
+                  <h3 className="font-bold text-sm sm:text-base leading-tight">Bordereau d'Envoi des Dossiers Sinistres</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400">Compagnie : {selectedAssuranceForBordereau.nom}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold transition-colors"
+                  className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold transition-colors"
                 >
-                  <Printer className="w-4 h-4" /> Imprimer Bordereau
+                  <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Imprimer</span>
                 </button>
                 <button
                   onClick={() => setSelectedAssuranceForBordereau(null)}
-                  className="p-1.5 text-slate-400 hover:text-white"
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                  title="Fermer"
                 >
                   <X className="w-5 h-5" />
                 </button>

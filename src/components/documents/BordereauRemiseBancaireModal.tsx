@@ -147,11 +147,11 @@ export const BordereauRemiseBancaireModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-4 sm:my-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in duration-200">
         
         {/* Header Controls (Hidden on Print) */}
-        <div className="no-print bg-slate-900 text-white p-4 sm:p-5 border-b border-slate-800">
+        <div className="no-print sticky top-0 z-40 bg-slate-900 text-white p-3.5 sm:p-5 border-b border-slate-800 shadow-md backdrop-blur-md">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-blue-600 rounded-xl">

@@ -78,8 +78,8 @@ export const DocumentActionBar: React.FC<Props> = ({
   };
 
   return (
-    <div className="no-print bg-slate-900 text-white p-4 sm:px-6 sm:py-4 border-b border-slate-800">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="no-print sticky top-0 z-40 bg-slate-900 text-white p-3.5 sm:px-6 sm:py-4 border-b border-slate-800 shadow-md backdrop-blur-md">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
         
         {/* Document Info */}
         <div className="flex items-center gap-3">
