@@ -1,0 +1,570 @@
+'use client';
+
+import React, { useState } from 'react';
+import { DossierSinistre, StatutDossier } from '@/types';
+import { formatDH, formatDate, getStatutDossierBadge } from '@/lib/utils';
+import { 
+  Search, 
+  Filter, 
+  PlusCircle, 
+  FileText, 
+  ShieldCheck, 
+  PackageMinus, 
+  Camera, 
+  ChevronRight,
+  Car,
+  CheckCircle2,
+  AlertCircle,
+  Truck,
+  Paperclip,
+  Upload,
+  FileCheck2,
+  Eye,
+  Download,
+  FileSpreadsheet,
+  Coins
+} from 'lucide-react';
+import { DocumentAttache } from '@/types';
+import { exportEtatMensuelExcel } from '@/lib/exportUtils';
+import { MatriculeBadge } from '@/components/ui/MatriculeBadge';
+import { formatMatricule } from '@/lib/matriculeMaroc';
+
+interface Props {
+  dossiers: DossierSinistre[];
+  onOpenNewDossier: () => void;
+  onOpenQuittance: (dossier: DossierSinistre) => void;
+  onOpenFacture: (dossier: DossierSinistre) => void;
+  onOpenBonSortie: (dossier: DossierSinistre) => void;
+  onOpenBonLivraison: (dossier: DossierSinistre) => void;
+  onAddDocumentToDossier: (dossierId: string, doc: DocumentAttache) => void;
+  onUpdateStatut: (dossierId: string, newStatut: StatutDossier) => void;
+  onOpenEncaisserModal?: (dossier: DossierSinistre) => void;
+}
+
+export const DossiersView: React.FC<Props> = ({
+  dossiers,
+  onOpenNewDossier,
+  onOpenQuittance,
+  onOpenFacture,
+  onOpenBonSortie,
+  onOpenBonLivraison,
+  onAddDocumentToDossier,
+  onUpdateStatut,
+  onOpenEncaisserModal,
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatut, setFilterStatut] = useState<string>('ALL');
+  const [selectedDossier, setSelectedDossier] = useState<DossierSinistre | null>(dossiers[0] || null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [newDocNom, setNewDocNom] = useState('');
+  const [newDocType, setNewDocType] = useState<DocumentAttache['typeDocument']>('PRISE_EN_CHARGE_ASSURANCE');
+
+  const filteredDossiers = dossiers.filter((d) => {
+    const matchSearch =
+      d.vehicule.immatriculation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      formatMatricule(d.vehicule.immatriculation, 'LATIN').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      formatMatricule(d.vehicule.immatriculation, 'ARABE').includes(searchTerm) ||
+      d.client.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.numeroSinistre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.assurance?.nom || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.numeroDossier.toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchStatut = true;
+    if (filterStatut === 'ALL') {
+      matchStatut = true;
+    } else if (filterStatut === 'TYPE_ASSURANCE') {
+      matchStatut = d.typeDossier === 'ASSURANCE';
+    } else if (filterStatut === 'TYPE_PARTICULIER') {
+      matchStatut = d.typeDossier === 'PARTICULIER_COMPTANT';
+    } else {
+      matchStatut = d.statut === filterStatut;
+    }
+
+    return matchSearch && matchStatut;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Top action bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Search box */}
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Rechercher matricule, client, sinistre..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium"
+            />
+          </div>
+
+          {/* Status and Type filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={filterStatut}
+              onChange={(e) => setFilterStatut(e.target.value)}
+              className="text-xs py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="ALL">Tous les dossiers</option>
+              <optgroup label="Par Type de Client">
+                <option value="TYPE_ASSURANCE">🛡️ Dossiers Assurances</option>
+                <option value="TYPE_PARTICULIER">👤 Clients Particuliers (Comptant)</option>
+              </optgroup>
+              <optgroup label="Par Statut de Pose / Traitement">
+                <option value="NOUVEAU">Nouveau</option>
+                <option value="EN_COURS_POSE">En cours de pose</option>
+                <option value="DEPOSE_ASSURANCE">Déposé Assurance</option>
+                <option value="VALIDE_REGLE">Validé & Réglé</option>
+                <option value="REJETE">Rejeté / Litige</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportEtatMensuelExcel(filteredDossiers, 'Liste')}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 whitespace-nowrap"
+            title="Exporter la liste actuelle en Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            Exporter Excel
+          </button>
+
+          <button
+            onClick={onOpenNewDossier}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 whitespace-nowrap"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Nouveau Dossier
+          </button>
+        </div>
+      </div>
+
+      {/* Two Column Layout: List on Left, Active Dossier Preview on Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column : Dossiers List (7 cols) */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              {filteredDossiers.length} Dossier(s) Référencé(s)
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100 max-h-[750px] overflow-y-auto custom-scrollbar">
+            {filteredDossiers.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-xs">
+                Aucun dossier ne correspond à votre recherche.
+              </div>
+            ) : (
+              filteredDossiers.map((dossier) => {
+                const badge = getStatutDossierBadge(dossier.statut);
+                const isSelected = selectedDossier?.id === dossier.id;
+
+                return (
+                  <div
+                    key={dossier.id}
+                    onClick={() => setSelectedDossier(dossier)}
+                    className={`p-4 transition-all cursor-pointer flex items-center justify-between gap-4 ${
+                      isSelected ? 'bg-brand-50/70 border-l-4 border-brand-600' : 'hover:bg-slate-50/60'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">
+                          {dossier.vehicule.marque} {dossier.vehicule.modele}
+                        </span>
+                        <MatriculeBadge immatriculation={dossier.vehicule.immatriculation} />
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        {dossier.client.nom} ({dossier.client.telephone})
+                      </p>
+                      {dossier.typeDossier === 'PARTICULIER_COMPTANT' ? (
+                        <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                          Client Particulier (Prestation Comptant • Sans Assurance)
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-slate-500">
+                          Assurance : <strong className="text-slate-800">{dossier.assurance?.nom}</strong> • Sinistre : <span className="font-mono">{dossier.numeroSinistre || '-'}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-right space-y-1.5 flex-shrink-0">
+                      <div className="font-bold text-sm font-mono text-slate-900">
+                        {formatDH(dossier.montantTotalTTC)}
+                      </div>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.bg}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Right Column : Detail & Action Sheet (5 cols) */}
+        <div className="lg:col-span-5 space-y-4">
+          {selectedDossier ? (
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-5 sticky top-6">
+              {/* Top Banner of Selected Dossier */}
+              <div className="border-b border-slate-100 pb-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded uppercase">
+                      {selectedDossier.numeroDossier}
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <h2 className="text-lg font-black text-slate-900">
+                        {selectedDossier.vehicule.marque} {selectedDossier.vehicule.modele}
+                      </h2>
+                      <MatriculeBadge immatriculation={selectedDossier.vehicule.immatriculation} />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Créé le {formatDate(selectedDossier.dateCreation)} • Poseur : {selectedDossier.poseur || 'Non affecté'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    {selectedDossier.typeDossier === 'PARTICULIER_COMPTANT' ? (
+                      <>
+                        <p className="text-xs text-slate-500">Total Client Direct :</p>
+                        <p className="text-lg font-black text-amber-600 font-mono">
+                          {formatDH(selectedDossier.montantTotalTTC)}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-slate-500">Prise en charge :</p>
+                        <p className="text-lg font-black text-brand-700 font-mono">
+                          {formatDH(selectedDossier.montantPriseEnChargeAssurance)}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status Selector Dropdown */}
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600">Changer Statut :</span>
+                  <select
+                    value={selectedDossier.statut}
+                    onChange={(e) => onUpdateStatut(selectedDossier.id, e.target.value as StatutDossier)}
+                    className="text-xs py-1.5 px-3 bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  >
+                    <option value="NOUVEAU">Nouveau dossier</option>
+                    <option value="EN_COURS_POSE">En cours de pose</option>
+                    <option value="POSE_TERMINEE">Pose terminée</option>
+                    <option value="DEPOSE_ASSURANCE">Déposé chez l'Assurance</option>
+                    <option value="VALIDE_REGLE">Validé & Règlement reçu</option>
+                    <option value="REJETE">Rejeté / Litige</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Encaissement Rapide */}
+              {selectedDossier.statut !== 'VALIDE_REGLE' && onOpenEncaisserModal && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Coins className="w-4 h-4 text-emerald-600" /> Règlement & Encaissement
+                    </span>
+                    <span className="text-xs font-mono font-bold text-emerald-800">
+                      {formatDH(selectedDossier.montantTotalTTC)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onOpenEncaisserModal(selectedDossier)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-sm transition-colors"
+                  >
+                    <Coins className="w-4 h-4" /> Encaisser Règlement (Espèces, Chèque, Effet...)
+                  </button>
+                </div>
+              )}
+
+              {/* Action Buttons: Essential Documents */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Documents Prêts pour Impression / Signature :
+                </p>
+
+                {/* 1. Quittance Subrogative (Uniquement pour Dossier avec Assurance) */}
+                {selectedDossier.typeDossier === 'ASSURANCE' ? (
+                  <button
+                    onClick={() => onOpenQuittance(selectedDossier)}
+                    className="w-full flex items-center justify-between p-3 bg-brand-50 hover:bg-brand-100/80 text-brand-900 rounded-xl border border-brand-200 text-xs font-semibold transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <ShieldCheck className="w-4 h-4 text-brand-600" />
+                      <span>Quittance Subrogative d'Assurance</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-brand-400" />
+                  </button>
+                ) : (
+                  <div className="p-2.5 bg-amber-50/70 rounded-xl border border-amber-200/60 text-xs text-amber-900 flex items-center gap-2">
+                    <span className="font-bold text-[11px] bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded">Particulier Direct</span>
+                    <span className="text-[11px] text-amber-800">Facturation au comptant directe (sans subrogation).</span>
+                  </div>
+                )}
+
+                {/* 2. Facture Officielle */}
+                <button
+                  onClick={() => onOpenFacture(selectedDossier)}
+                  className="w-full flex items-center justify-between p-3 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-900 rounded-xl border border-emerald-200 text-xs font-semibold transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    <span>Facture Officielle Maroc (TVA 20% / ICE)</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-emerald-400" />
+                </button>
+
+                {/* 3. Bon de Sortie Stock */}
+                <button
+                  onClick={() => onOpenBonSortie(selectedDossier)}
+                  className="w-full flex items-center justify-between p-3 bg-amber-50 hover:bg-amber-100/80 text-amber-900 rounded-xl border border-amber-200 text-xs font-semibold transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <PackageMinus className="w-4 h-4 text-amber-600" />
+                    <span>Bon de Sortie Stock (Atelier / Poseur)</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-400" />
+                </button>
+
+                {/* 4. Bon de Livraison */}
+                <button
+                  onClick={() => onOpenBonLivraison(selectedDossier)}
+                  className="w-full flex items-center justify-between p-3 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-900 rounded-xl border border-indigo-200 text-xs font-semibold transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Truck className="w-4 h-4 text-indigo-600" />
+                    <span>Bon de Livraison (Décharge Client / Pose)</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-indigo-400" />
+                </button>
+              </div>
+
+              {/* Client & Insurance Specs */}
+              {selectedDossier.typeDossier === 'ASSURANCE' ? (
+                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Assurance</p>
+                    <p className="font-semibold text-slate-800">{selectedDossier.assurance?.nom}</p>
+                    <p className="text-slate-500 font-mono mt-0.5">Police: {selectedDossier.numeroPolice || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Franchise</p>
+                    {selectedDossier.franchiseOfferte ? (
+                      <span className="text-emerald-700 font-bold">Offerte par le garage</span>
+                    ) : (
+                      <span className="text-slate-800 font-semibold">{formatDH(selectedDossier.montantFranchise)}</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 text-xs bg-amber-50/60 p-3 rounded-xl border border-amber-200/60">
+                  <div>
+                    <p className="text-[10px] font-bold text-amber-700 uppercase">Type Dossier</p>
+                    <p className="font-semibold text-slate-800">Particulier Direct (Comptant)</p>
+                    <p className="text-slate-500 text-[11px] mt-0.5">Prestation sans assurance</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-amber-700 uppercase">Facturation Client</p>
+                    <p className="text-amber-800 font-bold font-mono">{formatDH(selectedDossier.montantTotalTTC)} TTC</p>
+                    <p className="text-emerald-700 text-[10px] font-semibold">Règlement à la livraison</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Fichiers & Pièces Jointes Assurance */}
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5 text-brand-600" /> Documents Assurance & Fichiers
+                  </p>
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="text-[11px] font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1 bg-brand-50 px-2 py-1 rounded-lg"
+                  >
+                    <Upload className="w-3 h-3" /> + Joindre Fichier
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  {(!selectedDossier.documents || selectedDossier.documents.length === 0) ? (
+                    <p className="text-[11px] text-slate-400 italic py-1">
+                      Aucun document joint (ex: Accord de prise en charge, rapport d'expertise).
+                    </p>
+                  ) : (
+                    selectedDossier.documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200 text-xs hover:bg-slate-100/80 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileCheck2 className="w-4 h-4 text-brand-600 flex-shrink-0" />
+                          <div className="truncate">
+                            <p className="font-semibold text-slate-800 truncate">{doc.nom}</p>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {doc.typeDocument} {doc.taille ? `• ${doc.taille}` : ''} • {formatDate(doc.dateAjout)}
+                            </span>
+                          </div>
+                        </div>
+                        <a
+                          href={doc.url}
+                          download={doc.nom}
+                          className="p-1 text-slate-400 hover:text-brand-600 transition-colors flex-shrink-0"
+                          title="Télécharger / Voir document"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Photos Gallery */}
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5" /> Photos Expert & Contrôle ({Object.values(selectedDossier.photos).filter(Boolean).length})
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {selectedDossier.photos.avantSinistreUrl && (
+                    <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                      <img
+                        src={selectedDossier.photos.avantSinistreUrl}
+                        alt="Avant pose"
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
+                        Avant (Sinistre)
+                      </span>
+                    </div>
+                  )}
+                  {selectedDossier.photos.apresPoseUrl && (
+                    <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                      <img
+                        src={selectedDossier.photos.apresPoseUrl}
+                        alt="Après pose"
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute bottom-0 inset-x-0 bg-emerald-900/80 text-white text-[9px] p-0.5 text-center">
+                        Après (Posé)
+                      </span>
+                    </div>
+                  )}
+                  {selectedDossier.photos.carteGriseUrl && (
+                    <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                      <img
+                        src={selectedDossier.photos.carteGriseUrl}
+                        alt="Carte grise"
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
+                        Carte Grise
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-xs">
+              Sélectionnez un dossier pour consulter les détails et imprimer les pièces.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Upload Fichier / Document Assurance */}
+      {showUploadModal && selectedDossier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 bg-slate-900 text-white">
+              <div className="flex items-center gap-2">
+                <Paperclip className="w-5 h-5 text-brand-400" />
+                <h3 className="font-bold text-sm">Joindre Document Sinistre</h3>
+              </div>
+              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const newDoc: DocumentAttache = {
+                  id: `doc-${Date.now()}`,
+                  nom: newDocNom || 'Document_Assurance.pdf',
+                  typeDocument: newDocType,
+                  url: '#',
+                  taille: '850 Ko',
+                  dateAjout: new Date().toISOString().split('T')[0],
+                };
+                onAddDocumentToDossier(selectedDossier.id, newDoc);
+                setShowUploadModal(false);
+                setNewDocNom('');
+              }}
+              className="p-6 space-y-4 text-xs"
+            >
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Type de Document *</label>
+                <select
+                  value={newDocType}
+                  onChange={(e) => setNewDocType(e.target.value as any)}
+                  className="w-full px-3 py-2 border rounded-lg font-medium"
+                >
+                  <option value="PRISE_EN_CHARGE_ASSURANCE">Accord de Prise en Charge Assurance</option>
+                  <option value="RAPPORT_EXPERTISE">Rapport d'Expertise Automobile</option>
+                  <option value="CARTE_GRISE">Copie Carte Grise / Permis</option>
+                  <option value="DEVIS_SIGNE">Devis / Ordre de Réparation Signé</option>
+                  <option value="AUTRE">Autre Document</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Nom du Fichier / Titre *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: PriseEnCharge_Sanlam_Sinistre77218.pdf"
+                  value={newDocNom}
+                  onChange={(e) => setNewDocNom(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg font-mono"
+                />
+              </div>
+
+              {/* Upload Dropzone simulation */}
+              <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center bg-slate-50">
+                <Upload className="w-6 h-6 text-brand-600 mx-auto mb-1" />
+                <p className="font-semibold text-slate-800">Glisser-déposer le document PDF ou Photo</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, JPG, PNG (Max 15 Mo)</p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="px-4 py-2 border rounded-lg font-semibold text-slate-700"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold"
+                >
+                  Ajouter au Dossier
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
