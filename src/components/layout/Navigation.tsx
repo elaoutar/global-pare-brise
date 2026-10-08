@@ -77,7 +77,7 @@ export const Navigation: React.FC<Props> = ({
     },
     {
       id: 'fournisseurs',
-      label: 'Fournisseurs',
+      label: 'Fournisseurs & Commandes',
       icon: Truck,
     },
   ];

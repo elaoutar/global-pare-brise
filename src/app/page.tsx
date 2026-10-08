@@ -14,7 +14,8 @@ import {
   Assurance,
   Partenaire,
   Fournisseur,
-  ModePaiement
+  ModePaiement,
+  BonCommandeFournisseur
 } from '@/types';
 import { 
   INITIAL_DOSSIERS, 
@@ -26,8 +27,10 @@ import {
   INITIAL_ASSURANCES, 
   INITIAL_PARTENAIRES, 
   INITIAL_FOURNISSEURS,
+  INITIAL_COMMANDES_FOURNISSEURS,
   GARAGE_INFO 
 } from '@/lib/data';
+import { formatDH } from '@/lib/utils';
 
 import { Navigation } from '@/components/layout/Navigation';
 import { DashboardView } from '@/components/views/DashboardView';
@@ -46,6 +49,7 @@ import { FactureModal } from '@/components/documents/FactureModal';
 import { BonSortieModal } from '@/components/documents/BonSortieModal';
 import { BonLivraisonModal } from '@/components/documents/BonLivraisonModal';
 import { EncaisserPaiementModal } from '@/components/modals/EncaisserPaiementModal';
+import { BonCommandeFournisseurModal } from '@/components/documents/BonCommandeFournisseurModal';
 import { Menu, X, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
@@ -63,6 +67,7 @@ export default function Home() {
   const [assurances, setAssurances] = useState<Assurance[]>(INITIAL_ASSURANCES);
   const [partenaires, setPartenaires] = useState<Partenaire[]>(INITIAL_PARTENAIRES);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(INITIAL_FOURNISSEURS);
+  const [commandesFournisseurs, setCommandesFournisseurs] = useState<BonCommandeFournisseur[]>(INITIAL_COMMANDES_FOURNISSEURS);
 
   // Modals state
   const [showNewDossierModal, setShowNewDossierModal] = useState(false);
@@ -71,6 +76,7 @@ export default function Home() {
   const [activeBonSortieModal, setActiveBonSortieModal] = useState<{ bonSortie: BonSortie; dossier: DossierSinistre } | null>(null);
   const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier: DossierSinistre } | null>(null);
   const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier: DossierSinistre; facture?: Facture } | null>(null);
+  const [activeCommandeFournisseurModal, setActiveCommandeFournisseurModal] = useState<{ commande: BonCommandeFournisseur; fournisseur: Fournisseur } | null>(null);
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -304,6 +310,24 @@ export default function Home() {
   const handleDeleteFournisseur = (fournisseurId: string) => {
     setFournisseurs((prev) => prev.filter((f) => f.id !== fournisseurId));
     showToast('Fournisseur supprimé.');
+  };
+
+  // Commandes Fournisseurs Handlers
+  const handleCreateCommandeFournisseur = (newCmd: BonCommandeFournisseur) => {
+    setCommandesFournisseurs((prev) => [newCmd, ...prev]);
+    const fourn = fournisseurs.find((f) => f.id === newCmd.fournisseurId);
+    showToast(`Bon de Commande ${newCmd.numeroBC} créé avec succès (${formatDH(newCmd.totalTTC)} TTC).`);
+  };
+
+  const handleUpdateCommandeFournisseur = (updatedCmd: BonCommandeFournisseur) => {
+    setCommandesFournisseurs((prev) =>
+      prev.map((c) => (c.id === updatedCmd.id ? updatedCmd : c))
+    );
+    showToast(`Commande ${updatedCmd.numeroBC} mise à jour avec succès.`);
+  };
+
+  const handleOpenCommandeFournisseurModal = (commande: BonCommandeFournisseur, fournisseur: Fournisseur) => {
+    setActiveCommandeFournisseurModal({ commande, fournisseur });
   };
 
   const handleUpdateStatutDossier = (dossierId: string, newStatut: StatutDossier) => {
@@ -653,9 +677,14 @@ export default function Home() {
         {activeTab === 'fournisseurs' && (
           <FournisseursView
             fournisseurs={fournisseurs}
+            commandes={commandesFournisseurs}
+            stockArticles={stock}
             onAddFournisseur={handleAddFournisseur}
             onUpdateFournisseur={handleUpdateFournisseur}
             onDeleteFournisseur={handleDeleteFournisseur}
+            onCreateCommande={handleCreateCommandeFournisseur}
+            onUpdateCommande={handleUpdateCommandeFournisseur}
+            onOpenCommandeModal={handleOpenCommandeFournisseurModal}
           />
         )}
       </main>
@@ -708,6 +737,14 @@ export default function Home() {
           facture={activeEncaisserModal.facture}
           onClose={() => setActiveEncaisserModal(null)}
           onConfirmPaiement={handleConfirmerEncaissement}
+        />
+      )}
+
+      {activeCommandeFournisseurModal && (
+        <BonCommandeFournisseurModal
+          commande={activeCommandeFournisseurModal.commande}
+          fournisseur={activeCommandeFournisseurModal.fournisseur}
+          onClose={() => setActiveCommandeFournisseurModal(null)}
         />
       )}
     </div>

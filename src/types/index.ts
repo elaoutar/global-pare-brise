@@ -214,3 +214,64 @@ export interface ReglementRecette {
   notes?: string;
 }
 
+// ----------------------------------------------------
+// COMMANDES ET RÈGLEMENTS FOURNISSEURS (Bons de commande)
+// ----------------------------------------------------
+export type StatutCommandeFournisseur = 
+  | 'BROUILLON'
+  | 'ENVOYEE'
+  | 'RECUE_PARTIELLE'
+  | 'RECUE_CONFORME'
+  | 'ANNULEE';
+
+export type StatutPaiementFournisseur = 
+  | 'NON_PAYE'
+  | 'ACOMPTE_VERSE'
+  | 'PAYE_TOTAL'
+  | 'EN_ATTENTE_ECHEANCE';
+
+export interface LigneCommandeFournisseur {
+  id: string;
+  articleId?: string;
+  designation: string;
+  reference?: string;
+  codeEurocode?: string;
+  quantite: number;
+  prixUnitaireAchatHT: number;
+  tauxTva?: number; // 20% au Maroc par défaut
+  totalHT: number;
+}
+
+export interface BonCommandeFournisseur {
+  id: string;
+  numeroBC: string; // Ex: BC-2026-0031
+  fournisseurId: string;
+  dateCommande: string;
+  dateLivraisonPrevue?: string;
+  dateReceptionReelle?: string;
+  agenceVille?: string; // 'Marrakech' | 'El Jadida'
+  
+  lignes: LigneCommandeFournisseur[];
+  
+  totalHT: number;
+  tauxTva: number; // 20%
+  totalTVA: number;
+  totalTTC: number;
+  
+  // Suivi de la commande
+  statutCommande: StatutCommandeFournisseur;
+  
+  // Suivi du paiement
+  statutPaiement: StatutPaiementFournisseur;
+  montantPaye: number; // Montant déjà réglé au fournisseur (DH)
+  modePaiement?: ModePaiement;
+  referencePaiement?: string; // N° Chèque, N° Traite, N° Virement
+  datePaiementEffectif?: string;
+  dateEcheancePaiement?: string; // Échéance chèque ou traite fournisseur
+  
+  numeroBLFournisseur?: string; // Réf BL délivré par le fournisseur
+  numeroFactureFournisseur?: string; // Réf Facture du fournisseur
+  notes?: string;
+}
+
+

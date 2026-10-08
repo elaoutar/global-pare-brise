@@ -162,3 +162,36 @@ export function montantEnToutesLettres(nombre: number): string {
   return resultat;
 }
 
+export function getStatutCommandeFournisseurBadge(statut: string) {
+  switch (statut) {
+    case 'BROUILLON':
+      return { label: 'Brouillon', bg: 'bg-slate-100 text-slate-700 border-slate-300' };
+    case 'ENVOYEE':
+      return { label: 'Envoyée au Fournisseur', bg: 'bg-blue-100 text-blue-800 border-blue-200' };
+    case 'RECUE_PARTIELLE':
+      return { label: 'Reçue Partiellement', bg: 'bg-amber-100 text-amber-800 border-amber-200' };
+    case 'RECUE_CONFORME':
+      return { label: 'Reçue & Conforme', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+    case 'ANNULEE':
+      return { label: 'Annulée', bg: 'bg-rose-100 text-rose-800 border-rose-200' };
+    default:
+      return { label: statut, bg: 'bg-slate-100 text-slate-800 border-slate-200' };
+  }
+}
+
+export function getStatutPaiementFournisseurBadge(statut: string) {
+  switch (statut) {
+    case 'NON_PAYE':
+      return { label: 'Non Payé (En Attente)', bg: 'bg-rose-100 text-rose-800 border-rose-200' };
+    case 'ACOMPTE_VERSE':
+      return { label: 'Acompte Versé', bg: 'bg-amber-100 text-amber-800 border-amber-200' };
+    case 'EN_ATTENTE_ECHEANCE':
+      return { label: 'Chèque / Traite en attente', bg: 'bg-purple-100 text-purple-800 border-purple-200' };
+    case 'PAYE_TOTAL':
+      return { label: 'Payé Intégralement', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+    default:
+      return { label: statut, bg: 'bg-slate-100 text-slate-800 border-slate-200' };
+  }
+}
+
+
