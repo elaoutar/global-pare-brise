@@ -249,8 +249,8 @@ export const StockView: React.FC<Props> = ({
                     <th className="py-3 px-4">Désignation</th>
                     <th className="py-3 px-4 text-center">Type</th>
                     <th className="py-3 px-4 text-center">Stock Actuel</th>
-                    <th className="py-3 px-4 text-right">P. Achat HT</th>
-                    <th className="py-3 px-4 text-right">P. Vente HT</th>
+                    <th className="py-3 px-4 text-right">P. Achat TTC</th>
+                    <th className="py-3 px-4 text-right">P. Vente TTC</th>
                     <th className="py-3 px-4 text-center">Statut</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -467,7 +467,7 @@ export const StockView: React.FC<Props> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Prix Achat HT (DH)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Prix Achat TTC (DH)</label>
                   <input
                     type="number"
                     min="0"
@@ -477,7 +477,7 @@ export const StockView: React.FC<Props> = ({
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Prix Vente HT (DH)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Prix Vente TTC (DH)</label>
                   <input
                     type="number"
                     min="0"

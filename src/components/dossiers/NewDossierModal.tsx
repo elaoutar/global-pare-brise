@@ -47,11 +47,11 @@ interface Props {
 }
 
 const PRESTATIONS_RAPIDES = [
-  { designation: 'Calibrage Caméra Pare-brise (ADAS)', prixHT: 350 },
-  { designation: 'Déplacement & Pose à Domicile / Sur Site', prixHT: 120 },
-  { designation: 'Joint de finition profilé supérieur neuf', prixHT: 80 },
-  { designation: 'Rénovation optiques de phares (la paire)', prixHT: 150 },
-  { designation: 'Traitement Anti-Pluie & Déperlant Vitres', prixHT: 90 },
+  { designation: 'Calibrage Caméra Pare-brise (ADAS)', prixTTC: 350 },
+  { designation: 'Déplacement & Pose à Domicile / Sur Site', prixTTC: 150 },
+  { designation: 'Joint de finition profilé supérieur neuf', prixTTC: 100 },
+  { designation: 'Rénovation optiques de phares (la paire)', prixTTC: 180 },
+  { designation: 'Traitement Anti-Pluie & Déperlant Vitres', prixTTC: 100 },
 ];
 
 export const NewDossierModal: React.FC<Props> = ({
@@ -123,21 +123,21 @@ export const NewDossierModal: React.FC<Props> = ({
   const [numPolice, setNumPolice] = useState('');
   const [dateSinistre, setDateSinistre] = useState(new Date().toISOString().split('T')[0]);
 
-  // Financials & Prestations HT (Entièrement Modifiables)
+  // Financials & Prestations TTC (Saisie directe en TTC, le système calcule le HT et la TVA)
   const [selectedArticleId, setSelectedArticleId] = useState('');
   const [modeVitrage, setModeVitrage] = useState<'STOCK' | 'SUR_COMMANDE'>('SUR_COMMANDE');
   const [customVitrageDesignation, setCustomVitrageDesignation] = useState('');
   const [customEurocode, setCustomEurocode] = useState('');
   
-  // Prestations unit prices (DH HT)
-  const [prixVitrageHT, setPrixVitrageHT] = useState<number>(1250);
-  const [prixColleHT, setPrixColleHT] = useState<number>(150);
-  const [prixMainOeuvreHT, setPrixMainOeuvreHT] = useState<number>(100);
+  // Prestations unit prices (Saisis en DH TTC)
+  const [prixVitrageTTC, setPrixVitrageTTC] = useState<number>(1500);
+  const [prixColleTTC, setPrixColleTTC] = useState<number>(180);
+  const [prixMainOeuvreTTC, setPrixMainOeuvreTTC] = useState<number>(120);
   const [lignesPrestationsExtra, setLignesPrestationsExtra] = useState<
-    { id: string; designation: string; prixHT: number }[]
+    { id: string; designation: string; prixTTC: number }[]
   >([]);
   const [customPrestationNom, setCustomPrestationNom] = useState('');
-  const [customPrestationPrix, setCustomPrestationPrix] = useState<number>(150);
+  const [customPrestationPrixTTC, setCustomPrestationPrixTTC] = useState<number>(150);
   const [showAddCustomPrestation, setShowAddCustomPrestation] = useState(false);
 
   const [prixTotalTTC, setPrixTotalTTC] = useState(1800);
@@ -156,26 +156,26 @@ export const NewDossierModal: React.FC<Props> = ({
   const [photoAvant, setPhotoAvant] = useState('https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=600&q=80');
   const [photoCarteGrise, setPhotoCarteGrise] = useState('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80');
 
-  // Dynamic Financials Calculations
-  const extraPrestationsTotalHT = lignesPrestationsExtra.reduce((sum, item) => sum + (Number(item.prixHT) || 0), 0);
-  const dynamicTotalHT = +(Number(prixVitrageHT) + Number(prixColleHT) + Number(prixMainOeuvreHT) + extraPrestationsTotalHT).toFixed(2);
-  const dynamicTotalTVA = +(dynamicTotalHT * 0.20).toFixed(2);
-  const dynamicTotalTTC = +(dynamicTotalHT + dynamicTotalTVA).toFixed(2);
+  // Dynamic Financials Calculations (Total TTC saisi -> Calcul automatique du HT et TVA)
+  const extraPrestationsTotalTTC = lignesPrestationsExtra.reduce((sum, item) => sum + (Number(item.prixTTC) || 0), 0);
+  const dynamicTotalTTC = +(Number(prixVitrageTTC) + Number(prixColleTTC) + Number(prixMainOeuvreTTC) + extraPrestationsTotalTTC).toFixed(2);
+  const dynamicTotalHT = +(dynamicTotalTTC / 1.20).toFixed(2);
+  const dynamicTotalTVA = +(dynamicTotalTTC - dynamicTotalHT).toFixed(2);
 
   const handleArticleChange = (artId: string) => {
     setSelectedArticleId(artId);
     const art = stockArticles.find((a) => a.id === artId);
     if (art) {
-      setPrixVitrageHT(art.prixVenteHT);
-      const newTotalHT = art.prixVenteHT + prixColleHT + prixMainOeuvreHT + extraPrestationsTotalHT;
-      setPrixTotalTTC(Math.round(newTotalHT * 1.2));
+      setPrixVitrageTTC(art.prixVenteHT); // Stock prixVente is now TTC
+      const newTotalTTC = art.prixVenteHT + prixColleTTC + prixMainOeuvreTTC + extraPrestationsTotalTTC;
+      setPrixTotalTTC(Math.round(newTotalTTC));
     }
   };
 
-  const handleAddPresetPrestation = (preset: { designation: string; prixHT: number }) => {
+  const handleAddPresetPrestation = (preset: { designation: string; prixTTC: number }) => {
     setLignesPrestationsExtra((prev) => [
       ...prev,
-      { id: `ext-${Date.now()}-${Math.random()}`, designation: preset.designation, prixHT: preset.prixHT },
+      { id: `ext-${Date.now()}-${Math.random()}`, designation: preset.designation, prixTTC: preset.prixTTC },
     ]);
   };
 
@@ -187,7 +187,7 @@ export const NewDossierModal: React.FC<Props> = ({
     if (!customPrestationNom.trim()) return;
     setLignesPrestationsExtra((prev) => [
       ...prev,
-      { id: `ext-${Date.now()}`, designation: customPrestationNom.trim(), prixHT: Number(customPrestationPrix) || 0 },
+      { id: `ext-${Date.now()}`, designation: customPrestationNom.trim(), prixTTC: Number(customPrestationPrixTTC) || 0 },
     ]);
     setCustomPrestationNom('');
     setShowAddCustomPrestation(false);
@@ -314,37 +314,45 @@ export const NewDossierModal: React.FC<Props> = ({
 
     const isAssurance = typeDossier === 'ASSURANCE';
 
-    // Construire toutes les lignes de facturation avec les tarifs modifiés en direct
-    const extraLines: LigneFacture[] = lignesPrestationsExtra.map((extra) => ({
-      designation: extra.designation,
-      quantite: 1,
-      prixUnitaireHT: Number(extra.prixHT) || 0,
-      tauxTva: 20,
-      totalHT: Number(extra.prixHT) || 0,
-    }));
+    // Construire toutes les lignes de facturation : saisie en TTC -> conversion automatique en HT pour la facture
+    const extraLines: LigneFacture[] = lignesPrestationsExtra.map((extra) => {
+      const lineTTC = Number(extra.prixTTC) || 0;
+      const lineHT = +(lineTTC / 1.20).toFixed(2);
+      return {
+        designation: extra.designation,
+        quantite: 1,
+        prixUnitaireHT: lineHT,
+        tauxTva: 20,
+        totalHT: lineHT,
+      };
+    });
+
+    const vitrageHT = +(Number(prixVitrageTTC) / 1.20).toFixed(2);
+    const colleHT = +(Number(prixColleTTC) / 1.20).toFixed(2);
+    const mainOeuvreHT = +(Number(prixMainOeuvreTTC) / 1.20).toFixed(2);
 
     const finalLignes: LigneFacture[] = [
       {
         designation: finalDesignation,
         codeEurocode: finalEurocode,
         quantite: 1,
-        prixUnitaireHT: Number(prixVitrageHT) || 0,
+        prixUnitaireHT: vitrageHT,
         tauxTva: 20,
-        totalHT: Number(prixVitrageHT) || 0,
+        totalHT: vitrageHT,
       },
       {
         designation: 'Kit colle polyuréthane & primaire d\'adhérence certifié',
         quantite: 1,
-        prixUnitaireHT: Number(prixColleHT) || 0,
+        prixUnitaireHT: colleHT,
         tauxTva: 20,
-        totalHT: Number(prixColleHT) || 0,
+        totalHT: colleHT,
       },
       {
         designation: 'Main d\'œuvre pose et dépose vitrage collé',
         quantite: 1,
-        prixUnitaireHT: Number(prixMainOeuvreHT) || 0,
+        prixUnitaireHT: mainOeuvreHT,
         tauxTva: 20,
-        totalHT: Number(prixMainOeuvreHT) || 0,
+        totalHT: mainOeuvreHT,
       },
       ...extraLines,
     ];
@@ -1097,8 +1105,7 @@ export const NewDossierModal: React.FC<Props> = ({
                           onChange={(e) => {
                             const val = +e.target.value;
                             setPrixTotalTTC(val);
-                            const targetHT = Math.round(val / 1.2);
-                            setPrixVitrageHT(Math.max(0, targetHT - prixColleHT - prixMainOeuvreHT - extraPrestationsTotalHT));
+                            setPrixVitrageTTC(Math.max(0, val - prixColleTTC - prixMainOeuvreTTC - extraPrestationsTotalTTC));
                           }}
                           className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono font-bold text-brand-800 focus:ring-2 focus:ring-brand-500 focus:outline-none"
                         />
@@ -1216,16 +1223,18 @@ export const NewDossierModal: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Tarifs Prestations, Main d'Œuvre & Fournitures Modifiables en Direct */}
+              {/* Tarifs Prestations, Main d'Œuvre & Fournitures Saisis en TTC */}
               <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2">
                     <Calculator className="w-4 h-4 text-brand-600" />
                     <h4 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
-                      Tarification des Prestations & Main d'Œuvre (DH HT)
+                      Tarification des Prestations & Main d'Œuvre (DH TTC)
                     </h4>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-medium">TVA 20% calculée automatiquement</span>
+                  <span className="text-[11px] text-brand-700 bg-brand-50 px-2.5 py-0.5 rounded font-bold">
+                    ✓ Saisie en TTC • Le HT sera calculé sur la facture
+                  </span>
                 </div>
 
                 {/* Prestations Table / Inputs */}
@@ -1241,13 +1250,13 @@ export const NewDossierModal: React.FC<Props> = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-semibold text-slate-600">Prix HT :</label>
+                      <label className="text-[11px] font-semibold text-slate-600">Prix TTC :</label>
                       <div className="relative w-28">
                         <input
                           type="number"
                           min="0"
-                          value={prixVitrageHT}
-                          onChange={(e) => setPrixVitrageHT(+e.target.value)}
+                          value={prixVitrageTTC}
+                          onChange={(e) => setPrixVitrageTTC(+e.target.value)}
                           className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-right font-mono font-bold text-slate-900 focus:ring-2 focus:ring-brand-500"
                         />
                         <span className="absolute right-1.5 top-1 text-[10px] text-slate-400 pointer-events-none">DH</span>
@@ -1262,13 +1271,13 @@ export const NewDossierModal: React.FC<Props> = ({
                       <span className="text-[11px] text-slate-500">Démontage accessoires, préparation baie, application primaire & pose</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-semibold text-slate-600">Prix HT :</label>
+                      <label className="text-[11px] font-semibold text-slate-600">Prix TTC :</label>
                       <div className="relative w-28">
                         <input
                           type="number"
                           min="0"
-                          value={prixMainOeuvreHT}
-                          onChange={(e) => setPrixMainOeuvreHT(+e.target.value)}
+                          value={prixMainOeuvreTTC}
+                          onChange={(e) => setPrixMainOeuvreTTC(+e.target.value)}
                           className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-right font-mono font-bold text-slate-900 focus:ring-2 focus:ring-brand-500"
                         />
                         <span className="absolute right-1.5 top-1 text-[10px] text-slate-400 pointer-events-none">DH</span>
@@ -1283,13 +1292,13 @@ export const NewDossierModal: React.FC<Props> = ({
                       <span className="text-[11px] text-slate-500">Mastic polyuréthane certifié constructeur (300ml) + tampon activateur</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-semibold text-slate-600">Prix HT :</label>
+                      <label className="text-[11px] font-semibold text-slate-600">Prix TTC :</label>
                       <div className="relative w-28">
                         <input
                           type="number"
                           min="0"
-                          value={prixColleHT}
-                          onChange={(e) => setPrixColleHT(+e.target.value)}
+                          value={prixColleTTC}
+                          onChange={(e) => setPrixColleTTC(+e.target.value)}
                           className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-right font-mono font-bold text-slate-900 focus:ring-2 focus:ring-brand-500"
                         />
                         <span className="absolute right-1.5 top-1 text-[10px] text-slate-400 pointer-events-none">DH</span>
@@ -1305,16 +1314,16 @@ export const NewDossierModal: React.FC<Props> = ({
                         <span className="font-semibold text-slate-800">{extra.designation}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-[11px] font-semibold text-slate-600">Prix HT :</label>
+                        <label className="text-[11px] font-semibold text-slate-600">Prix TTC :</label>
                         <div className="relative w-28">
                           <input
                             type="number"
                             min="0"
-                            value={extra.prixHT}
+                            value={extra.prixTTC}
                             onChange={(e) => {
                               const val = +e.target.value;
                               setLignesPrestationsExtra((prev) =>
-                                prev.map((item) => (item.id === extra.id ? { ...item, prixHT: val } : item))
+                                prev.map((item) => (item.id === extra.id ? { ...item, prixTTC: val } : item))
                               );
                             }}
                             className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-right font-mono font-bold text-slate-900 focus:ring-2 focus:ring-brand-500"
@@ -1347,7 +1356,7 @@ export const NewDossierModal: React.FC<Props> = ({
                         onClick={() => handleAddPresetPrestation(p)}
                         className="text-[11px] py-1 px-2.5 bg-slate-100 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 border border-slate-200 rounded-lg text-slate-700 transition-colors flex items-center gap-1 font-medium"
                       >
-                        <Plus className="w-3 h-3" /> {p.designation} (+{p.prixHT} DH)
+                        <Plus className="w-3 h-3" /> {p.designation} (+{p.prixTTC} DH TTC)
                       </button>
                     ))}
                     <button
@@ -1370,10 +1379,10 @@ export const NewDossierModal: React.FC<Props> = ({
                       />
                       <input
                         type="number"
-                        placeholder="Prix HT"
-                        value={customPrestationPrix}
-                        onChange={(e) => setCustomPrestationPrix(+e.target.value)}
-                        className="w-24 px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-right"
+                        placeholder="Prix TTC (DH)"
+                        value={customPrestationPrixTTC}
+                        onChange={(e) => setCustomPrestationPrixTTC(+e.target.value)}
+                        className="w-28 px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-mono font-bold text-right"
                       />
                       <button
                         type="button"

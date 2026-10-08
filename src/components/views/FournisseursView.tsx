@@ -98,19 +98,19 @@ export const FournisseursView: React.FC<Props> = ({
   const [orderRefPaiement, setOrderRefPaiement] = useState('');
   const [orderEcheancePaiement, setOrderEcheancePaiement] = useState('');
 
-  // Items lines in order creation
+  // Items lines in order creation (Saisie des articles en TTC)
   const [orderLines, setOrderLines] = useState<
-    { id: string; designation: string; reference: string; quantite: number; prixHT: number }[]
+    { id: string; designation: string; reference: string; quantite: number; prixTTC: number }[]
   >([
-    { id: '1', designation: 'Pare-Brise Dacia Logan II / Sandero II', reference: '7288AGS', quantite: 5, prixHT: 650 },
-    { id: '2', designation: 'Cartouche Mastic Polyuréthane SikaTack Drive', reference: 'COLLE-SIKA', quantite: 20, prixHT: 85 }
+    { id: '1', designation: 'Pare-Brise Dacia Logan II / Sandero II', reference: '7288AGS', quantite: 5, prixTTC: 780 },
+    { id: '2', designation: 'Cartouche Mastic Polyuréthane SikaTack Drive', reference: 'COLLE-SIKA', quantite: 20, prixTTC: 100 }
   ]);
 
-  // Quick item addition
+  // Quick item addition (Saisie en TTC)
   const [newItemDesignation, setNewItemDesignation] = useState('');
   const [newItemRef, setNewItemRef] = useState('');
   const [newItemQte, setNewItemQte] = useState(1);
-  const [newItemPrixHT, setNewItemPrixHT] = useState(500);
+  const [newItemPrixTTC, setNewItemPrixTTC] = useState(600);
 
   // Modal Update Payment / Reception Status
   const [orderToUpdate, setOrderToUpdate] = useState<BonCommandeFournisseur | null>(null);
@@ -185,32 +185,32 @@ export const FournisseursView: React.FC<Props> = ({
         designation: newItemDesignation,
         reference: newItemRef,
         quantite: newItemQte,
-        prixHT: newItemPrixHT
+        prixTTC: newItemPrixTTC
       }
     ]);
     setNewItemDesignation('');
     setNewItemRef('');
     setNewItemQte(1);
-    setNewItemPrixHT(500);
+    setNewItemPrixTTC(600);
   };
 
   const handleRemoveLine = (idx: number) => {
     setOrderLines(orderLines.filter((_, i) => i !== idx));
   };
 
-  // Select item from existing stock
+  // Select item from existing stock (Stock prixAchatHT is now treated as TTC)
   const handleSelectFromStock = (artId: string) => {
     const art = stockArticles.find((a) => a.id === artId);
     if (!art) return;
     setNewItemDesignation(art.designation);
     setNewItemRef(art.codeEurocode || art.reference);
-    setNewItemPrixHT(art.prixAchatHT);
+    setNewItemPrixTTC(art.prixAchatHT);
   };
 
-  // Computations for new order
-  const orderTotalHT = orderLines.reduce((acc, l) => acc + (l.prixHT * l.quantite), 0);
-  const orderTotalTVA = Math.round(orderTotalHT * 0.20 * 100) / 100;
-  const orderTotalTTC = Math.round((orderTotalHT + orderTotalTVA) * 100) / 100;
+  // Computations for new order (Total TTC -> Calcul automatique du HT et TVA 20%)
+  const orderTotalTTC = orderLines.reduce((acc, l) => acc + (l.prixTTC * l.quantite), 0);
+  const orderTotalHT = +(orderTotalTTC / 1.20).toFixed(2);
+  const orderTotalTVA = +(orderTotalTTC - orderTotalHT).toFixed(2);
 
   const handleCreateOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,15 +227,20 @@ export const FournisseursView: React.FC<Props> = ({
       dateCommande: orderDate,
       dateLivraisonPrevue: orderDateLivraison || undefined,
       agenceVille: orderAgence,
-      lignes: orderLines.map((l, index) => ({
-        id: `lbc-${index}-${Date.now()}`,
-        designation: l.designation,
-        reference: l.reference,
-        codeEurocode: l.reference,
-        quantite: l.quantite,
-        prixUnitaireAchatHT: l.prixHT,
-        totalHT: l.prixHT * l.quantite,
-      })),
+      lignes: orderLines.map((l, index) => {
+        const lineTotalTTC = l.prixTTC * l.quantite;
+        const lineTotalHT = +(lineTotalTTC / 1.20).toFixed(2);
+        const puHT = +(l.prixTTC / 1.20).toFixed(2);
+        return {
+          id: `lbc-${index}-${Date.now()}`,
+          designation: l.designation,
+          reference: l.reference,
+          codeEurocode: l.reference,
+          quantite: l.quantite,
+          prixUnitaireAchatHT: puHT,
+          totalHT: lineTotalHT,
+        };
+      }),
       totalHT: orderTotalHT,
       tauxTva: 20,
       totalTVA: orderTotalTVA,
@@ -909,13 +914,13 @@ export const FournisseursView: React.FC<Props> = ({
                   </div>
 
                   <div className="col-span-2">
-                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">P.U Achat HT</label>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">P.U Achat TTC</label>
                     <input
                       type="number"
                       min={0}
-                      value={newItemPrixHT}
-                      onChange={(e) => setNewItemPrixHT(Number(e.target.value))}
-                      className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white text-right font-mono"
+                      value={newItemPrixTTC}
+                      onChange={(e) => setNewItemPrixTTC(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white text-right font-mono font-bold"
                     />
                   </div>
 
@@ -939,8 +944,8 @@ export const FournisseursView: React.FC<Props> = ({
                         <th className="py-2 px-3">Désignation</th>
                         <th className="py-2 px-3">Réf / Eurocode</th>
                         <th className="py-2 px-3 text-center">Qté</th>
-                        <th className="py-2 px-3 text-right">P.U Achat HT</th>
-                        <th className="py-2 px-3 text-right">Total HT</th>
+                        <th className="py-2 px-3 text-right">P.U Achat TTC</th>
+                        <th className="py-2 px-3 text-right">Total TTC</th>
                         <th className="py-2 px-3 text-center w-10"></th>
                       </tr>
                     </thead>
@@ -957,9 +962,9 @@ export const FournisseursView: React.FC<Props> = ({
                             <td className="py-2 px-3 font-semibold text-slate-800">{line.designation}</td>
                             <td className="py-2 px-3 font-mono text-slate-500 text-[11px]">{line.reference || '-'}</td>
                             <td className="py-2 px-3 text-center font-bold text-slate-900">{line.quantite}</td>
-                            <td className="py-2 px-3 text-right font-mono text-slate-600">{formatDH(line.prixHT)}</td>
+                            <td className="py-2 px-3 text-right font-mono text-slate-600">{formatDH(line.prixTTC)}</td>
                             <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
-                              {formatDH(line.prixHT * line.quantite)}
+                              {formatDH(line.prixTTC * line.quantite)}
                             </td>
                             <td className="py-2 px-3 text-center">
                               <button
