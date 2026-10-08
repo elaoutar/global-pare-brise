@@ -73,6 +73,7 @@ export const NewDossierModal: React.FC<Props> = ({
   const [clientTel, setClientTel] = useState('');
   const [clientCin, setClientCin] = useState('');
   const [clientVille, setClientVille] = useState('Marrakech');
+  const [isCustomVille, setIsCustomVille] = useState(false);
 
   const [vehiculeImm, setVehiculeImm] = useState('');
   const [vehiculeMarque, setVehiculeMarque] = useState('Dacia');
@@ -611,13 +612,49 @@ export const NewDossierModal: React.FC<Props> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Ville</label>
-                  <input
-                    type="text"
-                    value={clientVille}
-                    onChange={(e) => setClientVille(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">Ville / Agence *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !isCustomVille;
+                        setIsCustomVille(next);
+                        if (!next) setClientVille('Marrakech');
+                        else setClientVille('');
+                      }}
+                      className="text-[10px] text-brand-600 hover:text-brand-800 font-semibold"
+                    >
+                      {isCustomVille ? '← Choisir agence' : '✏️ Autre ville'}
+                    </button>
+                  </div>
+
+                  {isCustomVille ? (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Saisir la ville..."
+                      value={clientVille}
+                      onChange={(e) => setClientVille(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                    />
+                  ) : (
+                    <select
+                      value={clientVille}
+                      onChange={(e) => {
+                        if (e.target.value === '__AUTRE__') {
+                          setIsCustomVille(true);
+                          setClientVille('');
+                        } else {
+                          setClientVille(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-medium focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                    >
+                      <option value="Marrakech">📍 Marrakech (Agence)</option>
+                      <option value="El Jadida">📍 El Jadida (Agence)</option>
+                      <option value="__AUTRE__">✏️ Autre ville (saisie libre)...</option>
+                    </select>
+                  )}
                 </div>
               </div>
 

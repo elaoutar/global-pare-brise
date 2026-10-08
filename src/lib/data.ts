@@ -270,7 +270,7 @@ export const INITIAL_DOSSIERS: DossierSinistre[] = [
       telephone: '06 61 12 34 56',
       email: 'y.elamrani@gmail.com',
       cin: 'BK654321',
-      ville: 'Casablanca',
+      ville: 'Marrakech',
     },
     vehicule: {
       id: 'veh-1',
@@ -334,7 +334,7 @@ export const INITIAL_DOSSIERS: DossierSinistre[] = [
       telephone: '06 63 98 76 54',
       email: 'fz.benkirane@hotmail.com',
       cin: 'A498210',
-      ville: 'Rabat',
+      ville: 'El Jadida',
     },
     vehicule: {
       id: 'veh-2',
@@ -378,7 +378,7 @@ export const INITIAL_DOSSIERS: DossierSinistre[] = [
       nom: 'Société MaroTrans Express',
       telephone: '05 22 70 80 90',
       cin: 'ICE: 001928374000012',
-      ville: 'Casablanca',
+      ville: 'Marrakech',
     },
     vehicule: {
       id: 'veh-3',
@@ -420,7 +420,7 @@ export const INITIAL_DOSSIERS: DossierSinistre[] = [
       telephone: '06 70 45 12 89',
       email: 'm.chraibi@menara.ma',
       cin: 'C789456',
-      ville: 'Casablanca',
+      ville: 'El Jadida',
     },
     vehicule: {
       id: 'veh-4',
