@@ -129,12 +129,13 @@ export const AssurancesView: React.FC<Props> = ({
   // Group stats per insurance
   const statsAssurances = filteredAssurances.map((ass) => {
     const dossiersAss = dossiers.filter((d) => d.typeDossier === 'ASSURANCE' && d.assurance?.id === ass.id);
-    const dossiersDeposes = dossiersAss.filter((d) => d.statut === 'DEPOSE_ASSURANCE');
+    const dossiersDeposes = dossiersAss.filter((d) => d.statut === 'ENVOYE_AZUR_GLASS' || d.statut === 'DEPOSE_ASSURANCE');
     const dossiersRegles = dossiersAss.filter((d) => d.statut === 'VALIDE_REGLE');
 
-    const totalFacture = dossiersAss.reduce((acc, d) => acc + d.montantPriseEnChargeAssurance, 0);
-    const totalRegle = dossiersRegles.reduce((acc, d) => acc + d.montantPriseEnChargeAssurance, 0);
-    const resteEnAttente = Math.max(0, totalFacture - totalRegle);
+    const totalFacture = dossiersAss.reduce((acc, d) => acc + d.montantTotalTTC, 0);
+    const totalReversementAttendu = dossiersAss.reduce((acc, d) => acc + (d.montantReversementAzurGlass || d.montantPriseEnChargeAssurance || d.montantTotalTTC), 0);
+    const totalRegle = dossiersRegles.reduce((acc, d) => acc + (d.montantReversementAzurGlass || d.montantPriseEnChargeAssurance || d.montantTotalTTC), 0);
+    const resteEnAttente = Math.max(0, totalReversementAttendu - totalRegle);
 
     return {
       assurance: ass,
@@ -142,6 +143,7 @@ export const AssurancesView: React.FC<Props> = ({
       dossiersDeposes: dossiersDeposes.length,
       dossiersRegles: dossiersRegles.length,
       totalFacture,
+      totalReversementAttendu,
       totalRegle,
       resteEnAttente,
       dossiersList: dossiersAss,
@@ -150,15 +152,39 @@ export const AssurancesView: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
+      {/* Top Banner Partenaire Exclusif AZUR GLASS */}
+      <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-sm border border-indigo-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 text-[10px] font-black uppercase tracking-wider">
+              Intermédiaire Déclarant Exclusif
+            </span>
+            <span className="text-xs text-indigo-300 font-mono">Partenaire Agréé</span>
+          </div>
+          <h2 className="text-lg font-black text-white mt-1.5 flex items-center gap-2">
+            AZUR GLASS SARL • Déclarations & Prises en Charge Assurances
+          </h2>
+          <p className="text-xs text-indigo-200 mt-0.5 max-w-2xl">
+            Global Pare-Brise transmet l'intégralité de ses dossiers d'assurances à AZUR GLASS qui gère les déclarations, accords compagnies et reversements directs.
+          </p>
+        </div>
+        <div className="bg-indigo-950/60 p-3 rounded-xl border border-indigo-700/60 text-right min-w-[200px]">
+          <span className="text-[10px] text-indigo-300 uppercase font-bold block">Reversement Total Attendu</span>
+          <span className="text-xl font-black font-mono text-emerald-400">
+            {formatDH(statsAssurances.reduce((acc, s) => acc + s.totalReversementAttendu, 0))}
+          </span>
+        </div>
+      </div>
+
       {/* Top action bar */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
             <Shield className="w-5 h-5 text-brand-600" />
-            Compagnies d'Assurance & Conventions Tiers-Payant
+            Compagnies & Agences d'Assurance
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Gérez les conventions d'assurances partenaires, les délais de règlement et éditez les bordereaux de transmission
+            Suivi des dossiers par compagnie, agences locales et reversements transitant par AZUR GLASS
           </p>
         </div>
 

@@ -27,6 +27,20 @@ export const GARAGE_INFO = {
   rib: '011 780 0000 123456789012 34 (Attijariwafa Bank)',
 };
 
+// Intermédiaire Partenaire Exclusif pour les Déclarations d'Assurance
+export const AZUR_GLASS_INFO = {
+  nom: 'AZUR GLASS',
+  formeJuridique: 'SARL',
+  designationComplete: 'AZUR GLASS (Centre Conventionné Assurances)',
+  adresse: 'Angle Bd Yacoub El Mansour & Rue Al Fourat, Marrakech - Maroc',
+  telephone: '0524443322 / 0661123456',
+  email: 'contact@azurglass.ma',
+  ice: '002987123000089',
+  ifiscal: '48901234',
+  rc: '42190 Marrakech',
+  patente: '55120984',
+};
+
 export const INITIAL_ASSURANCES: Assurance[] = [
   {
     id: 'ass-1',

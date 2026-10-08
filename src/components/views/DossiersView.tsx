@@ -308,8 +308,10 @@ export const DossiersView: React.FC<Props> = ({
                     <option value="NOUVEAU">Nouveau dossier</option>
                     <option value="EN_COURS_POSE">En cours de pose</option>
                     <option value="POSE_TERMINEE">Pose terminée</option>
-                    <option value="DEPOSE_ASSURANCE">Déposé chez l'Assurance</option>
-                    <option value="VALIDE_REGLE">Validé & Règlement reçu</option>
+                    <option value="ENVOYE_AZUR_GLASS">Envoyé à AZUR GLASS</option>
+                    <option value="ACCORD_RECUE_AZUR_GLASS">Accord reçu (AZUR GLASS)</option>
+                    <option value="EN_ATTENTE_REGLEMENT_AZUR">En attente reversement AZUR GLASS</option>
+                    <option value="VALIDE_REGLE">Soldé & Réglé par AZUR GLASS</option>
                     <option value="REJETE">Rejeté / Litige</option>
                   </select>
                 </div>
@@ -361,14 +363,18 @@ export const DossiersView: React.FC<Props> = ({
                   </div>
                 )}
 
-                {/* 2. Facture Officielle */}
+                {/* 2. Facture Officielle (Adressée à AZUR GLASS si dossier assurance) */}
                 <button
                   onClick={() => onOpenFacture(selectedDossier)}
                   className="w-full flex items-center justify-between p-3 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-900 rounded-xl border border-emerald-200 text-xs font-semibold transition-colors"
                 >
                   <div className="flex items-center gap-2.5">
                     <FileText className="w-4 h-4 text-emerald-600" />
-                    <span>Facture Officielle Maroc (TVA 20% / ICE)</span>
+                    <span>
+                      {selectedDossier.typeDossier === 'ASSURANCE' 
+                        ? 'Facture Officielle AZUR GLASS (TVA 20% / ICE)' 
+                        : 'Facture Client Officielle (TVA 20% / ICE)'}
+                    </span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-emerald-400" />
                 </button>
@@ -412,21 +418,55 @@ export const DossiersView: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Client & Insurance Specs */}
+              {/* Client & Insurance Specs (Détails AZUR GLASS, Agence & TVA Pro) */}
               {selectedDossier.typeDossier === 'ASSURANCE' ? (
-                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Assurance</p>
-                    <p className="font-semibold text-slate-800">{selectedDossier.assurance?.nom}</p>
-                    <p className="text-slate-500 font-mono mt-0.5">Police: {selectedDossier.numeroPolice || '-'}</p>
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5 text-xs">
+                  {/* Intermédiaire AZUR GLASS banner */}
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200 text-[11px]">
+                    <span className="font-bold text-indigo-950 flex items-center gap-1">
+                      🏛️ Intermédiaire : <strong>AZUR GLASS</strong>
+                    </span>
+                    <span className="text-slate-500 font-mono">
+                      Réf: {selectedDossier.referenceDossierAzurGlass || `AZUR-${selectedDossier.numeroDossier.slice(-4)}`}
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Franchise</p>
-                    {selectedDossier.franchiseOfferte ? (
-                      <span className="text-emerald-700 font-bold">Offerte par le garage</span>
-                    ) : (
-                      <span className="text-slate-800 font-semibold">{formatDH(selectedDossier.montantFranchise)}</span>
-                    )}
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Compagnie & Agence</p>
+                      <p className="font-semibold text-slate-800">{selectedDossier.assurance?.nom}</p>
+                      <p className="text-indigo-700 font-medium">{selectedDossier.agenceAssurance || 'Agence locale'}</p>
+                      <p className="text-slate-500 font-mono mt-0.5">Police: {selectedDossier.numeroPolice || '-'}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">Franchise & Régime</p>
+                      {selectedDossier.franchiseOfferte ? (
+                        <span className="text-emerald-700 font-bold block">Franchise Offerte</span>
+                      ) : (
+                        <span className="text-slate-800 font-semibold block">{formatDH(selectedDossier.montantFranchise)}</span>
+                      )}
+                      <span className="inline-block mt-0.5 px-1.5 py-0.2 bg-slate-200 rounded text-[10px] font-semibold text-slate-700">
+                        {selectedDossier.typeClientAssurance === 'PROFESSIONNEL' ? 'Client Professionnel' : (selectedDossier.typeClientAssurance === 'AGENCE_LOCATION' ? 'Agence Location' : 'Particulier')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Reversement Net AZUR GLASS Box */}
+                  <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-indigo-900 block">
+                        Reversement Net AZUR GLASS :
+                      </span>
+                      {Number(selectedDossier.tvaExclueParAssurance || 0) > 0 && (
+                        <span className="text-[10px] text-amber-700 block">
+                          (TVA exclue déduite : {formatDH(selectedDossier.tvaExclueParAssurance || 0)})
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-mono font-black text-sm text-indigo-900">
+                      {formatDH(selectedDossier.montantReversementAzurGlass || selectedDossier.montantPriseEnChargeAssurance || selectedDossier.montantTotalTTC)}
+                    </span>
                   </div>
                 </div>
               ) : (
@@ -584,14 +624,23 @@ export const DossiersView: React.FC<Props> = ({
                 <label className="block font-semibold text-slate-700 mb-1">Type de Document *</label>
                 <select
                   value={newDocType}
-                  onChange={(e) => setNewDocType(e.target.value as any)}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setNewDocType(val);
+                    if (val === 'QUITTANCE_SIGNEE') {
+                      setNewDocNom(`Quittance_Signee_${selectedDossier.numeroDossier}.pdf`);
+                    } else if (val === 'DEVIS_SIGNE') {
+                      setNewDocNom(`Ordre_Reparation_Signe_${selectedDossier.numeroDossier}.pdf`);
+                    }
+                  }}
                   className="w-full px-3 py-2 border rounded-lg font-medium"
                 >
-                  <option value="PRISE_EN_CHARGE_ASSURANCE">Accord de Prise en Charge Assurance</option>
+                  <option value="QUITTANCE_SIGNEE">✍️ Quittance Subrogative Signée par le Client</option>
+                  <option value="DEVIS_SIGNE">✍️ Devis / Ordre de Réparation Signé</option>
+                  <option value="PRISE_EN_CHARGE_ASSURANCE">Accord de Prise en Charge Assurance / Azur Glass</option>
                   <option value="RAPPORT_EXPERTISE">Rapport d'Expertise Automobile</option>
-                  <option value="CARTE_GRISE">Copie Carte Grise / Permis</option>
-                  <option value="DEVIS_SIGNE">Devis / Ordre de Réparation Signé</option>
-                  <option value="AUTRE">Autre Document</option>
+                  <option value="CARTE_GRISE">Copie Carte Grise / CIN / Permis</option>
+                  <option value="AUTRE">Autre Document Sinistre</option>
                 </select>
               </div>
 
@@ -600,19 +649,32 @@ export const DossiersView: React.FC<Props> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Ex: PriseEnCharge_Sanlam_Sinistre77218.pdf"
+                  placeholder="Ex: Quittance_Signee_DOS-2026-0042.pdf"
                   value={newDocNom}
                   onChange={(e) => setNewDocNom(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg font-mono"
                 />
               </div>
 
-              {/* Upload Dropzone simulation */}
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center bg-slate-50">
-                <Upload className="w-6 h-6 text-brand-600 mx-auto mb-1" />
-                <p className="font-semibold text-slate-800">Glisser-déposer le document PDF ou Photo</p>
+              {/* Upload Dropzone with real file input */}
+              <label className="border-2 border-dashed border-indigo-300 hover:border-indigo-500 rounded-xl p-4 text-center bg-indigo-50/40 hover:bg-indigo-50 transition-colors cursor-pointer block">
+                <Upload className="w-6 h-6 text-indigo-600 mx-auto mb-1" />
+                <p className="font-semibold text-slate-800">
+                  {newDocNom ? `Fichier prêt : ${newDocNom}` : 'Cliquez pour choisir ou glisser la photo/scan signé'}
+                </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, JPG, PNG (Max 15 Mo)</p>
-              </div>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setNewDocNom(file.name);
+                    }
+                  }}
+                />
+              </label>
 
               <div className="flex justify-end gap-2 pt-2 border-t">
                 <button

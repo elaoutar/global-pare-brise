@@ -16,8 +16,8 @@ interface Props {
 
 export const FactureModal: React.FC<Props> = ({ facture, dossier, onClose }) => {
   const printRef = useRef<HTMLDivElement>(null);
-  const destinataireNom = facture.destinataire === 'ASSURANCE' 
-    ? (dossier.assurance?.nom || 'Assurance') 
+  const destinataireNom = (facture.destinataire === 'AZUR_GLASS' || facture.destinataire === 'ASSURANCE')
+    ? 'AZUR GLASS (Intermédiaire Assurances)' 
     : dossier.client.nom;
 
   const shareMsg = `Bonjour ${dossier.client.nom}, voici votre Facture N° ${facture.numeroFacture} d'un montant de ${formatDH(facture.totalTTC)} pour l'intervention sur votre véhicule ${dossier.vehicule.immatriculation} chez GLOBAL PARE-BRISE Marrakech.`;
@@ -34,7 +34,7 @@ export const FactureModal: React.FC<Props> = ({ facture, dossier, onClose }) => 
           subtitle={`Destinataire : ${destinataireNom} • Véhicule : ${dossier.vehicule.immatriculation}`}
           clientPhone={dossier.client.telephone}
           shareMessage={shareMsg}
-          badgeText="Facture"
+          badgeText={facture.destinataire === 'AZUR_GLASS' || facture.destinataire === 'ASSURANCE' ? 'Facture AZUR GLASS' : 'Facture Client'}
           badgeColor="bg-emerald-600"
           onClose={onClose}
         />
@@ -72,17 +72,22 @@ export const FactureModal: React.FC<Props> = ({ facture, dossier, onClose }) => 
           <div className="grid grid-cols-2 gap-6 my-6">
             <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Facturé à :</p>
-              {facture.destinataire === 'ASSURANCE' && dossier.assurance ? (
+              {(facture.destinataire === 'AZUR_GLASS' || facture.destinataire === 'ASSURANCE') ? (
                 <>
-                  <p className="text-base font-bold text-slate-900">{dossier.assurance.nom}</p>
-                  <p className="text-xs text-slate-600">{dossier.assurance.adresse}</p>
-                  <p className="text-xs text-slate-600">Tél : {dossier.assurance.telephone}</p>
-                  <p className="text-xs text-slate-700 mt-2 font-mono">
-                    <strong>N° Sinistre :</strong> {dossier.numeroSinistre || '-'}
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.2 rounded">Partenaire Déclarant</span>
+                  </div>
+                  <p className="text-base font-black text-slate-900">AZUR GLASS SARL</p>
+                  <p className="text-xs text-slate-600">Centre Conventionné Assurances</p>
+                  <p className="text-xs text-slate-600">Angle Bd Yacoub El Mansour & Rue Al Fourat, Marrakech</p>
+                  <p className="text-xs text-slate-700 font-mono mt-1">
+                    <strong>ICE :</strong> 002987123000089 | <strong>IF :</strong> 48901234
                   </p>
-                  <p className="text-xs text-slate-700 font-mono">
-                    <strong>N° Police :</strong> {dossier.numeroPolice || '-'}
-                  </p>
+                  <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-700 space-y-0.5">
+                    <p><strong>Cie Assurance :</strong> {dossier.assurance?.nom || 'Assurance'} {dossier.agenceAssurance ? `(${dossier.agenceAssurance})` : ''}</p>
+                    <p className="font-mono"><strong>N° Sinistre :</strong> {dossier.numeroSinistre || '-'}</p>
+                    <p className="font-mono"><strong>N° Police :</strong> {dossier.numeroPolice || '-'}</p>
+                  </div>
                 </>
               ) : (
                 <>

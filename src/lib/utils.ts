@@ -46,6 +46,21 @@ export function getStatutDossierBadge(statut: StatutDossier) {
         label: 'Pose terminée',
         bg: 'bg-purple-100 text-purple-800 border-purple-200',
       };
+    case 'ENVOYE_AZUR_GLASS':
+      return {
+        label: 'Envoyé à AZUR GLASS',
+        bg: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      };
+    case 'ACCORD_RECUE_AZUR_GLASS':
+      return {
+        label: 'Accord reçu (AZUR GLASS)',
+        bg: 'bg-teal-100 text-teal-800 border-teal-200',
+      };
+    case 'EN_ATTENTE_REGLEMENT_AZUR':
+      return {
+        label: 'En attente reversement AZUR GLASS',
+        bg: 'bg-amber-100 text-amber-900 border-amber-300',
+      };
     case 'DEPOSE_ASSURANCE':
       return {
         label: 'Déposé Assurance',
@@ -53,7 +68,7 @@ export function getStatutDossierBadge(statut: StatutDossier) {
       };
     case 'VALIDE_REGLE':
       return {
-        label: 'Validé & Réglé',
+        label: 'Soldé / Réglé par AZUR GLASS',
         bg: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       };
     case 'REJETE':

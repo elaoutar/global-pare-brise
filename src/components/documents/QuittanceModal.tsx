@@ -57,11 +57,19 @@ export const QuittanceModal: React.FC<Props> = ({ dossier, onClose }) => {
               </p>
             </div>
             <div className="text-right">
-              <div className="inline-block bg-slate-100 border border-slate-300 rounded-lg p-3 text-left min-w-[220px]">
-                <p className="text-xs font-semibold text-slate-500 uppercase">Compagnie d'Assurance</p>
+              <div className="inline-block bg-slate-100 border border-slate-300 rounded-lg p-3 text-left min-w-[240px]">
+                <p className="text-xs font-semibold text-slate-500 uppercase">Compagnie & Agence</p>
                 <p className="text-base font-bold text-slate-900">{dossier.assurance?.nom || 'Assurance'}</p>
+                {dossier.agenceAssurance && (
+                  <p className="text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 mt-0.5">
+                    Agence : {dossier.agenceAssurance}
+                  </p>
+                )}
                 <p className="text-xs text-slate-600 mt-1">Police N°: <span className="font-mono font-semibold">{dossier.numeroPolice || '-'}</span></p>
                 <p className="text-xs text-slate-600">Sinistre N°: <span className="font-mono font-semibold">{dossier.numeroSinistre || '-'}</span></p>
+                <p className="text-[10px] text-slate-500 mt-1 pt-1 border-t border-slate-200 font-semibold">
+                  Partenaire Déclarant : <strong className="text-indigo-900">AZUR GLASS</strong>
+                </p>
               </div>
             </div>
           </div>

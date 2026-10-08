@@ -2,11 +2,16 @@ export type StatutDossier =
   | 'NOUVEAU'
   | 'EN_COURS_POSE'
   | 'POSE_TERMINEE'
-  | 'DEPOSE_ASSURANCE'
+  | 'ENVOYE_AZUR_GLASS'
+  | 'ACCORD_RECUE_AZUR_GLASS'
+  | 'EN_ATTENTE_REGLEMENT_AZUR'
   | 'VALIDE_REGLE'
+  | 'DEPOSE_ASSURANCE'
   | 'REJETE';
 
 export type StatutPaiement = 'EN_ATTENTE' | 'PARTIEL' | 'REGLE' | 'IMPAYE';
+
+export type TypeClientAssurance = 'PARTICULIER' | 'PROFESSIONNEL' | 'AGENCE_LOCATION';
 
 export type TypeArticle = 'PARE_BRISE' | 'LUNETTE_AR' | 'VITRE_LATERALE' | 'COLLE' | 'ACCESSOIRE';
 
@@ -102,7 +107,7 @@ export interface Facture {
   id: string;
   numeroFacture: string; // Ex: FA-2026-0158
   dossierId: string;
-  destinataire: 'ASSURANCE' | 'CLIENT';
+  destinataire: 'ASSURANCE' | 'CLIENT' | 'AZUR_GLASS';
   dateEmission: string;
   dateEcheance: string;
   lignes: LigneFacture[];
@@ -120,26 +125,42 @@ export type TypeDossier = 'ASSURANCE' | 'PARTICULIER_COMPTANT';
 export interface DossierSinistre {
   id: string;
   numeroDossier: string; // Ex: DOS-2026-0091
-  typeDossier: TypeDossier; // ASSURANCE (tiers-payant) ou PARTICULIER_COMPTANT (paiement direct client)
+  typeDossier: TypeDossier; // ASSURANCE (tiers-payant via AZUR GLASS) ou PARTICULIER_COMPTANT (paiement direct client)
   dateCreation: string;
   
   // Client & Véhicule
   client: Client;
   vehicule: Vehicule;
   
-  // Prise en charge Assurance (Optionnel si particulier comptant)
+  // Prise en charge Assurance (via Intermédiaire Exclusif AZUR GLASS)
   assurance?: Assurance;
+  agenceAssurance?: string; // Ex: "SANLAM JAAFAR", "RMA GUELIZ", "WAFA MASSIRA"
   partenaire?: Partenaire;
   numeroSinistre?: string;
   numeroPolice?: string;
   dateSinistre?: string;
   
-  // Aspects financiers
+  // Catégorie client pour la TVA
+  typeClientAssurance?: TypeClientAssurance; // PARTICULIER, PROFESSIONNEL, AGENCE_LOCATION
+  
+  // Réf dossier chez l'intermédiaire AZUR GLASS
+  referenceDossierAzurGlass?: string;
+  dateEnvoiAzurGlass?: string;
+
+  // Aspects financiers & Déduction TVA Pro / Location
   montantTotalTTC: number;
-  montantPriseEnChargeAssurance: number;
   montantFranchise: number;
   franchisePayeeParClient: boolean;
   franchiseOfferte: boolean; // Geste commercial du garage
+
+  // Cas TVA Pro / Location exclue par l'assurance (montant fixe variable en DH)
+  tvaExclueParAssurance?: number; // Montant en DH de la TVA exclue par l'assurance pour les Pro/Location
+  
+  // Montant net reversé par AZUR GLASS à Global Pare-Brise
+  montantReversementAzurGlass?: number; // Total TTC - Franchise (si non offerte) - TVA exclue
+  
+  // Prise en charge initiale globale (avant déductions)
+  montantPriseEnChargeAssurance: number;
   
   // État d'avancement
   statut: StatutDossier;

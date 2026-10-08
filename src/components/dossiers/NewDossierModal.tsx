@@ -118,10 +118,13 @@ export const NewDossierModal: React.FC<Props> = ({
   };
 
   const [assuranceId, setAssuranceId] = useState(assurances[0]?.id || '');
+  const [agenceAssurance, setAgenceAssurance] = useState('SANLAM JAAFAR'); // Ex: Agence locale
+  const [typeClientAssurance, setTypeClientAssurance] = useState<'PARTICULIER' | 'PROFESSIONNEL' | 'AGENCE_LOCATION'>('PARTICULIER');
   const [partenaireId, setPartenaireId] = useState('');
   const [numSinistre, setNumSinistre] = useState('');
   const [numPolice, setNumPolice] = useState('');
   const [dateSinistre, setDateSinistre] = useState(new Date().toISOString().split('T')[0]);
+  const [referenceDossierAzurGlass, setReferenceDossierAzurGlass] = useState('');
 
   // Financials & Prestations TTC (Saisie directe en TTC, le système calcule le HT et la TVA)
   const [selectedArticleId, setSelectedArticleId] = useState('');
@@ -143,6 +146,7 @@ export const NewDossierModal: React.FC<Props> = ({
   const [prixTotalTTC, setPrixTotalTTC] = useState(1800);
   const [montantFranchise, setMontantFranchise] = useState(200);
   const [franchiseOfferte, setFranchiseOfferte] = useState(true);
+  const [tvaExclueParAssurance, setTvaExclueParAssurance] = useState<number>(0); // Montant DH TVA exclu par l'assurance pour Pro/Location
   const [poseurNom, setPoseurNom] = useState('Karim Bennani (Atelier)');
 
   // Retail Payment options at file creation
@@ -361,13 +365,13 @@ export const NewDossierModal: React.FC<Props> = ({
     const computedTotalTVA = +(computedTotalHT * 0.20).toFixed(2);
     const computedTotalTTC = +(computedTotalHT + computedTotalTVA).toFixed(2);
 
-    // Auto-create Facture (Assurance ou Client direct)
+    // Auto-create Facture (Destinataire: AZUR_GLASS si assurance, sinon CLIENT)
     const facId = `fac-${Date.now()}`;
     const factureGeneree: Facture = {
       id: facId,
       numeroFacture: `FA-2026-${seq}`,
       dossierId: dossierId,
-      destinataire: isAssurance ? 'ASSURANCE' : 'CLIENT',
+      destinataire: isAssurance ? 'AZUR_GLASS' : 'CLIENT',
       dateEmission: dateNow,
       dateEcheance: isAssurance 
         ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -406,6 +410,16 @@ export const NewDossierModal: React.FC<Props> = ({
       };
     }
 
+    // Calcul précis du reversement AZUR GLASS (Total TTC - Franchise payée par client - TVA exclue pour Pro/Location)
+    const effectiveFranchiseDeduite = franchiseOfferte ? 0 : montantFranchise;
+    const effectiveTvaExclue = (typeClientAssurance === 'PROFESSIONNEL' || typeClientAssurance === 'AGENCE_LOCATION')
+      ? Number(tvaExclueParAssurance) || 0
+      : 0;
+
+    const netReversementAzur = isAssurance
+      ? Math.max(0, +(computedTotalTTC - effectiveFranchiseDeduite - effectiveTvaExclue).toFixed(2))
+      : 0;
+
     const newDossier: DossierSinistre = {
       id: dossierId,
       numeroDossier: numDossier,
@@ -428,16 +442,24 @@ export const NewDossierModal: React.FC<Props> = ({
         chassisVin: vehiculeVin,
       },
       assurance: isAssurance ? selectedAssurance : undefined,
+      agenceAssurance: isAssurance ? agenceAssurance : undefined,
+      typeClientAssurance: isAssurance ? typeClientAssurance : undefined,
       partenaire: selectedPartenaire,
       numeroSinistre: isAssurance ? (numSinistre || `SIN-${selectedAssurance.code}-${seq}`) : undefined,
       numeroPolice: isAssurance ? (numPolice || `POL-${seq}`) : undefined,
       dateSinistre: isAssurance ? dateSinistre : undefined,
+      referenceDossierAzurGlass: isAssurance ? (referenceDossierAzurGlass || `AZUR-${seq}`) : undefined,
+      dateEnvoiAzurGlass: isAssurance ? dateNow : undefined,
       montantTotalTTC: computedTotalTTC,
-      montantPriseEnChargeAssurance: isAssurance ? (franchiseOfferte ? computedTotalTTC : Math.max(0, computedTotalTTC - montantFranchise)) : 0,
+      montantPriseEnChargeAssurance: isAssurance ? computedTotalTTC : 0,
       montantFranchise: isAssurance ? montantFranchise : 0,
       franchisePayeeParClient: isAssurance && !franchiseOfferte && montantFranchise > 0,
       franchiseOfferte: isAssurance ? franchiseOfferte : false,
-      statut: (typeDossier === 'PARTICULIER_COMPTANT' && reglementImmediat) ? 'VALIDE_REGLE' : 'EN_COURS_POSE',
+      tvaExclueParAssurance: effectiveTvaExclue,
+      montantReversementAzurGlass: netReversementAzur,
+      statut: (typeDossier === 'PARTICULIER_COMPTANT' && reglementImmediat) 
+        ? 'VALIDE_REGLE' 
+        : (isAssurance ? 'ENVOYE_AZUR_GLASS' : 'EN_COURS_POSE'),
       photos: {
         avantSinistreUrl: photoAvant,
         carteGriseUrl: photoCarteGrise,
@@ -990,8 +1012,28 @@ export const NewDossierModal: React.FC<Props> = ({
                   </div>
                 </div>
               ) : (
-                /* SECTION DOSSIER ASSURANCE */
+                /* SECTION DOSSIER ASSURANCE (VIA AZUR GLASS) */
                 <div className="space-y-4">
+                  {/* Banner Partenaire Exclusif AZUR GLASS */}
+                  <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                        AG
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-indigo-950 uppercase tracking-wide block">
+                          Intermédiaire Déclarant : AZUR GLASS (Partenaire Agréé)
+                        </span>
+                        <p className="text-[11px] text-indigo-700">
+                          Ce dossier sera transmis à AZUR GLASS pour déclaration officielle et remboursement compagnie.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-indigo-200/70 text-indigo-900 font-bold px-2 py-0.5 rounded">
+                      Facturation AZUR GLASS
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1009,23 +1051,98 @@ export const NewDossierModal: React.FC<Props> = ({
                         ))}
                       </select>
                     </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Apporteur / Partenaire (Optionnel)
+                        Agence d'Assurance / Intermédiaire Local *
                       </label>
-                      <select
-                        value={partenaireId}
-                        onChange={(e) => setPartenaireId(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                      >
-                        <option value="">Aucun (Client direct)</option>
-                        {partenaires.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nom} ({p.tauxCommissionPourcent}%)
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: SANLAM JAAFAR, RMA GUELIZ, WAFA MASSIRA..."
+                        value={agenceAssurance}
+                        onChange={(e) => setAgenceAssurance(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                      />
                     </div>
+                  </div>
+
+                  {/* Catégorie Client Assurance (TVA Particulier vs Pro / Location) */}
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <label className="block text-xs font-bold text-slate-800">
+                      Catégorie du Client Assuré (Régime TVA) :
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTypeClientAssurance('PARTICULIER');
+                          setTvaExclueParAssurance(0);
+                        }}
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          typeClientAssurance === 'PARTICULIER'
+                            ? 'border-brand-600 bg-brand-50 text-brand-900 font-bold shadow-xs ring-1 ring-brand-500'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <span className="block text-xs">👤 Particulier</span>
+                        <span className="text-[10px] text-slate-500">Reversement TTC standard</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTypeClientAssurance('PROFESSIONNEL')}
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          typeClientAssurance === 'PROFESSIONNEL'
+                            ? 'border-indigo-600 bg-indigo-50 text-indigo-950 font-bold shadow-xs ring-1 ring-indigo-500'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <span className="block text-xs">🏢 Professionnel / Société</span>
+                        <span className="text-[10px] text-indigo-700 font-semibold">TVA Exclue par assurance</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTypeClientAssurance('AGENCE_LOCATION')}
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          typeClientAssurance === 'AGENCE_LOCATION'
+                            ? 'border-indigo-600 bg-indigo-50 text-indigo-950 font-bold shadow-xs ring-1 ring-indigo-500'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <span className="block text-xs">🚗 Agence de Location</span>
+                        <span className="text-[10px] text-indigo-700 font-semibold">TVA Exclue par assurance</span>
+                      </button>
+                    </div>
+
+                    {/* Champ TVA Exclue en DH pour Pro & Agences de Location */}
+                    {(typeClientAssurance === 'PROFESSIONNEL' || typeClientAssurance === 'AGENCE_LOCATION') && (
+                      <div className="mt-2.5 p-3 bg-amber-50/80 border border-amber-200 rounded-lg animate-in fade-in duration-150">
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-xs font-bold text-amber-950 flex items-center gap-1">
+                            Montant de TVA Exclue par l'Assurance (DH) :
+                          </label>
+                          <span className="text-[10px] text-amber-800 italic">
+                            Montant fixe variable communiqué par l'assurance
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={0}
+                            value={tvaExclueParAssurance}
+                            onChange={(e) => setTvaExclueParAssurance(Number(e.target.value))}
+                            placeholder="Ex: 300 (Montant TVA exclu)"
+                            className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-sm font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500"
+                          />
+                          <span className="absolute right-3 top-2 text-xs font-bold text-amber-700">DH</span>
+                        </div>
+                        <p className="text-[10px] text-amber-800 mt-1">
+                          ⚠️ Cette TVA sera déduite du reversement d'AZUR GLASS et réglée directement par le client Pro / Location.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">
@@ -1066,7 +1183,7 @@ export const NewDossierModal: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* Franchise Management */}
+                  {/* Franchise & Reversement AZUR GLASS */}
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-700">Gestion de la Franchise</span>
@@ -1097,7 +1214,7 @@ export const NewDossierModal: React.FC<Props> = ({
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-slate-600 mb-1">
-                          Estimation Prise en charge Assurance (TTC)
+                          Montant Prestation Accordée (TTC)
                         </label>
                         <input
                           type="number"
@@ -1109,6 +1226,23 @@ export const NewDossierModal: React.FC<Props> = ({
                           }}
                           className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono font-bold text-brand-800 focus:ring-2 focus:ring-brand-500 focus:outline-none"
                         />
+                      </div>
+                    </div>
+
+                    {/* Récapitulatif du reversement net attendu d'AZUR GLASS */}
+                    <div className="p-3 bg-indigo-900 text-white rounded-lg flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] uppercase text-indigo-300 font-bold block">
+                          Reversement Net Attendu d'AZUR GLASS :
+                        </span>
+                        <span className="text-[11px] text-indigo-200">
+                          {prixTotalTTC} DH TTC {franchiseOfferte ? '' : ` - ${montantFranchise} DH Franchise`} {(typeClientAssurance !== 'PARTICULIER' && tvaExclueParAssurance > 0) ? ` - ${tvaExclueParAssurance} DH TVA Pro` : ''}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-base font-black font-mono text-emerald-400">
+                          {formatDH(Math.max(0, prixTotalTTC - (franchiseOfferte ? 0 : montantFranchise) - ((typeClientAssurance !== 'PARTICULIER') ? Number(tvaExclueParAssurance) : 0)))}
+                        </span>
                       </div>
                     </div>
                   </div>
