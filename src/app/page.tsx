@@ -56,6 +56,7 @@ import { EncaisserPaiementModal } from '@/components/modals/EncaisserPaiementMod
 import { BonCommandeFournisseurModal } from '@/components/documents/BonCommandeFournisseurModal';
 import { DevisClientModal } from '@/components/documents/DevisClientModal';
 import { NewDevisModal } from '@/components/documents/NewDevisModal';
+import { TransmettreAzurGlassModal } from '@/components/dossiers/TransmettreAzurGlassModal';
 import { Menu, X, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
@@ -84,6 +85,7 @@ export default function Home() {
   const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier: DossierSinistre } | null>(null);
   const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier: DossierSinistre; facture?: Facture } | null>(null);
   const [activeCommandeFournisseurModal, setActiveCommandeFournisseurModal] = useState<{ commande: BonCommandeFournisseur; fournisseur: Fournisseur } | null>(null);
+  const [activeTransmettreAzurGlassDossier, setActiveTransmettreAzurGlassDossier] = useState<DossierSinistre | null>(null);
 
   // Devis Modals
   const [showNewDevisModal, setShowNewDevisModal] = useState(false);
@@ -566,6 +568,35 @@ export default function Home() {
     showToast('Statut du dossier mis à jour.');
   };
 
+  const handleOpenTransmettreAzurGlass = (dossier: DossierSinistre) => {
+    setActiveTransmettreAzurGlassDossier(dossier);
+  };
+
+  const handleSendCompleteAzurGlass = (
+    dossierId: string,
+    transmissionData: {
+      destinataire: string;
+      cc?: string;
+      objet: string;
+      message: string;
+      dateEnvoi: string;
+    }
+  ) => {
+    setDossiers((prev) =>
+      prev.map((d) =>
+        d.id === dossierId
+          ? {
+              ...d,
+              statut: 'ENVOYE_AZUR_GLASS',
+              dateEnvoiAzurGlass: transmissionData.dateEnvoi,
+            }
+          : d
+      )
+    );
+    setActiveTransmettreAzurGlassDossier(null);
+    showToast(`Dossier complet transmis avec succès par email à AZUR GLASS (${transmissionData.destinataire}) !`);
+  };
+
   const handleAddDocumentToDossier = (dossierId: string, doc: DocumentAttache) => {
     setDossiers((prev) =>
       prev.map((d) => {
@@ -860,6 +891,7 @@ export default function Home() {
             onOpenBonSortie={handleOpenBonSortieFromDossier}
             onOpenBonLivraison={handleOpenBonLivraisonFromDossier}
             onOpenDevis={handleOpenDevisFromDossier}
+            onOpenTransmettreAzurGlass={handleOpenTransmettreAzurGlass}
             onAddDocumentToDossier={handleAddDocumentToDossier}
             onUpdateStatut={handleUpdateStatutDossier}
             onOpenEncaisserModal={handleOpenEncaisserModalFromDossier}
@@ -1017,6 +1049,17 @@ export default function Home() {
           commande={activeCommandeFournisseurModal.commande}
           fournisseur={activeCommandeFournisseurModal.fournisseur}
           onClose={() => setActiveCommandeFournisseurModal(null)}
+        />
+      )}
+
+      {activeTransmettreAzurGlassDossier && (
+        <TransmettreAzurGlassModal
+          dossier={activeTransmettreAzurGlassDossier}
+          facture={factures.find((f) => f.dossierId === activeTransmettreAzurGlassDossier.id)}
+          bonSortie={bonsSortie.find((b) => b.dossierId === activeTransmettreAzurGlassDossier.id)}
+          bonLivraison={bonsLivraison.find((bl) => bl.dossierId === activeTransmettreAzurGlassDossier.id)}
+          onClose={() => setActiveTransmettreAzurGlassDossier(null)}
+          onSendComplete={handleSendCompleteAzurGlass}
         />
       )}
     </div>

@@ -24,7 +24,9 @@ import {
   FileSpreadsheet,
   Coins,
   MapPin,
-  Building
+  Building,
+  Mail,
+  Send
 } from 'lucide-react';
 import { DocumentAttache } from '@/types';
 import { exportEtatMensuelExcel } from '@/lib/exportUtils';
@@ -39,6 +41,7 @@ interface Props {
   onOpenBonSortie: (dossier: DossierSinistre) => void;
   onOpenBonLivraison: (dossier: DossierSinistre) => void;
   onOpenDevis?: (dossier: DossierSinistre) => void;
+  onOpenTransmettreAzurGlass?: (dossier: DossierSinistre) => void;
   onAddDocumentToDossier: (dossierId: string, doc: DocumentAttache) => void;
   onUpdateStatut: (dossierId: string, newStatut: StatutDossier) => void;
   onOpenEncaisserModal?: (dossier: DossierSinistre) => void;
@@ -52,6 +55,7 @@ export const DossiersView: React.FC<Props> = ({
   onOpenBonSortie,
   onOpenBonLivraison,
   onOpenDevis,
+  onOpenTransmettreAzurGlass,
   onAddDocumentToDossier,
   onUpdateStatut,
   onOpenEncaisserModal,
@@ -59,7 +63,8 @@ export const DossiersView: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatut, setFilterStatut] = useState<string>('ALL');
   const [filterVille, setFilterVille] = useState<string>('ALL');
-  const [selectedDossier, setSelectedDossier] = useState<DossierSinistre | null>(dossiers[0] || null);
+  const [selectedDossierId, setSelectedDossierId] = useState<string | null>(dossiers[0]?.id || null);
+  const selectedDossier = dossiers.find((d) => d.id === (selectedDossierId || dossiers[0]?.id)) || dossiers[0] || null;
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newDocNom, setNewDocNom] = useState('');
   const [newDocType, setNewDocType] = useState<DocumentAttache['typeDocument']>('PRISE_EN_CHARGE_ASSURANCE');
@@ -204,7 +209,7 @@ export const DossiersView: React.FC<Props> = ({
                 return (
                   <div
                     key={dossier.id}
-                    onClick={() => setSelectedDossier(dossier)}
+                    onClick={() => setSelectedDossierId(dossier.id)}
                     className={`p-4 transition-all cursor-pointer flex items-center justify-between gap-4 ${
                       isSelected ? 'bg-brand-50/70 border-l-4 border-brand-600' : 'hover:bg-slate-50/60'
                     }`}
@@ -229,8 +234,14 @@ export const DossiersView: React.FC<Props> = ({
                           Client Particulier (Prestation Comptant • Sans Assurance)
                         </p>
                       ) : (
-                        <p className="text-[11px] text-slate-500">
-                          Assurance : <strong className="text-slate-800">{dossier.assurance?.nom}</strong> • Sinistre : <span className="font-mono">{dossier.numeroSinistre || '-'}</span>
+                        <p className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5">
+                          <span>Assurance : <strong className="text-slate-800">{dossier.assurance?.nom}</strong></span>
+                          <span>• Sinistre : <span className="font-mono">{dossier.numeroSinistre || '-'}</span></span>
+                          {dossier.dateEnvoiAzurGlass && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded font-semibold">
+                              ✉️ Envoyé AZUR
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>
@@ -316,6 +327,49 @@ export const DossiersView: React.FC<Props> = ({
                   </select>
                 </div>
               </div>
+
+              {/* Transmission Dossier Complet AZUR GLASS (1-Clic) */}
+              {selectedDossier.typeDossier === 'ASSURANCE' && onOpenTransmettreAzurGlass && (
+                <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 p-3.5 rounded-xl border border-indigo-700/60 text-white shadow-sm space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-indigo-500/30 rounded-lg text-indigo-300 border border-indigo-400/30">
+                        <Mail className="w-4 h-4 text-brand-300" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-white flex items-center gap-1.5">
+                          Transmission AZUR GLASS
+                          {selectedDossier.statut === 'ENVOYE_AZUR_GLASS' && (
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded-full font-bold">
+                              ✓ Déjà Envoyé
+                            </span>
+                          )}
+                        </span>
+                        <p className="text-[10px] text-slate-300">
+                          Pack complet : Facture, Quittance signée, Bon de sortie, Photos
+                        </p>
+                      </div>
+                    </div>
+
+                    {selectedDossier.dateEnvoiAzurGlass && (
+                      <span className="text-[10px] font-mono text-indigo-200 bg-white/10 px-2 py-0.5 rounded">
+                        Envoyé le {formatDate(selectedDossier.dateEnvoiAzurGlass)}
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenTransmettreAzurGlass(selectedDossier)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-lg text-xs font-black shadow-sm transition-all active:scale-95"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {selectedDossier.statut === 'ENVOYE_AZUR_GLASS'
+                      ? 'Renvoyer / Consulter Transmission Email (AZUR GLASS)'
+                      : '✉️ Envoyer Dossier Complet à AZUR GLASS (1-Clic)'}
+                  </button>
+                </div>
+              )}
 
               {/* Encaissement Rapide */}
               {selectedDossier.statut !== 'VALIDE_REGLE' && onOpenEncaisserModal && (
