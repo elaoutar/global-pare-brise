@@ -15,7 +15,9 @@ import {
   Partenaire,
   Fournisseur,
   ModePaiement,
-  BonCommandeFournisseur
+  BonCommandeFournisseur,
+  DevisClient,
+  StatutDevis
 } from '@/types';
 import { 
   INITIAL_DOSSIERS, 
@@ -28,6 +30,7 @@ import {
   INITIAL_PARTENAIRES, 
   INITIAL_FOURNISSEURS,
   INITIAL_COMMANDES_FOURNISSEURS,
+  INITIAL_DEVIS,
   GARAGE_INFO 
 } from '@/lib/data';
 import { formatDH } from '@/lib/utils';
@@ -42,6 +45,7 @@ import { AssurancesView } from '@/components/views/AssurancesView';
 import { PartenairesView } from '@/components/views/PartenairesView';
 import { FournisseursView } from '@/components/views/FournisseursView';
 import { RapportsExportView } from '@/components/views/RapportsExportView';
+import { DevisView } from '@/components/views/DevisView';
 
 import { NewDossierModal } from '@/components/dossiers/NewDossierModal';
 import { QuittanceModal } from '@/components/documents/QuittanceModal';
@@ -50,6 +54,8 @@ import { BonSortieModal } from '@/components/documents/BonSortieModal';
 import { BonLivraisonModal } from '@/components/documents/BonLivraisonModal';
 import { EncaisserPaiementModal } from '@/components/modals/EncaisserPaiementModal';
 import { BonCommandeFournisseurModal } from '@/components/documents/BonCommandeFournisseurModal';
+import { DevisClientModal } from '@/components/documents/DevisClientModal';
+import { NewDevisModal } from '@/components/documents/NewDevisModal';
 import { Menu, X, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
@@ -68,6 +74,7 @@ export default function Home() {
   const [partenaires, setPartenaires] = useState<Partenaire[]>(INITIAL_PARTENAIRES);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(INITIAL_FOURNISSEURS);
   const [commandesFournisseurs, setCommandesFournisseurs] = useState<BonCommandeFournisseur[]>(INITIAL_COMMANDES_FOURNISSEURS);
+  const [devisList, setDevisList] = useState<DevisClient[]>(INITIAL_DEVIS);
 
   // Modals state
   const [showNewDossierModal, setShowNewDossierModal] = useState(false);
@@ -77,6 +84,11 @@ export default function Home() {
   const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier: DossierSinistre } | null>(null);
   const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier: DossierSinistre; facture?: Facture } | null>(null);
   const [activeCommandeFournisseurModal, setActiveCommandeFournisseurModal] = useState<{ commande: BonCommandeFournisseur; fournisseur: Fournisseur } | null>(null);
+
+  // Devis Modals
+  const [showNewDevisModal, setShowNewDevisModal] = useState(false);
+  const [editingDevis, setEditingDevis] = useState<DevisClient | null>(null);
+  const [activeDevisModal, setActiveDevisModal] = useState<DevisClient | null>(null);
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -330,6 +342,218 @@ export default function Home() {
     setActiveCommandeFournisseurModal({ commande, fournisseur });
   };
 
+  // ----------------------------------------------------
+  // DEVIS CLIENTS HANDLERS
+  // ----------------------------------------------------
+  const handleSaveDevis = (devis: DevisClient) => {
+    const exists = devisList.some((d) => d.id === devis.id);
+    if (exists) {
+      setDevisList((prev) => prev.map((d) => (d.id === devis.id ? devis : d)));
+      showToast(`Devis ${devis.numeroDevis} mis à jour avec succès.`);
+    } else {
+      setDevisList((prev) => [devis, ...prev]);
+      showToast(`Devis ${devis.numeroDevis} créé avec succès (${formatDH(devis.totalTTC)} TTC).`);
+    }
+    setShowNewDevisModal(false);
+    setEditingDevis(null);
+  };
+
+  const handleUpdateStatutDevis = (devisId: string, newStatut: StatutDevis) => {
+    setDevisList((prev) =>
+      prev.map((d) => (d.id === devisId ? { ...d, statut: newStatut } : d))
+    );
+    showToast(`Statut du devis mis à jour : ${newStatut}`);
+  };
+
+  const handleDeleteDevis = (devisId: string) => {
+    setDevisList((prev) => prev.filter((d) => d.id !== devisId));
+    showToast('Devis supprimé avec succès.');
+  };
+
+  const handleConvertDevisEnDossier = (devis: DevisClient) => {
+    const seq = Math.floor(1000 + Math.random() * 9000);
+    const newDosId = `dos-${Date.now()}`;
+    const matchedAssurance = devis.compagnieAssurance
+      ? assurances.find((a) => a.nom.toLowerCase().includes((devis.compagnieAssurance || '').toLowerCase()))
+      : undefined;
+
+    const newDossier: DossierSinistre = {
+      id: newDosId,
+      numeroDossier: `DOS-2026-${seq}`,
+      typeDossier: devis.typeDemande === 'ASSURANCE' ? 'ASSURANCE' : 'PARTICULIER_COMPTANT',
+      dateCreation: new Date().toISOString().split('T')[0],
+      client: {
+        id: `cli-${Date.now()}`,
+        nom: devis.clientNom,
+        telephone: devis.clientTelephone,
+        cin: devis.clientCin,
+        email: devis.clientEmail,
+        ville: devis.agenceVille,
+      },
+      vehicule: {
+        id: `veh-${Date.now()}`,
+        clientId: `cli-${Date.now()}`,
+        immatriculation: devis.vehiculeImmatriculation,
+        marque: devis.vehiculeMarque,
+        modele: devis.vehiculeModele,
+        annee: devis.vehiculeAnnee,
+        chassisVin: devis.vehiculeChassisVin,
+      },
+      assurance: matchedAssurance,
+      montantTotalTTC: devis.totalTTC,
+      montantPriseEnChargeAssurance: devis.typeDemande === 'ASSURANCE' ? devis.totalTTC : 0,
+      montantFranchise: 0,
+      franchiseOfferte: true,
+      franchisePayeeParClient: false,
+      statut: 'NOUVEAU',
+      photos: {},
+      poseur: 'Atelier Pose',
+      observations: `Converti depuis le Devis ${devis.numeroDevis}. ${devis.observations || ''}`.trim(),
+    };
+
+    // Auto-create Bon de Sortie & Bon de Livraison
+    const finalBS: BonSortie = {
+      id: `bs-${Date.now()}`,
+      numeroBS: `BS-2026-${seq}`,
+      dossierId: newDossier.id,
+      dateSortie: newDossier.dateCreation,
+      poseur: 'Atelier Pose',
+      lignes: devis.lignes.map((l, i) => ({
+        articleId: `art-dev-${i}-${Date.now()}`,
+        reference: l.codeEurocode || 'REF-VIT',
+        designation: l.designation,
+        quantite: l.quantite,
+      })),
+      notes: `Affecté suite au Devis ${devis.numeroDevis}`,
+    };
+
+    const newBL: BonLivraison = {
+      id: `bl-${Date.now()}`,
+      numeroBL: `BL-2026-${seq}`,
+      dossierId: newDossier.id,
+      dateLivraison: newDossier.dateCreation,
+      livreurPoseur: 'Atelier Pose',
+      receptionnaireNom: devis.clientNom,
+      receptionnaireCin: devis.clientCin,
+      lignes: devis.lignes.map((l) => ({
+        designation: l.designation,
+        codeEurocode: l.codeEurocode,
+        quantite: l.quantite,
+      })),
+      observations: `Véhicule ${devis.vehiculeMarque} ${devis.vehiculeModele} pris en charge conforme au devis.`,
+    };
+
+    // Auto-create Facture
+    const newFacture: Facture = {
+      id: `fac-${Date.now()}`,
+      numeroFacture: `FA-2026-${seq}`,
+      dossierId: newDossier.id,
+      destinataire: devis.typeDemande === 'ASSURANCE' ? 'ASSURANCE' : 'CLIENT',
+      dateEmission: newDossier.dateCreation,
+      dateEcheance: devis.typeDemande === 'ASSURANCE'
+        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        : newDossier.dateCreation,
+      lignes: devis.lignes.map((l) => ({
+        designation: l.designation,
+        codeEurocode: l.codeEurocode,
+        quantite: l.quantite,
+        prixUnitaireHT: l.prixUnitaireHT,
+        tauxTva: l.tauxTva,
+        totalHT: l.totalHT,
+      })),
+      totalHT: devis.totalHT,
+      totalTVA: devis.totalTVA,
+      totalTTC: devis.totalTTC,
+      montantRegle: 0,
+      statutPaiement: 'EN_ATTENTE',
+    };
+
+    const dossierWithDocs: DossierSinistre = {
+      ...newDossier,
+      bonSortieId: finalBS.id,
+      bonLivraisonId: newBL.id,
+      factureClientId: devis.typeDemande === 'PARTICULIER_DIRECT' ? newFacture.id : undefined,
+      factureAssuranceId: devis.typeDemande === 'ASSURANCE' ? newFacture.id : undefined,
+    };
+
+    setDossiers([dossierWithDocs, ...dossiers]);
+    setBonsSortie([finalBS, ...bonsSortie]);
+    setBonsLivraison([newBL, ...bonsLivraison]);
+    setFactures([newFacture, ...factures]);
+
+    // Mark devis as converted
+    setDevisList((prev) =>
+      prev.map((d) =>
+        d.id === devis.id
+          ? { ...d, statut: 'CONVERTI_DOSSIER', dossierIdGenere: newDosId }
+          : d
+      )
+    );
+
+    setActiveTab('dossiers');
+    showToast(`Devis ${devis.numeroDevis} converti avec succès en Dossier ${newDossier.numeroDossier} !`);
+  };
+
+  // Helper to open or create a Devis directly from a Dossier
+  const handleOpenDevisFromDossier = (dossier: DossierSinistre) => {
+    let matchedDevis = devisList.find((d) => d.dossierIdGenere === dossier.id || d.vehiculeImmatriculation === dossier.vehicule.immatriculation);
+    if (!matchedDevis) {
+      const seq = Math.floor(1000 + Math.random() * 9000);
+      const totalHT = +(dossier.montantTotalTTC / 1.20).toFixed(2);
+      const totalTVA = +(dossier.montantTotalTTC - totalHT).toFixed(2);
+      matchedDevis = {
+        id: `dev-dos-${dossier.id}`,
+        numeroDevis: `DEV-2026-${seq}`,
+        dateDevis: dossier.dateCreation,
+        dateValidite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        agenceVille: dossier.client.ville || 'Marrakech',
+        clientNom: dossier.client.nom,
+        clientTelephone: dossier.client.telephone,
+        clientCin: dossier.client.cin,
+        clientEmail: dossier.client.email,
+        clientVille: dossier.client.ville,
+        vehiculeMarque: dossier.vehicule.marque,
+        vehiculeModele: dossier.vehicule.modele,
+        vehiculeAnnee: dossier.vehicule.annee,
+        vehiculeImmatriculation: dossier.vehicule.immatriculation,
+        vehiculeChassisVin: dossier.vehicule.chassisVin,
+        typeDemande: dossier.typeDossier === 'ASSURANCE' ? 'ASSURANCE' : 'PARTICULIER_DIRECT',
+        compagnieAssurance: dossier.assurance?.nom,
+        lignes: [
+          {
+            designation: `Pare-Brise conforme ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`,
+            quantite: 1,
+            prixUnitaireHT: Math.max(0, +(totalHT - 250).toFixed(2)),
+            tauxTva: 20,
+            totalHT: Math.max(0, +(totalHT - 250).toFixed(2)),
+          },
+          {
+            designation: 'Kit colle polyuréthane & primaire d\'étanchéité',
+            quantite: 1,
+            prixUnitaireHT: 125,
+            tauxTva: 20,
+            totalHT: 125,
+          },
+          {
+            designation: 'Main d\'œuvre pose et dépose vitrage collé',
+            quantite: 1,
+            prixUnitaireHT: 125,
+            tauxTva: 20,
+            totalHT: 125,
+          },
+        ],
+        totalHT,
+        totalTVA,
+        totalTTC: dossier.montantTotalTTC,
+        statut: 'ACCEPTE',
+        dossierIdGenere: dossier.id,
+        observations: `Devis rattaché au dossier ${dossier.numeroDossier}.`,
+      };
+      setDevisList((prev) => [matchedDevis!, ...prev]);
+    }
+    setActiveDevisModal(matchedDevis);
+  };
+
   const handleUpdateStatutDossier = (dossierId: string, newStatut: StatutDossier) => {
     setDossiers((prev) =>
       prev.map((d) => (d.id === dossierId ? { ...d, statut: newStatut } : d))
@@ -547,6 +771,7 @@ export default function Home() {
           onOpenNewDossier={() => setShowNewDossierModal(true)}
           dossiersCount={dossiers.length}
           stockAlerteCount={stockCritiqueCount}
+          devisCount={devisList.length}
         />
       </div>
 
@@ -580,6 +805,7 @@ export default function Home() {
               }}
               dossiersCount={dossiers.length}
               stockAlerteCount={stockCritiqueCount}
+              devisCount={devisList.length}
             />
           </div>
         </div>
@@ -600,6 +826,26 @@ export default function Home() {
           />
         )}
 
+        {activeTab === 'devis' && (
+          <DevisView
+            devisList={devisList}
+            stockArticles={stock}
+            assurances={assurances}
+            onOpenNewDevis={() => {
+              setEditingDevis(null);
+              setShowNewDevisModal(true);
+            }}
+            onOpenEditDevis={(devis) => {
+              setEditingDevis(devis);
+              setShowNewDevisModal(true);
+            }}
+            onOpenViewDevis={(devis) => setActiveDevisModal(devis)}
+            onUpdateStatutDevis={handleUpdateStatutDevis}
+            onDeleteDevis={handleDeleteDevis}
+            onConvertDevisEnDossier={handleConvertDevisEnDossier}
+          />
+        )}
+
         {activeTab === 'dossiers' && (
           <DossiersView
             dossiers={dossiers}
@@ -608,6 +854,7 @@ export default function Home() {
             onOpenFacture={handleOpenFactureFromDossier}
             onOpenBonSortie={handleOpenBonSortieFromDossier}
             onOpenBonLivraison={handleOpenBonLivraisonFromDossier}
+            onOpenDevis={handleOpenDevisFromDossier}
             onAddDocumentToDossier={handleAddDocumentToDossier}
             onUpdateStatut={handleUpdateStatutDossier}
             onOpenEncaisserModal={handleOpenEncaisserModalFromDossier}
@@ -697,6 +944,26 @@ export default function Home() {
           stockArticles={stock}
           onClose={() => setShowNewDossierModal(false)}
           onSubmit={handleCreateDossier}
+        />
+      )}
+
+      {showNewDevisModal && (
+        <NewDevisModal
+          stockArticles={stock}
+          assurances={assurances}
+          initialDevis={editingDevis}
+          onSave={handleSaveDevis}
+          onClose={() => {
+            setShowNewDevisModal(false);
+            setEditingDevis(null);
+          }}
+        />
+      )}
+
+      {activeDevisModal && (
+        <DevisClientModal
+          devis={activeDevisModal}
+          onClose={() => setActiveDevisModal(null)}
         />
       )}
 

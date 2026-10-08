@@ -23,6 +23,7 @@ interface Props {
   onOpenNewDossier: () => void;
   dossiersCount: number;
   stockAlerteCount: number;
+  devisCount?: number;
 }
 
 export const Navigation: React.FC<Props> = ({
@@ -31,12 +32,19 @@ export const Navigation: React.FC<Props> = ({
   onOpenNewDossier,
   dossiersCount,
   stockAlerteCount,
+  devisCount = 0,
 }) => {
   const navItems = [
     {
       id: 'dashboard',
       label: 'Tableau de Bord',
       icon: LayoutDashboard,
+    },
+    {
+      id: 'devis',
+      label: 'Devis Clients',
+      icon: FileSpreadsheet,
+      badge: devisCount > 0 ? devisCount : undefined,
     },
     {
       id: 'dossiers',

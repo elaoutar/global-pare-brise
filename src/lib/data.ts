@@ -8,7 +8,8 @@ import {
   BonSortie,
   BonLivraison,
   ReglementRecette,
-  BonCommandeFournisseur
+  BonCommandeFournisseur,
+  DevisClient
 } from '@/types';
 
 export const GARAGE_INFO = {
@@ -915,6 +916,102 @@ export const INITIAL_COMMANDES_FOURNISSEURS: BonCommandeFournisseur[] = [
     statutPaiement: 'NON_PAYE',
     montantPaye: 0,
     notes: 'Brouillon de commande en cours de finalisation selon besoins atelier.',
+  },
+];
+
+export const INITIAL_DEVIS: DevisClient[] = [
+  {
+    id: 'dev-1',
+    numeroDevis: 'DEV-2026-0012',
+    dateDevis: '2026-10-06',
+    dateValidite: '2026-11-06',
+    agenceVille: 'Marrakech',
+    clientNom: 'Samir Mansour',
+    clientTelephone: '0661223344',
+    clientCin: 'EE54210',
+    clientVille: 'Marrakech',
+    vehiculeMarque: 'Volkswagen',
+    vehiculeModele: 'Golf 7',
+    vehiculeAnnee: 2019,
+    vehiculeImmatriculation: '45892|A|6',
+    typeDemande: 'PARTICULIER_DIRECT',
+    lignes: [
+      {
+        designation: 'Pare-Brise Teinté Vert avec Capteur de Pluie - VW Golf VII',
+        codeEurocode: '8589AGSV',
+        quantite: 1,
+        prixUnitaireHT: 1250,
+        tauxTva: 20,
+        totalHT: 1250,
+      },
+      {
+        designation: 'Kit colle polyuréthane & primaire d\'étanchéité constructeur',
+        codeEurocode: 'SIKA-300ML',
+        quantite: 1,
+        prixUnitaireHT: 125,
+        tauxTva: 20,
+        totalHT: 125,
+      },
+      {
+        designation: 'Main d\'œuvre pose et dépose pare-brise collé avec calibrage capteur',
+        quantite: 1,
+        prixUnitaireHT: 125,
+        tauxTva: 20,
+        totalHT: 125,
+      },
+    ],
+    totalHT: 1500,
+    totalTVA: 300,
+    totalTTC: 1800,
+    statut: 'ENVOYE',
+    observations: 'Devis remis en main propre au client. Garantie étanchéité 1 an incluse.',
+  },
+  {
+    id: 'dev-2',
+    numeroDevis: 'DEV-2026-0013',
+    dateDevis: '2026-10-07',
+    dateValidite: '2026-11-07',
+    agenceVille: 'El Jadida',
+    clientNom: 'Nadia Cherkaoui',
+    clientTelephone: '0665889900',
+    clientCin: 'M789123',
+    clientVille: 'El Jadida',
+    vehiculeMarque: 'Hyundai',
+    vehiculeModele: 'Tucson IV',
+    vehiculeAnnee: 2022,
+    vehiculeImmatriculation: '12450|B|26',
+    typeDemande: 'ASSURANCE',
+    compagnieAssurance: 'Sanlam Assurance',
+    lignes: [
+      {
+        designation: 'Pare-Brise Acoustic & Caméra ADAS - Hyundai Tucson IV',
+        codeEurocode: '4045ACCM',
+        quantite: 1,
+        prixUnitaireHT: 2083.33,
+        tauxTva: 20,
+        totalHT: 2083.33,
+      },
+      {
+        designation: 'Kit colle polyuréthane haute performance SikaTack Drive',
+        codeEurocode: 'SIKA-300ML',
+        quantite: 1,
+        prixUnitaireHT: 125,
+        tauxTva: 20,
+        totalHT: 125,
+      },
+      {
+        designation: 'Main d\'œuvre pose et recollage embase caméra ADAS',
+        quantite: 1,
+        prixUnitaireHT: 125,
+        tauxTva: 20,
+        totalHT: 125,
+      },
+    ],
+    totalHT: 2333.33,
+    totalTVA: 466.67,
+    totalTTC: 2800,
+    statut: 'ACCEPTE',
+    observations: 'Client en attente de validation de prise en charge Sanlam pour prise de rendez-vous atelier.',
   },
 ];
 

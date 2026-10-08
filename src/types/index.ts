@@ -274,4 +274,60 @@ export interface BonCommandeFournisseur {
   notes?: string;
 }
 
+// ----------------------------------------------------
+// DEVIS CLIENTS (Estimation avant intervention)
+// ----------------------------------------------------
+export type StatutDevis = 
+  | 'BROUILLON' 
+  | 'ENVOYE' 
+  | 'ACCEPTE' 
+  | 'REFUSE' 
+  | 'CONVERTI_DOSSIER';
+
+export interface LigneDevis {
+  id?: string;
+  designation: string;
+  codeEurocode?: string;
+  quantite: number;
+  prixUnitaireHT: number;
+  tauxTva: number; // 20%
+  totalHT: number;
+}
+
+export interface DevisClient {
+  id: string;
+  numeroDevis: string; // Ex: DEV-2026-0045
+  dateDevis: string;
+  dateValidite: string; // Par défaut 30 jours
+  agenceVille: string; // Marrakech ou El Jadida
+  
+  // Client Info
+  clientNom: string;
+  clientTelephone: string;
+  clientCin?: string;
+  clientEmail?: string;
+  clientVille?: string;
+
+  // Véhicule Info
+  vehiculeMarque: string;
+  vehiculeModele: string;
+  vehiculeAnnee: number;
+  vehiculeImmatriculation: string;
+  vehiculeChassisVin?: string;
+
+  // Type d'assurance pressentie (optionnel)
+  typeDemande: 'PARTICULIER_DIRECT' | 'ASSURANCE';
+  compagnieAssurance?: string;
+
+  // Lignes et tarification
+  lignes: LigneDevis[];
+  totalHT: number;
+  totalTVA: number;
+  totalTTC: number;
+
+  statut: StatutDevis;
+  observations?: string;
+  dossierIdGenere?: string; // Si converti en dossier réel
+}
+
 

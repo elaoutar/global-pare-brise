@@ -38,6 +38,7 @@ interface Props {
   onOpenFacture: (dossier: DossierSinistre) => void;
   onOpenBonSortie: (dossier: DossierSinistre) => void;
   onOpenBonLivraison: (dossier: DossierSinistre) => void;
+  onOpenDevis?: (dossier: DossierSinistre) => void;
   onAddDocumentToDossier: (dossierId: string, doc: DocumentAttache) => void;
   onUpdateStatut: (dossierId: string, newStatut: StatutDossier) => void;
   onOpenEncaisserModal?: (dossier: DossierSinistre) => void;
@@ -50,6 +51,7 @@ export const DossiersView: React.FC<Props> = ({
   onOpenFacture,
   onOpenBonSortie,
   onOpenBonLivraison,
+  onOpenDevis,
   onAddDocumentToDossier,
   onUpdateStatut,
   onOpenEncaisserModal,
@@ -394,6 +396,20 @@ export const DossiersView: React.FC<Props> = ({
                   </div>
                   <ChevronRight className="w-4 h-4 text-indigo-400" />
                 </button>
+
+                {/* 5. Devis Client */}
+                {onOpenDevis && (
+                  <button
+                    onClick={() => onOpenDevis(selectedDossier)}
+                    className="w-full flex items-center justify-between p-3 bg-amber-50/70 hover:bg-amber-100/80 text-amber-900 rounded-xl border border-amber-200 text-xs font-semibold transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <FileText className="w-4 h-4 text-amber-600" />
+                      <span>Devis Client / Estimation (Imprimer / A4)</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-amber-400" />
+                  </button>
+                )}
               </div>
 
               {/* Client & Insurance Specs */}
