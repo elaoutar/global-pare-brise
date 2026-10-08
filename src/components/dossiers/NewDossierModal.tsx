@@ -1183,7 +1183,7 @@ export const NewDossierModal: React.FC<Props> = ({
                         .filter((art) => art.quantiteEnStock > 0)
                         .map((art) => (
                           <option key={art.id} value={art.id}>
-                            {art.designation} (En stock: {art.quantiteEnStock}) - {art.prixVenteHT} DH HT
+                            {art.designation} (En stock: {art.quantiteEnStock}) - {art.prixVenteHT} DH TTC
                           </option>
                         ))}
                     </select>
