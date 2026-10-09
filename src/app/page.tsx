@@ -17,7 +17,8 @@ import {
   ModePaiement,
   BonCommandeFournisseur,
   DevisClient,
-  StatutDevis
+  StatutDevis,
+  UserSession
 } from '@/types';
 import { 
   INITIAL_DOSSIERS, 
@@ -69,9 +70,14 @@ import { DevisClientModal } from '@/components/documents/DevisClientModal';
 import { NewDevisModal } from '@/components/documents/NewDevisModal';
 import { TransmettreAzurGlassModal } from '@/components/dossiers/TransmettreAzurGlassModal';
 import { DeclarationBrisGlaceModal } from '@/components/documents/DeclarationBrisGlaceModal';
-import { Menu, X, ShieldCheck } from 'lucide-react';
+import { LoginView } from '@/components/auth/LoginView';
+import { Menu, X, ShieldCheck, LogOut } from 'lucide-react';
 
 export default function Home() {
+  // Session & Rôles Utilisateurs
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
+
   // Navigation
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -112,6 +118,47 @@ export default function Home() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
+
+  // Chargement de la session utilisateur locale
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('gp_user_session');
+      if (stored) {
+        setCurrentUser(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.error('Erreur lecture session:', err);
+    } finally {
+      setAuthLoaded(true);
+    }
+  }, []);
+
+  const handleLogin = (session: UserSession) => {
+    setCurrentUser(session);
+    try {
+      localStorage.setItem('gp_user_session', JSON.stringify(session));
+    } catch (err) {
+      console.error('Erreur stockage session:', err);
+    }
+    showToast(`Connexion réussie : Bienvenue ${session.nom} (${session.role === 'SUPERADMIN' ? 'Super Admin' : 'Assistante'})`);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('gp_user_session');
+    } catch (err) {
+      console.error('Erreur déconnexion:', err);
+    }
+    showToast('Déconnexion effectuée.');
+  };
+
+  // Sécurité navigation : L'Assistante ne peut pas accéder aux recettes et rapports financiers
+  useEffect(() => {
+    if (currentUser?.role === 'ASSISTANTE' && (activeTab === 'recettes' || activeTab === 'rapports')) {
+      setActiveTab('dashboard');
+    }
+  }, [currentUser, activeTab]);
 
   // Chargement des données réelles depuis Supabase Cloud
   useEffect(() => {
@@ -850,6 +897,21 @@ export default function Home() {
 
   const stockCritiqueCount = stock.filter((a) => a.quantiteEnStock <= a.stockMinimumAlerte).length;
 
+  // Écran d'attente lors du chargement de la session
+  if (!authLoaded) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-3">
+        <ShieldCheck className="w-12 h-12 text-sky-400 animate-pulse" />
+        <p className="text-sm font-bold text-slate-400">Chargement de Global Pare-Brise...</p>
+      </div>
+    );
+  }
+
+  // Écran de Connexion si aucune session active
+  if (!currentUser) {
+    return <LoginView onLogin={handleLogin} />;
+  }
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* Toast Notification */}
@@ -869,6 +931,8 @@ export default function Home() {
           dossiersCount={dossiers.length}
           stockAlerteCount={stockCritiqueCount}
           devisCount={devisList.length}
+          userSession={currentUser}
+          onLogout={handleLogout}
         />
       </div>
 
@@ -878,12 +942,28 @@ export default function Home() {
           <ShieldCheck className="w-5 h-5 text-sky-400" />
           <span className="font-black text-sm uppercase">GLOBAL PARE-BRISE</span>
         </div>
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800"
-        >
-          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-800 text-[10px] font-bold">
+            {currentUser?.role === 'SUPERADMIN' ? (
+              <span className="text-amber-300">👑 Admin</span>
+            ) : (
+              <span className="text-sky-300">👩‍💼 Assistante</span>
+            )}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1 text-slate-400 hover:text-rose-400 transition-colors"
+            title="Déconnexion"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Drawer */}
@@ -903,6 +983,11 @@ export default function Home() {
               dossiersCount={dossiers.length}
               stockAlerteCount={stockCritiqueCount}
               devisCount={devisList.length}
+              userSession={currentUser}
+              onLogout={() => {
+                setIsMobileMenuOpen(false);
+                handleLogout();
+              }}
             />
           </div>
         </div>
@@ -915,6 +1000,7 @@ export default function Home() {
             dossiers={dossiers}
             stock={stock}
             factures={factures}
+            userRole={currentUser?.role}
             onOpenNewDossier={() => setShowNewDossierModal(true)}
             onSelectDossier={(d) => {
               setActiveTab('dossiers');
@@ -982,7 +1068,7 @@ export default function Home() {
           />
         )}
 
-        {activeTab === 'recettes' && (
+        {activeTab === 'recettes' && currentUser?.role === 'SUPERADMIN' && (
           <RecettesView
             recettes={recettes}
             dossiers={dossiers}
@@ -991,7 +1077,7 @@ export default function Home() {
           />
         )}
 
-        {activeTab === 'rapports' && (
+        {activeTab === 'rapports' && currentUser?.role === 'SUPERADMIN' && (
           <RapportsExportView
             dossiers={dossiers}
             assurances={assurances}

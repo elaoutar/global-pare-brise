@@ -351,4 +351,15 @@ export interface DevisClient {
   dossierIdGenere?: string; // Si converti en dossier réel
 }
 
+export type UserRole = 'SUPERADMIN' | 'ASSISTANTE';
+
+export interface UserSession {
+  id: string;
+  nom: string;
+  email: string;
+  role: UserRole;
+  agence: string;
+}
+
+
 
