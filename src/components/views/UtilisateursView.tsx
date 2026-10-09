@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { UserSession, UserRole } from '@/types';
-import { registerSupabaseUser } from '@/lib/authService';
+import { registerSupabaseUser, fetchCollaborateursFromSupabase } from '@/lib/authService';
 import { 
   Users, 
   UserPlus, 
@@ -59,6 +59,25 @@ interface Props {
 export const UtilisateursView: React.FC<Props> = ({ currentAdmin }) => {
   const [collaborateurs, setCollaborateurs] = useState<Collaborateur[]>(INITIAL_COLLABORATEURS);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Chargement des collaborateurs réels depuis Supabase Database
+  React.useEffect(() => {
+    fetchCollaborateursFromSupabase().then((data) => {
+      if (data && data.length > 0) {
+        setCollaborateurs(
+          data.map((u) => ({
+            id: u.id,
+            nom: u.nom,
+            email: u.email,
+            role: u.role,
+            agence: u.agence || 'Marrakech',
+            dateCreation: u.created_at ? u.created_at.split('T')[0] : '2026-01-01',
+            statut: u.statut || 'ACTIF',
+          }))
+        );
+      }
+    });
+  }, []);
 
   // Formulaire d'ajout
   const [nom, setNom] = useState('');

@@ -270,3 +270,29 @@ FOR UPDATE USING (bucket_id = 'sinistre-documents');
 
 CREATE POLICY "Public Delete sinistre-documents" ON storage.objects
 FOR DELETE USING (bucket_id = 'sinistre-documents');
+
+-- ==============================================================================
+-- 15. TABLE UTILISATEURS & GESTION DES RÔLES
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.utilisateurs (
+    id TEXT PRIMARY KEY,
+    nom TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    mot_de_passe TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'ASSISTANTE',
+    agence TEXT NOT NULL DEFAULT 'Marrakech',
+    statut TEXT NOT NULL DEFAULT 'ACTIF',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.utilisateurs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public all on utilisateurs" ON public.utilisateurs FOR ALL USING (true) WITH CHECK (true);
+
+-- Comptes initiaux
+INSERT INTO public.utilisateurs (id, nom, email, mot_de_passe, role, agence)
+VALUES 
+('usr-admin-1', 'Direction Générale (Gérant)', 'direction@globaleparebrise.ma', 'GlobalPareBrise2026!', 'SUPERADMIN', 'Marrakech'),
+('usr-assistante-1', 'Sanaa (Secrétaire & Opérations)', 'assistante@globaleparebrise.ma', 'Assistante2026!', 'ASSISTANTE', 'Marrakech')
+ON CONFLICT (email) DO UPDATE SET mot_de_passe = EXCLUDED.mot_de_passe, role = EXCLUDED.role;
+
