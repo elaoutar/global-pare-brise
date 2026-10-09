@@ -1111,6 +1111,7 @@ export default function Home() {
             onAddAssurance={handleAddAssurance}
             onUpdateAssurance={handleUpdateAssurance}
             onDeleteAssurance={handleDeleteAssurance}
+            onUpdateStatutDossier={handleUpdateStatutDossier}
           />
         )}
 

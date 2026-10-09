@@ -83,8 +83,8 @@ export const Navigation: React.FC<Props> = ({
     },
     {
       id: 'assurances',
-      label: 'État des Assurances',
-      icon: ShieldAlert,
+      label: 'État AZUR GLASS (Assurances)',
+      icon: ShieldCheck,
     },
     {
       id: 'partenaires',
