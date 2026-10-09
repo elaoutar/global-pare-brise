@@ -619,47 +619,55 @@ export const DossiersView: React.FC<Props> = ({
 
               {/* Photos Gallery */}
               <div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Camera className="w-3.5 h-3.5" /> Photos Expert & Contrôle ({Object.values(selectedDossier.photos).filter(Boolean).length})
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5" /> Photos Expert & Contrôle ({selectedDossier.photos ? Object.values(selectedDossier.photos).filter(Boolean).length : 0})
+                  </span>
                 </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {selectedDossier.photos.avantSinistreUrl && (
-                    <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                      <img
-                        src={selectedDossier.photos.avantSinistreUrl}
-                        alt="Avant pose"
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
-                        Avant (Sinistre)
-                      </span>
-                    </div>
-                  )}
-                  {selectedDossier.photos.apresPoseUrl && (
-                    <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                      <img
-                        src={selectedDossier.photos.apresPoseUrl}
-                        alt="Après pose"
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute bottom-0 inset-x-0 bg-emerald-900/80 text-white text-[9px] p-0.5 text-center">
-                        Après (Posé)
-                      </span>
-                    </div>
-                  )}
-                  {selectedDossier.photos.carteGriseUrl && (
-                    <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                      <img
-                        src={selectedDossier.photos.carteGriseUrl}
-                        alt="Carte grise"
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
-                        Carte Grise
-                      </span>
-                    </div>
-                  )}
-                </div>
+                {(!selectedDossier.photos || Object.values(selectedDossier.photos).filter(Boolean).length === 0) ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center text-slate-400 text-xs italic">
+                    Aucune photo ajoutée pour ce dossier.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {selectedDossier.photos.avantSinistreUrl && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img
+                          src={selectedDossier.photos.avantSinistreUrl}
+                          alt="Avant pose"
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
+                          Avant (Sinistre)
+                        </span>
+                      </div>
+                    )}
+                    {selectedDossier.photos.apresPoseUrl && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img
+                          src={selectedDossier.photos.apresPoseUrl}
+                          alt="Après pose"
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute bottom-0 inset-x-0 bg-emerald-900/80 text-white text-[9px] p-0.5 text-center">
+                          Après (Posé)
+                        </span>
+                      </div>
+                    )}
+                    {selectedDossier.photos.carteGriseUrl && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img
+                          src={selectedDossier.photos.carteGriseUrl}
+                          alt="Carte grise"
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
+                          Carte Grise
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (

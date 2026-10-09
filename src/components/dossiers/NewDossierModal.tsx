@@ -32,7 +32,9 @@ import {
   Plus,
   Trash2,
   Calculator,
-  Sparkles
+  Sparkles,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { MatriculeMarocInput } from '@/components/ui/MatriculeMarocInput';
 import { formatDH } from '@/lib/utils';
@@ -156,9 +158,10 @@ export const NewDossierModal: React.FC<Props> = ({
   const [refPaiementClient, setRefPaiementClient] = useState('');
   const [echeancePaiementClient, setEcheancePaiementClient] = useState(new Date().toISOString().split('T')[0]);
 
-  // Sample Photos
-  const [photoAvant, setPhotoAvant] = useState('https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=600&q=80');
-  const [photoCarteGrise, setPhotoCarteGrise] = useState('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80');
+  // Photos Sinistre & Contrôle (chargées par l'utilisateur ou l'expert)
+  const [photoAvant, setPhotoAvant] = useState('');
+  const [photoApresPose, setPhotoApresPose] = useState('');
+  const [photoCarteGrise, setPhotoCarteGrise] = useState('');
 
   // Dynamic Financials Calculations (Total TTC saisi -> Calcul automatique du HT et TVA)
   const extraPrestationsTotalTTC = lignesPrestationsExtra.reduce((sum, item) => sum + (Number(item.prixTTC) || 0), 0);
@@ -461,8 +464,9 @@ export const NewDossierModal: React.FC<Props> = ({
         ? 'VALIDE_REGLE' 
         : (isAssurance ? 'ENVOYE_AZUR_GLASS' : 'EN_COURS_POSE'),
       photos: {
-        avantSinistreUrl: photoAvant,
-        carteGriseUrl: photoCarteGrise,
+        avantSinistreUrl: photoAvant || undefined,
+        apresPoseUrl: photoApresPose || undefined,
+        carteGriseUrl: photoCarteGrise || undefined,
       },
       bonSortieId: bonSortie ? bsId : undefined,
       factureAssuranceId: isAssurance ? facId : undefined,
@@ -1548,22 +1552,139 @@ export const NewDossierModal: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Poseur / Technicien</label>
-                  <input
-                    type="text"
-                    value={poseurNom}
-                    onChange={(e) => setPoseurNom(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                  />
+              {/* Affectation Technicien */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Poseur / Technicien</label>
+                <input
+                  type="text"
+                  value={poseurNom}
+                  onChange={(e) => setPoseurNom(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                  placeholder="Nom du poseur"
+                />
+              </div>
+
+              {/* Photos Sinistre & Contrôle (Ajout réel lors de la création) */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-brand-600" /> Photos Dossier (Facultatif ou pour Expert)
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    {[photoAvant, photoApresPose, photoCarteGrise].filter(Boolean).length} photo(s) ajoutée(s)
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Photos Sinistre</label>
-                  <div className="flex gap-2">
-                    <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
-                      <Camera className="w-3.5 h-3.5" /> 2 Photos jointes
-                    </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {/* 1. Photo Avant Pose / Bris */}
+                  <div className="border border-dashed border-slate-300 rounded-lg p-2.5 bg-white text-center hover:bg-slate-50 transition">
+                    <p className="text-[11px] font-bold text-slate-700 mb-1">1. Bris / Avant Pose</p>
+                    {photoAvant ? (
+                      <div className="relative aspect-video rounded overflow-hidden mb-1.5 border border-slate-200 group">
+                        <img src={photoAvant} alt="Avant" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setPhotoAvant('')}
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded p-1 text-[10px] opacity-90 hover:opacity-100"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer block py-3 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1.5">
+                        <Upload className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+                        <span className="text-[10px] block font-medium">Choisir photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = () => setPhotoAvant(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                    <span className="text-[9px] text-slate-400">Impact ou fissure pare-brise</span>
+                  </div>
+
+                  {/* 2. Photo Après Pose */}
+                  <div className="border border-dashed border-slate-300 rounded-lg p-2.5 bg-white text-center hover:bg-slate-50 transition">
+                    <p className="text-[11px] font-bold text-slate-700 mb-1">2. Après Pose (Posé)</p>
+                    {photoApresPose ? (
+                      <div className="relative aspect-video rounded overflow-hidden mb-1.5 border border-slate-200 group">
+                        <img src={photoApresPose} alt="Après" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setPhotoApresPose('')}
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded p-1 text-[10px] opacity-90 hover:opacity-100"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer block py-3 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1.5">
+                        <Upload className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+                        <span className="text-[10px] block font-medium">Choisir photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = () => setPhotoApresPose(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                    <span className="text-[9px] text-slate-400">Véhicule terminé avec vitrage neuf</span>
+                  </div>
+
+                  {/* 3. Photo Carte Grise */}
+                  <div className="border border-dashed border-slate-300 rounded-lg p-2.5 bg-white text-center hover:bg-slate-50 transition">
+                    <p className="text-[11px] font-bold text-slate-700 mb-1">3. Carte Grise</p>
+                    {photoCarteGrise ? (
+                      <div className="relative aspect-video rounded overflow-hidden mb-1.5 border border-slate-200 group">
+                        <img src={photoCarteGrise} alt="Carte grise" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setPhotoCarteGrise('')}
+                          className="absolute top-1 right-1 bg-red-600 text-white rounded p-1 text-[10px] opacity-90 hover:opacity-100"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer block py-3 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1.5">
+                        <Upload className="w-4 h-4 mx-auto mb-1 text-slate-400" />
+                        <span className="text-[10px] block font-medium">Choisir photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = () => setPhotoCarteGrise(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                    <span className="text-[9px] text-slate-400">Photo de la carte grise / attestation</span>
                   </div>
                 </div>
               </div>
