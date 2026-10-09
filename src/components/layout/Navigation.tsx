@@ -161,9 +161,15 @@ export const Navigation: React.FC<Props> = ({
       </div>
 
       {/* Footer Info */}
-      <div className="p-4 border-t border-slate-800 text-[11px] text-slate-500">
-        <p className="font-mono text-slate-400 font-semibold">{GARAGE_INFO.ice}</p>
-        <p className="text-[10px] mt-0.5">Tiers-payant conventionné</p>
+      <div className="p-4 border-t border-slate-800 text-[11px] text-slate-500 space-y-2">
+        <div>
+          <p className="font-mono text-slate-400 font-semibold">{GARAGE_INFO.ice}</p>
+          <p className="text-[10px] mt-0.5">Tiers-payant conventionné</p>
+        </div>
+        <div className="pt-2 border-t border-slate-800/60 flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Supabase Cloud Connecté</span>
+        </div>
       </div>
     </aside>
   );

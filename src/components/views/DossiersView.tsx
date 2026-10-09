@@ -33,6 +33,7 @@ import { DocumentAttache } from '@/types';
 import { exportEtatMensuelExcel } from '@/lib/exportUtils';
 import { MatriculeBadge } from '@/components/ui/MatriculeBadge';
 import { formatMatricule } from '@/lib/matriculeMaroc';
+import { uploadFileToSupabase } from '@/lib/supabaseService';
 
 interface Props {
   dossiers: DossierSinistre[];
@@ -71,6 +72,8 @@ export const DossiersView: React.FC<Props> = ({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newDocNom, setNewDocNom] = useState('');
   const [newDocType, setNewDocType] = useState<DocumentAttache['typeDocument']>('PRISE_EN_CHARGE_ASSURANCE');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
   // Extraire les villes uniques pour la liste de filtrage
   const villesDisponibles = Array.from(
@@ -686,19 +689,34 @@ export const DossiersView: React.FC<Props> = ({
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                const newDoc: DocumentAttache = {
-                  id: `doc-${Date.now()}`,
-                  nom: newDocNom || 'Document_Assurance.pdf',
-                  typeDocument: newDocType,
-                  url: '#',
-                  taille: '850 Ko',
-                  dateAjout: new Date().toISOString().split('T')[0],
-                };
-                onAddDocumentToDossier(selectedDossier.id, newDoc);
-                setShowUploadModal(false);
-                setNewDocNom('');
+                setIsUploadingDoc(true);
+                try {
+                  let fileUrl = '#';
+                  let taille = '850 Ko';
+                  if (selectedFile) {
+                    taille = `${(selectedFile.size / 1024).toFixed(0)} Ko`;
+                    const uploadedUrl = await uploadFileToSupabase(selectedFile, `sinistres/${selectedDossier.numeroDossier}`);
+                    if (uploadedUrl) {
+                      fileUrl = uploadedUrl;
+                    }
+                  }
+                  const newDoc: DocumentAttache = {
+                    id: `doc-${Date.now()}`,
+                    nom: newDocNom || selectedFile?.name || 'Document_Assurance.pdf',
+                    typeDocument: newDocType,
+                    url: fileUrl,
+                    taille,
+                    dateAjout: new Date().toISOString().split('T')[0],
+                  };
+                  onAddDocumentToDossier(selectedDossier.id, newDoc);
+                  setShowUploadModal(false);
+                  setNewDocNom('');
+                  setSelectedFile(null);
+                } finally {
+                  setIsUploadingDoc(false);
+                }
               }}
               className="p-6 space-y-4 text-xs"
             >
@@ -742,9 +760,9 @@ export const DossiersView: React.FC<Props> = ({
               <label className="border-2 border-dashed border-indigo-300 hover:border-indigo-500 rounded-xl p-4 text-center bg-indigo-50/40 hover:bg-indigo-50 transition-colors cursor-pointer block">
                 <Upload className="w-6 h-6 text-indigo-600 mx-auto mb-1" />
                 <p className="font-semibold text-slate-800">
-                  {newDocNom ? `Fichier prêt : ${newDocNom}` : 'Cliquez pour choisir ou glisser la photo/scan signé'}
+                  {selectedFile ? `Fichier prêt : ${selectedFile.name}` : (newDocNom ? `Fichier prêt : ${newDocNom}` : 'Cliquez pour choisir la photo ou le scan signé')}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, JPG, PNG (Max 15 Mo)</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, JPG, PNG (Stocké sur Supabase Storage)</p>
                 <input
                   type="file"
                   accept="image/*,.pdf"
@@ -752,6 +770,7 @@ export const DossiersView: React.FC<Props> = ({
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
+                      setSelectedFile(file);
                       setNewDocNom(file.name);
                     }
                   }}
@@ -761,16 +780,21 @@ export const DossiersView: React.FC<Props> = ({
               <div className="flex justify-end gap-2 pt-2 border-t">
                 <button
                   type="button"
-                  onClick={() => setShowUploadModal(false)}
+                  disabled={isUploadingDoc}
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    setSelectedFile(null);
+                  }}
                   className="px-4 py-2 border rounded-lg font-semibold text-slate-700"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold"
+                  disabled={isUploadingDoc}
+                  className="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold disabled:opacity-50"
                 >
-                  Ajouter au Dossier
+                  {isUploadingDoc ? 'Téléversement Cloud...' : 'Enregistrer sur Supabase'}
                 </button>
               </div>
             </form>

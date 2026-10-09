@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DossierSinistre, 
   ArticleStock, 
@@ -34,6 +34,17 @@ import {
   GARAGE_INFO 
 } from '@/lib/data';
 import { formatDH } from '@/lib/utils';
+import { isSupabaseConfigured } from '@/lib/supabaseClient';
+import { 
+  fetchDossiersFromSupabase, 
+  fetchStockFromSupabase, 
+  fetchFacturesFromSupabase, 
+  fetchDevisFromSupabase,
+  saveDossierToSupabase,
+  saveStockArticleToSupabase,
+  saveFactureToSupabase,
+  saveDevisToSupabase
+} from '@/lib/supabaseService';
 
 import { Navigation } from '@/components/layout/Navigation';
 import { DashboardView } from '@/components/views/DashboardView';
@@ -101,6 +112,39 @@ export default function Home() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
+
+  // Chargement des données réelles depuis Supabase Cloud
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const loadSupabaseData = async () => {
+      try {
+        const [supaDossiers, supaStock, supaFactures, supaDevis] = await Promise.all([
+          fetchDossiersFromSupabase(),
+          fetchStockFromSupabase(),
+          fetchFacturesFromSupabase(),
+          fetchDevisFromSupabase(),
+        ]);
+
+        if (supaDossiers && supaDossiers.length > 0) {
+          setDossiers(supaDossiers);
+        }
+        if (supaStock && supaStock.length > 0) {
+          setStock(supaStock);
+        }
+        if (supaFactures && supaFactures.length > 0) {
+          setFactures(supaFactures);
+        }
+        if (supaDevis && supaDevis.length > 0) {
+          setDevisList(supaDevis);
+        }
+      } catch (err) {
+        console.error('Erreur chargement Supabase:', err);
+      }
+    };
+
+    loadSupabaseData();
+  }, []);
 
   // Handlers
   const handleCreateDossier = (
@@ -179,11 +223,14 @@ export default function Home() {
 
     if (newFacture) {
       setFactures([newFacture, ...factures]);
+      saveFactureToSupabase(newFacture);
     }
 
     if (newRecette) {
       setRecettes([newRecette, ...recettes]);
     }
+
+    saveDossierToSupabase(dossierWithDocs);
 
     setShowNewDossierModal(false);
     showToast(
@@ -565,7 +612,14 @@ export default function Home() {
 
   const handleUpdateStatutDossier = (dossierId: string, newStatut: StatutDossier) => {
     setDossiers((prev) =>
-      prev.map((d) => (d.id === dossierId ? { ...d, statut: newStatut } : d))
+      prev.map((d) => {
+        if (d.id === dossierId) {
+          const updated = { ...d, statut: newStatut };
+          saveDossierToSupabase(updated);
+          return updated;
+        }
+        return d;
+      })
     );
     showToast('Statut du dossier mis à jour.');
   };
@@ -585,15 +639,18 @@ export default function Home() {
     }
   ) => {
     setDossiers((prev) =>
-      prev.map((d) =>
-        d.id === dossierId
-          ? {
-              ...d,
-              statut: 'ENVOYE_AZUR_GLASS',
-              dateEnvoiAzurGlass: transmissionData.dateEnvoi,
-            }
-          : d
-      )
+      prev.map((d) => {
+        if (d.id === dossierId) {
+          const updated = {
+            ...d,
+            statut: 'ENVOYE_AZUR_GLASS' as StatutDossier,
+            dateEnvoiAzurGlass: transmissionData.dateEnvoi,
+          };
+          saveDossierToSupabase(updated);
+          return updated;
+        }
+        return d;
+      })
     );
     setActiveTransmettreAzurGlassDossier(null);
     showToast(`Dossier complet transmis avec succès par email à AZUR GLASS (${transmissionData.destinataire}) !`);
@@ -604,10 +661,12 @@ export default function Home() {
       prev.map((d) => {
         if (d.id === dossierId) {
           const currentDocs = d.documents || [];
-          return {
+          const updated = {
             ...d,
             documents: [doc, ...currentDocs],
           };
+          saveDossierToSupabase(updated);
+          return updated;
         }
         return d;
       })
