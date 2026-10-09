@@ -116,11 +116,35 @@ Email: ${GARAGE_INFO.email}`;
   const [isSending, setIsSending] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Simulation d'envoi 1-Clic
-  const handleSend1Click = () => {
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendSuccess, setSendSuccess] = useState<boolean>(false);
+
+  // Envoi réel 1-Clic via l'API Gmail SMTP
+  const handleSend1Click = async () => {
     setIsSending(true);
-    setTimeout(() => {
-      setIsSending(false);
+    setSendError(null);
+    try {
+      const response = await fetch('/api/send-dossier-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          destinataire,
+          cc,
+          objet,
+          message,
+          dossierNumero: dossier.numeroDossier,
+          photos: dossier.photos,
+          documents: dossier.documents,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erreur lors de l\'envoi de l\'email');
+      }
+
+      setSendSuccess(true);
       const transmissionData = {
         destinataire,
         cc,
@@ -128,8 +152,16 @@ Email: ${GARAGE_INFO.email}`;
         message,
         dateEnvoi: new Date().toISOString(),
       };
-      onSendComplete(dossier.id, transmissionData);
-    }, 1200);
+      
+      setTimeout(() => {
+        onSendComplete(dossier.id, transmissionData);
+      }, 1500);
+    } catch (err: any) {
+      console.error('Erreur transmission email:', err);
+      setSendError(err.message || 'Impossible d\'envoyer l\'email. Vérifiez votre connexion.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   // Envoi direct via Webmail Gmail (Google Workspace ou compte perso)
@@ -385,6 +417,21 @@ Email: ${GARAGE_INFO.email}`;
               />
             </div>
           </div>
+
+          {/* Message de succès ou d'erreur */}
+          {sendSuccess && (
+            <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-bold animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+              <span>Email transmis avec succès à AZUR GLASS via Gmail ! Enregistrement du statut en cours...</span>
+            </div>
+          )}
+
+          {sendError && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-300 rounded-xl text-xs text-red-900">
+              <span className="font-bold text-red-600">Erreur :</span>
+              <span>{sendError}</span>
+            </div>
+          )}
 
           <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
             <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
