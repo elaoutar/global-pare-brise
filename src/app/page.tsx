@@ -57,6 +57,7 @@ import { BonCommandeFournisseurModal } from '@/components/documents/BonCommandeF
 import { DevisClientModal } from '@/components/documents/DevisClientModal';
 import { NewDevisModal } from '@/components/documents/NewDevisModal';
 import { TransmettreAzurGlassModal } from '@/components/dossiers/TransmettreAzurGlassModal';
+import { DeclarationBrisGlaceModal } from '@/components/documents/DeclarationBrisGlaceModal';
 import { Menu, X, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
@@ -80,6 +81,7 @@ export default function Home() {
   // Modals state
   const [showNewDossierModal, setShowNewDossierModal] = useState(false);
   const [activeQuittanceDossier, setActiveQuittanceDossier] = useState<DossierSinistre | null>(null);
+  const [activeDeclarationBrisGlaceDossier, setActiveDeclarationBrisGlaceDossier] = useState<DossierSinistre | null>(null);
   const [activeFactureModal, setActiveFactureModal] = useState<{ facture: Facture; dossier: DossierSinistre } | null>(null);
   const [activeBonSortieModal, setActiveBonSortieModal] = useState<{ bonSortie: BonSortie; dossier: DossierSinistre } | null>(null);
   const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier: DossierSinistre } | null>(null);
@@ -891,6 +893,7 @@ export default function Home() {
             onOpenBonSortie={handleOpenBonSortieFromDossier}
             onOpenBonLivraison={handleOpenBonLivraisonFromDossier}
             onOpenDevis={handleOpenDevisFromDossier}
+            onOpenDeclarationBrisGlace={(d) => setActiveDeclarationBrisGlaceDossier(d)}
             onOpenTransmettreAzurGlass={handleOpenTransmettreAzurGlass}
             onAddDocumentToDossier={handleAddDocumentToDossier}
             onUpdateStatut={handleUpdateStatutDossier}
@@ -1008,6 +1011,13 @@ export default function Home() {
         <QuittanceModal
           dossier={activeQuittanceDossier}
           onClose={() => setActiveQuittanceDossier(null)}
+        />
+      )}
+
+      {activeDeclarationBrisGlaceDossier && (
+        <DeclarationBrisGlaceModal
+          dossier={activeDeclarationBrisGlaceDossier}
+          onClose={() => setActiveDeclarationBrisGlaceDossier(null)}
         />
       )}
 

@@ -25,6 +25,7 @@ import {
   Coins,
   MapPin,
   Building,
+  Building2,
   Mail,
   Send
 } from 'lucide-react';
@@ -41,6 +42,7 @@ interface Props {
   onOpenBonSortie: (dossier: DossierSinistre) => void;
   onOpenBonLivraison: (dossier: DossierSinistre) => void;
   onOpenDevis?: (dossier: DossierSinistre) => void;
+  onOpenDeclarationBrisGlace?: (dossier: DossierSinistre) => void;
   onOpenTransmettreAzurGlass?: (dossier: DossierSinistre) => void;
   onAddDocumentToDossier: (dossierId: string, doc: DocumentAttache) => void;
   onUpdateStatut: (dossierId: string, newStatut: StatutDossier) => void;
@@ -55,6 +57,7 @@ export const DossiersView: React.FC<Props> = ({
   onOpenBonSortie,
   onOpenBonLivraison,
   onOpenDevis,
+  onOpenDeclarationBrisGlace,
   onOpenTransmettreAzurGlass,
   onAddDocumentToDossier,
   onUpdateStatut,
@@ -415,6 +418,31 @@ export const DossiersView: React.FC<Props> = ({
                     <span className="font-bold text-[11px] bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded">Particulier Direct</span>
                     <span className="text-[11px] text-amber-800">Facturation au comptant directe (sans subrogation).</span>
                   </div>
+                )}
+
+                {/* 1.bis Déclaration Bris de Glaces (Spécial Société / Pro) */}
+                {selectedDossier.typeDossier === 'ASSURANCE' && onOpenDeclarationBrisGlace && (
+                  <button
+                    onClick={() => onOpenDeclarationBrisGlace(selectedDossier)}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs font-semibold transition-colors ${
+                      selectedDossier.typeClientAssurance === 'PROFESSIONNEL' || selectedDossier.typeClientAssurance === 'AGENCE_LOCATION'
+                        ? 'bg-indigo-50/90 hover:bg-indigo-100 text-indigo-950 border-indigo-300 ring-1 ring-indigo-200'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Building2 className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                      <div className="text-left">
+                        <span className="block font-bold">Déclaration Bris de Glaces (Société / Pro)</span>
+                        <span className="text-[10px] text-slate-500 font-normal">
+                          {selectedDossier.typeClientAssurance === 'PROFESSIONNEL' || selectedDossier.typeClientAssurance === 'AGENCE_LOCATION'
+                            ? '★ Obligatoire pour Professionnels & Flottes (Cachet & Signature)'
+                            : 'Lettre de déclaration de sinistre pour personnes morales'}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-indigo-400" />
+                  </button>
                 )}
 
                 {/* 2. Facture Officielle (Adressée à AZUR GLASS si dossier assurance) */}

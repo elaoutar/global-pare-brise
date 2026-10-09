@@ -21,7 +21,8 @@ import {
   ExternalLink, 
   Clock, 
   Sparkles,
-  Info
+  Info,
+  Building2
 } from 'lucide-react';
 
 interface TransmettreAzurGlassModalProps {
@@ -98,10 +99,10 @@ ${tvaPro > 0 ? `• TVA Pro / Location exclue par l'assurance : -${tvaPro.toFixe
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [X] 1. Facture Officielle N° ${facture?.numeroFacture || `FA-2026-${numDossier.slice(-4)}`} libellée à AZUR GLASS SARL (ICE 002987123000089)
 [X] 2. Quittance Subrogative d'Assurance remplie et signée
-[X] 3. Bon de Sortie Atelier N° ${bonSortie?.numeroBS || `BS-2026-${numDossier.slice(-4)}`} (Vitrage & fournitures de pose)
-[X] 4. Bon de Livraison & Décharge client N° ${bonLivraison?.numeroBL || `BL-2026-${numDossier.slice(-4)}`}
-[X] 5. Photocopie Carte Grise & Attestation d'Assurance
-[X] 6. Photos justificatives du sinistre (Avant intervention, après pose et compteur)
+${dossier.typeClientAssurance === 'PROFESSIONNEL' || dossier.typeClientAssurance === 'AGENCE_LOCATION' ? `[X] 3. Déclaration de bris de glaces signée & cachetée par la société (${dossier.client.nom})\n` : ''}[X] 4. Bon de Sortie Atelier N° ${bonSortie?.numeroBS || `BS-2026-${numDossier.slice(-4)}`} (Vitrage & fournitures de pose)
+[X] 5. Bon de Livraison & Décharge client N° ${bonLivraison?.numeroBL || `BL-2026-${numDossier.slice(-4)}`}
+[X] 6. Photocopie Carte Grise & Attestation d'Assurance
+[X] 7. Photos justificatives du sinistre (Avant intervention, après pose et compteur)
 
 Merci de bien vouloir valider ce dossier et nous transmettre l'accord de règlement par virement bancaire.
 
@@ -269,6 +270,15 @@ Email: ${GARAGE_INFO.email}`;
                   <strong>Quittance d'assurance signée</strong> (Subrogation)
                 </span>
               </div>
+
+              {(dossier.typeClientAssurance === 'PROFESSIONNEL' || dossier.typeClientAssurance === 'AGENCE_LOCATION') && (
+                <div className="flex items-center gap-2 p-2 bg-indigo-50/80 rounded-lg border border-indigo-200 text-indigo-950">
+                  <Building2 className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                  <span className="truncate">
+                    <strong>Déclaration bris de glace</strong> (Cachet Société)
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-slate-800">
                 <PackageMinus className="w-4 h-4 text-amber-600 flex-shrink-0" />
