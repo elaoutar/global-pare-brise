@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { DossierSinistre } from '@/types';
-import { GARAGE_INFO } from '@/lib/data';
-import { formatDH, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
 import { DocumentActionBar } from './DocumentActionBar';
+import { Edit3, CheckCircle2 } from 'lucide-react';
 
 interface Props {
   dossier: DossierSinistre;
@@ -14,179 +14,359 @@ interface Props {
 
 export const QuittanceModal: React.FC<Props> = ({ dossier, onClose }) => {
   const printRef = useRef<HTMLDivElement>(null);
-  const cieNom = dossier.assurance?.nom || 'Assurance';
 
-  const shareMsg = `Bonjour ${dossier.client.nom}, voici votre Quittance Subrogative d'Assurance pour le dossier N° ${dossier.numeroDossier} (${cieNom}) concernant votre véhicule ${dossier.vehicule.immatriculation} chez GLOBAL PARE-BRISE Marrakech.`;
+  // Champs de la quittance personnalisables / modifiables
+  const [assuranceNom, setAssuranceNom] = useState(
+    dossier.assurance?.nom ? `${dossier.assurance.nom.toUpperCase()} ASSURANCE` : 'Sanlam ASSURANCE'
+  );
+  const [assuranceAdresse, setAssuranceAdresse] = useState(
+    dossier.assurance?.adresse || '2016, Bd Mohamed Zerktouni, Casablanca.\nMaroc'
+  );
+  const [assureNom, setAssureNom] = useState(dossier.client?.nom || '');
+  const [numeroPolice, setNumeroPolice] = useState(dossier.numeroPolice || '');
+  const [marqueVehicule, setMarqueVehicule] = useState(
+    `${dossier.vehicule?.marque || ''} ${dossier.vehicule?.modele || ''}`.trim()
+  );
+  const [immatriculation, setImmatriculation] = useState(
+    dossier.vehicule?.immatriculation ? formatMatricule(dossier.vehicule.immatriculation, 'LATIN') : ''
+  );
+  const [numeroSinistre, setNumeroSinistre] = useState(dossier.numeroSinistre || '');
+  const [dateSurvenance, setDateSurvenance] = useState(
+    dossier.dateSinistre ? formatDate(dossier.dateSinistre) : ''
+  );
+  const [intermediaire, setIntermediaire] = useState(
+    dossier.agenceAssurance || 'ASSURANCE'
+  );
+
+  // Montants indemnite & charges
+  const [montantIndemnite, setMontantIndemnite] = useState(
+    dossier.montantPriseEnChargeAssurance > 0 ? `${dossier.montantPriseEnChargeAssurance.toFixed(2)} DH` : ''
+  );
+  const [franchiseContractuelle, setFranchiseContractuelle] = useState(
+    dossier.montantFranchise > 0 ? `${dossier.montantFranchise.toFixed(2)}` : ''
+  );
+  const [tvaIndemnite, setTvaIndemnite] = useState(
+    dossier.tvaExclueParAssurance && dossier.tvaExclueParAssurance > 0
+      ? `${dossier.tvaExclueParAssurance.toFixed(2)}`
+      : (dossier.typeClientAssurance === 'PROFESSIONNEL' || dossier.typeClientAssurance === 'AGENCE_LOCATION')
+        ? `${((dossier.montantTotalTTC * 0.20) / 1.20).toFixed(2)}`
+        : ''
+  );
+  const [depassementPlafond, setDepassementPlafond] = useState('');
+
+  const [dateFaitA, setDateFaitA] = useState(
+    formatDate(dossier.dateCreation || new Date().toISOString())
+  );
+  const [isEditing, setIsEditing] = useState(false);
+
+  const shareMsg = `Bonjour ${assureNom}, voici votre Quittance d'indemnisation pour le véhicule ${immatriculation} (${assuranceNom}).`;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
       <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in duration-200">
         
-        {/* Modern Document Action Bar */}
+        {/* Document Action Bar */}
         <DocumentActionBar
           documentRef={printRef}
-          filename={`QUITTANCE-${dossier.numeroDossier}`}
-          documentTitle="Quittance Subrogative d'Assurance"
-          subtitle={`Dossier : ${dossier.numeroDossier} • Compagnie : ${cieNom} • Client : ${dossier.client.nom}`}
-          clientPhone={dossier.client.telephone}
+          filename={`QUITTANCE-${dossier.numeroDossier || immatriculation}`}
+          documentTitle="Quittance d'indemnisation"
+          subtitle={`Police : ${numeroPolice || '-'} • Assurance : ${assuranceNom} • Assuré : ${assureNom}`}
+          clientPhone={dossier.client?.telephone}
           shareMessage={shareMsg}
           badgeText="Quittance"
           badgeColor="bg-blue-600"
           onClose={onClose}
         />
 
-        {/* Printable Document Area (Strict A4) */}
+        {/* Barre d'édition rapide (hors impression) */}
+        <div className="no-print bg-slate-50 border-b border-slate-200 px-4 sm:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="text-slate-600">
+            Modèle officiel de quittance d'indemnisation <strong>AZUR GLASS</strong>. Vous pouvez ajuster les champs avant impression si nécessaire.
+          </div>
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-medium transition shadow-sm"
+          >
+            {isEditing ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Terminer la modification</span>
+              </>
+            ) : (
+              <>
+                <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                <span>Modifier les champs</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Panneau de modification rapide */}
+        {isEditing && (
+          <div className="no-print bg-amber-50/70 border-b border-amber-200 p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Nom Compagnie Assurance :</label>
+              <input
+                type="text"
+                value={assuranceNom}
+                onChange={(e) => setAssuranceNom(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Adresse Compagnie :</label>
+              <input
+                type="text"
+                value={assuranceAdresse}
+                onChange={(e) => setAssuranceAdresse(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Nom de l'assuré :</label>
+              <input
+                type="text"
+                value={assureNom}
+                onChange={(e) => setAssureNom(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">N° de police :</label>
+              <input
+                type="text"
+                value={numeroPolice}
+                onChange={(e) => setNumeroPolice(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Marque du véhicule :</label>
+              <input
+                type="text"
+                value={marqueVehicule}
+                onChange={(e) => setMarqueVehicule(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Immatriculation :</label>
+              <input
+                type="text"
+                value={immatriculation}
+                onChange={(e) => setImmatriculation(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">N° du sinistre :</label>
+              <input
+                type="text"
+                value={numeroSinistre}
+                placeholder="Ex: SIN-2026-..."
+                onChange={(e) => setNumeroSinistre(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Date de survenance :</label>
+              <input
+                type="text"
+                value={dateSurvenance}
+                placeholder="JJ/MM/AAAA"
+                onChange={(e) => setDateSurvenance(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Votre Intermédiaire :</label>
+              <input
+                type="text"
+                value={intermediaire}
+                onChange={(e) => setIntermediaire(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Montant net de l'indemnité :</label>
+              <input
+                type="text"
+                value={montantIndemnite}
+                placeholder="Ex: 2 400.00 DH"
+                onChange={(e) => setMontantIndemnite(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900 font-semibold"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Franchise contractuelle (dhs) :</label>
+              <input
+                type="text"
+                value={franchiseContractuelle}
+                placeholder="Ex: 300"
+                onChange={(e) => setFranchiseContractuelle(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">TVA indemnité (dhs) :</label>
+              <input
+                type="text"
+                value={tvaIndemnite}
+                placeholder="Ex: 400"
+                onChange={(e) => setTvaIndemnite(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Dépassement plafond (dhs) :</label>
+              <input
+                type="text"
+                value={depassementPlafond}
+                placeholder="Laisser vide ou saisir montant"
+                onChange={(e) => setDepassementPlafond(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Date d'édition :</label>
+              <input
+                type="text"
+                value={dateFaitA}
+                onChange={(e) => setDateFaitA(e.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-slate-900"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Printable Document Area (Strict Conforme au Modèle Utilisateur) */}
         <div className="overflow-x-auto bg-slate-100/50 p-2 sm:p-6 flex justify-center">
           <div 
             ref={printRef}
-            className="a4-document print-page p-6 sm:p-10 text-slate-800 text-xs sm:text-sm leading-relaxed shadow-sm border border-slate-200/80 rounded-xl"
+            className="a4-document print-page p-8 sm:p-14 text-slate-900 text-sm leading-relaxed shadow-sm border border-slate-200/80 rounded-xl bg-white max-w-[800px] w-full font-serif"
+            style={{ minHeight: '1050px' }}
           >
-          {/* Header Garage & Compagnie */}
-          <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight uppercase">
-                {GARAGE_INFO.nom}
+            
+            {/* Header Assurance */}
+            <div className="mb-8">
+              <h1 className="text-lg font-bold uppercase tracking-tight text-slate-950">
+                {assuranceNom}
               </h1>
-              <p className="text-xs font-semibold text-brand-600 uppercase tracking-wider mb-1">
-                Centre Spécialisé de Remplacement & Réparation de Vitrage Automobile
-              </p>
-              <p className="text-xs text-slate-600">{GARAGE_INFO.adresse}</p>
-              <p className="text-xs text-slate-600">Tél: {GARAGE_INFO.telephone}</p>
-              <p className="text-xs text-slate-500 font-mono mt-1">
-                ICE: {GARAGE_INFO.ice} | IF: {GARAGE_INFO.ifiscal} | RC: {GARAGE_INFO.rc}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="inline-block bg-slate-100 border border-slate-300 rounded-lg p-3 text-left min-w-[240px]">
-                <p className="text-xs font-semibold text-slate-500 uppercase">Compagnie & Agence</p>
-                <p className="text-base font-bold text-slate-900">{dossier.assurance?.nom || 'Assurance'}</p>
-                {dossier.agenceAssurance && (
-                  <p className="text-xs font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 mt-0.5">
-                    Agence : {dossier.agenceAssurance}
-                  </p>
-                )}
-                <p className="text-xs text-slate-600 mt-1">Police N°: <span className="font-mono font-semibold">{dossier.numeroPolice || '-'}</span></p>
-                <p className="text-xs text-slate-600">Sinistre N°: <span className="font-mono font-semibold">{dossier.numeroSinistre || '-'}</span></p>
-                <p className="text-[10px] text-slate-500 mt-1 pt-1 border-t border-slate-200 font-semibold">
-                  Partenaire Déclarant : <strong className="text-indigo-900">AZUR GLASS</strong>
-                </p>
+              <div className="text-xs text-slate-700 whitespace-pre-line mt-0.5">
+                {assuranceAdresse}
               </div>
             </div>
-          </div>
 
-          {/* Title */}
-          <div className="text-center my-6">
-            <h2 className="text-xl font-extrabold uppercase tracking-wide text-slate-900 border-2 border-slate-900 inline-block px-6 py-2 rounded">
-              QUITTANCE SUBROGATIVE DE BRIS DE GLACE
-            </h2>
-            <p className="text-xs text-slate-500 mt-2 italic">
-              Conforme aux dispositions du Code des Assurances et conventions de prise en charge directe
-            </p>
-          </div>
-
-          {/* Identification de l'assuré et véhicule */}
-          <div className="grid grid-cols-2 gap-4 my-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Souscripteur / Assuré</p>
-              <p className="font-semibold text-slate-900">{dossier.client.nom}</p>
-              <p className="text-xs text-slate-600">CIN / Identifiant: <span className="font-mono font-semibold">{dossier.client.cin || 'N/A'}</span></p>
-              <p className="text-xs text-slate-600">Tél: {dossier.client.telephone}</p>
-              <p className="text-xs text-slate-600">Ville: {dossier.client.ville}</p>
+            {/* Titre Principal */}
+            <div className="text-center my-6">
+              <h2 className="text-xl sm:text-2xl font-bold underline tracking-wide text-slate-950">
+                Quittance d’indemnisation
+              </h2>
             </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Véhicule Concerne</p>
-              <p className="font-semibold text-slate-900">{dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})</p>
-              <p className="text-xs text-slate-600">
-                Immatriculation : <span className="font-mono font-bold text-slate-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300" dir="ltr">
-                  {formatMatricule(dossier.vehicule.immatriculation, 'LATIN')}
-                </span>
-              </p>
-              <p className="text-xs text-slate-600 mt-1">N° Châssis (VIN): <span className="font-mono">{dossier.vehicule.chassisVin || 'Conforme carte grise'}</span></p>
-              <p className="text-xs text-slate-600">Kilométrage au compteur: <span className="font-mono">{dossier.vehicule.kilometrage ? `${dossier.vehicule.kilometrage} km` : '-'}</span></p>
-            </div>
-          </div>
 
-          {/* Déclaration et Subrogation */}
-          <div className="space-y-3 text-justify my-6 text-xs text-slate-700 leading-relaxed border-l-4 border-brand-600 pl-4">
-            <p>
-              Je soussigné(e), <strong>{dossier.client.nom}</strong>, propriétaire ou conducteur autorisé du véhicule ci-dessus désigné, déclare avoir constaté le bris du vitrage survenu le <strong>{formatDate(dossier.dateSinistre)}</strong> et certifie que les travaux de remplacement ont été réalisés avec succès et entière satisfaction par <strong>{GARAGE_INFO.nom}</strong>.
-            </p>
-            <p>
-              En contrepartie de la dispense de faire l'avance des frais relatifs à cette intervention, je subroge expressément le garage <strong>{GARAGE_INFO.nom}</strong> dans tous mes droits et actions contre la compagnie d'assurance <strong>{dossier.assurance?.nom || "l'assurance"}</strong> à concurrence du montant de la prise en charge agréée.
-            </p>
-            <p>
-              J'autorise par la présente la compagnie d'assurance à verser directement le règlement des prestations fournies entre les mains du garage susnommé.
-            </p>
-          </div>
-
-          {/* Décompte Financier */}
-          <div className="my-6 border border-slate-300 rounded-lg overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 border-b border-slate-300">
-                <tr>
-                  <th className="py-2.5 px-4 font-bold text-slate-700">Désignation des prestations</th>
-                  <th className="py-2.5 px-4 font-bold text-slate-700 text-right">Montant (TTC)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                <tr>
-                  <td className="py-2.5 px-4">
-                    Remplacement pare-brise / vitrage conforme normes d'origine + Pose & Consommables
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-medium">{formatDH(dossier.montantTotalTTC)}</td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-4 text-slate-600">
-                    Franchise contractuelle 
-                    {dossier.franchiseOfferte && <span className="ml-2 text-emerald-600 font-semibold">(Offerte par Globale Pare-Brise)</span>}
-                    {dossier.franchisePayeeParClient && <span className="ml-2 text-blue-600 font-semibold">(Réglée par le client)</span>}
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-medium">
-                    {dossier.montantFranchise > 0 ? formatDH(dossier.montantFranchise) : 'Néant (0.00 DH)'}
-                  </td>
-                </tr>
-                <tr className="bg-brand-50/50 font-bold text-slate-900 border-t-2 border-slate-300">
-                  <td className="py-3 px-4 text-sm text-brand-900">
-                    MONTANT TOTAL PRIS EN CHARGE PAR L'ASSURANCE :
-                  </td>
-                  <td className="py-3 px-4 text-right text-base text-brand-900 font-mono">
-                    {formatDH(dossier.montantPriseEnChargeAssurance)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Signatures */}
-          <div className="grid grid-cols-2 gap-8 mt-12 pt-4 border-t border-slate-300">
-            <div className="text-center">
-              <p className="text-xs font-semibold text-slate-700 uppercase">
-                Signature du Souscripteur / Assuré
-              </p>
-              <p className="text-[10px] text-slate-500 italic mt-0.5">(Précédée de la mention manuscrite "Bon pour accord et subrogation")</p>
-              <div className="h-28 border border-dashed border-slate-300 rounded-lg mt-3 flex items-end justify-center pb-2">
-                <span className="text-xs text-slate-400">Date & Signature de l'assuré</span>
+            {/* Informations Assuré & Véhicule */}
+            <div className="my-8 text-xs sm:text-sm space-y-1.5">
+              <div className="grid grid-cols-[180px_1fr] sm:grid-cols-[220px_1fr] items-baseline">
+                <span className="font-semibold text-slate-950">Assuré*</span>
+                <span className="font-bold text-slate-950">: {assureNom || '....................................................................'}</span>
+              </div>
+              <div className="grid grid-cols-[180px_1fr] sm:grid-cols-[220px_1fr] items-baseline">
+                <span className="font-semibold text-slate-950">N° de police</span>
+                <span className="font-medium text-slate-900">: {numeroPolice || '....................................................................'}</span>
+              </div>
+              <div className="grid grid-cols-[180px_1fr] sm:grid-cols-[220px_1fr] items-baseline">
+                <span className="font-semibold text-slate-950">Marque du véhicule</span>
+                <span className="font-medium text-slate-900">: {marqueVehicule || '....................................................................'}</span>
+              </div>
+              <div className="grid grid-cols-[180px_1fr] sm:grid-cols-[220px_1fr] items-baseline">
+                <span className="font-semibold text-slate-950">Immatriculation</span>
+                <span className="font-bold text-slate-900 font-mono">: {immatriculation || '....................................................................'}</span>
+              </div>
+              <div className="grid grid-cols-[180px_1fr] sm:grid-cols-[220px_1fr] items-baseline">
+                <span className="font-semibold text-slate-950">N° du sinistre</span>
+                <span className="font-medium text-slate-900">: {numeroSinistre || '....................................................................'}</span>
+              </div>
+              <div className="grid grid-cols-[180px_1fr] sm:grid-cols-[220px_1fr] items-baseline">
+                <span className="font-semibold text-slate-950">Date de survenance</span>
+                <span className="font-medium text-slate-900">: {dateSurvenance || '....................................................................'}</span>
+              </div>
+              <div className="grid grid-cols-[180px_1fr] sm:grid-cols-[220px_1fr] items-baseline">
+                <span className="font-semibold text-slate-950">Votre Intermédiaire</span>
+                <span className="font-medium text-slate-900">: {intermediaire || '....................................................................'}</span>
               </div>
             </div>
-            <div className="text-center">
-              <p className="text-xs font-semibold text-slate-700 uppercase">
-                Cachet & Signature du Centre
+
+            {/* Reconnaissance et Prise en charge */}
+            <div className="my-8 text-xs sm:text-sm text-justify leading-relaxed">
+              <p className="mb-4">
+                Je soussigné : <strong>{assureNom || '....................................................................'}</strong>
               </p>
-              <p className="text-[10px] text-slate-500 italic mt-0.5">{GARAGE_INFO.nom}</p>
-              <div className="h-28 border border-dashed border-slate-300 rounded-lg mt-3 flex items-center justify-center p-2">
-                <div className="text-[10px] text-slate-400 border border-slate-200 p-2 rounded">
-                  Fait à Marrakech, le {formatDate(dossier.dateCreation)}
-                  <br />Cachet de l'établissement
+              <p>
+                , Reconnais avoir accepté la prise en charge de la réparation des dommages subis par mon véhicule par <strong>AZUR GLASS</strong> agréé par <strong>{assuranceNom}</strong>, {assuranceAdresse.replace(/\n/g, ', ')}.
+              </p>
+            </div>
+
+            {/* Section Indemnité */}
+            <div className="my-6 text-xs sm:text-sm leading-relaxed">
+              <h3 className="font-bold text-sm sm:text-base text-slate-950 mb-2">
+                Indemnité
+              </h3>
+              <p className="text-justify mb-4">
+                Le montant net de votre indemnité est de{' '}
+                <strong className="underline underline-offset-4 px-2">
+                  {montantIndemnite || '........................................................'}
+                </strong>{' '}
+                et il constitue le solde complet, définitif et sans réserve, tous droits et indemnités compris, du Préjudice matériel qui a été causé à votre véhicule. La présente quittance vaut accord et désistement.
+              </p>
+
+              <p className="font-semibold mb-2 text-slate-950">
+                Le montant restant à votre charge au titre de cette réparation est de :
+              </p>
+              <ul className="space-y-1.5 pl-2">
+                <li className="flex items-baseline">
+                  <span className="mr-2 text-base leading-none">▪</span>
+                  <span>La franchise contractuelle s’élève à <strong>{franchiseContractuelle || '....................'}</strong> dhs.</span>
+                </li>
+                <li className="flex items-baseline">
+                  <span className="mr-2 text-base leading-none">▪</span>
+                  <span>La TVA sur le montant de l’indemnité est de <strong>{tvaIndemnite || '....................'}</strong> dhs.</span>
+                </li>
+                <li className="flex items-baseline">
+                  <span className="mr-2 text-base leading-none">▪</span>
+                  <span>Le montant restant à votre charge pour dépassement de plafond est de <strong>{depassementPlafond || '....................'}</strong> dhs.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Clauses Légales Subrogation */}
+            <div className="my-6 text-xs sm:text-sm text-justify leading-relaxed space-y-3 text-slate-800">
+              <p>
+                Moyennant le montant de la dite réparation, <strong>{assuranceNom}</strong> est subrogée jusqu'à concurrence du montant des réparations précité dans mes droits et actions, contre les tiers responsables qui par leur fait ont causé le dommage ayant donné lieu à la garantie de la compagnie, ou leurs assureurs.
+              </p>
+              <p>
+                En cas de déclaration fausse ou inexacte des circonstances décrites sur la déclaration de sinistre, la Compagnie se réserve le droit de récupérer le coût de la réparation par tous moyens de droit.
+              </p>
+            </div>
+
+            {/* Lieu & Signatures */}
+            <div className="mt-10 pt-4">
+              <p className="text-xs sm:text-sm mb-12">
+                Fait à MARRAKECH, le {dateFaitA || '................................'}
+              </p>
+
+              <div className="flex justify-between items-start text-xs sm:text-sm">
+                <div className="w-1/2">
+                  <p className="font-semibold text-slate-900 mb-1">« Lu et approuvé »</p>
+                  <p className="text-[11px] text-slate-500 italic mb-8">(Signature de l'assuré)</p>
+                </div>
+                <div className="w-1/2 text-right">
+                  <p className="font-bold text-slate-950 tracking-wider">AZUR GLASS</p>
+                  <p className="text-[11px] text-slate-500 italic mb-8">(Cachet & Signature)</p>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Footer légal */}
-          <div className="mt-8 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400">
-            {GARAGE_INFO.nom} - {GARAGE_INFO.formeJuridique} au Capital social de 100.000 DH - {GARAGE_INFO.adresse} - RIB: {GARAGE_INFO.rib}
           </div>
-        </div>
         </div>
       </div>
     </div>
