@@ -46,6 +46,7 @@ import {
   saveFactureToSupabase,
   saveDevisToSupabase
 } from '@/lib/supabaseService';
+import { getActiveSupabaseSession, logoutSupabase } from '@/lib/authService';
 
 import { Navigation } from '@/components/layout/Navigation';
 import { DashboardView } from '@/components/views/DashboardView';
@@ -119,18 +120,28 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Chargement de la session utilisateur locale
+  // Chargement de la session utilisateur (Supabase Auth ou stockage local)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('gp_user_session');
-      if (stored) {
-        setCurrentUser(JSON.parse(stored));
+    const initAuth = async () => {
+      try {
+        const supaSession = await getActiveSupabaseSession();
+        if (supaSession) {
+          setCurrentUser(supaSession);
+          localStorage.setItem('gp_user_session', JSON.stringify(supaSession));
+        } else {
+          const stored = localStorage.getItem('gp_user_session');
+          if (stored) {
+            setCurrentUser(JSON.parse(stored));
+          }
+        }
+      } catch (err) {
+        console.error('Erreur lecture session:', err);
+      } finally {
+        setAuthLoaded(true);
       }
-    } catch (err) {
-      console.error('Erreur lecture session:', err);
-    } finally {
-      setAuthLoaded(true);
-    }
+    };
+
+    initAuth();
   }, []);
 
   const handleLogin = (session: UserSession) => {
@@ -143,10 +154,11 @@ export default function Home() {
     showToast(`Connexion réussie : Bienvenue ${session.nom} (${session.role === 'SUPERADMIN' ? 'Super Admin' : 'Assistante'})`);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setCurrentUser(null);
     try {
       localStorage.removeItem('gp_user_session');
+      await logoutSupabase();
     } catch (err) {
       console.error('Erreur déconnexion:', err);
     }
