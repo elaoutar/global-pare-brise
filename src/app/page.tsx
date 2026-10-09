@@ -120,7 +120,7 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Chargement de la session utilisateur (Supabase Auth ou stockage local)
+  // Chargement strict de la session officielle Supabase Auth
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -129,13 +129,14 @@ export default function Home() {
           setCurrentUser(supaSession);
           localStorage.setItem('gp_user_session', JSON.stringify(supaSession));
         } else {
-          const stored = localStorage.getItem('gp_user_session');
-          if (stored) {
-            setCurrentUser(JSON.parse(stored));
-          }
+          // Si aucune session active Supabase, déconnexion obligatoire
+          localStorage.removeItem('gp_user_session');
+          setCurrentUser(null);
         }
       } catch (err) {
-        console.error('Erreur lecture session:', err);
+        console.error('Erreur vérification session Supabase:', err);
+        localStorage.removeItem('gp_user_session');
+        setCurrentUser(null);
       } finally {
         setAuthLoaded(true);
       }

@@ -7,14 +7,18 @@ export interface AuthResult {
 }
 
 /**
- * Connexion officielle via Supabase Auth (Option 1)
+ * Connexion officielle et stricte via Supabase Auth
+ * Aucun contournement : l'email et le mot de passe doivent être valides dans la base de données.
  */
 export async function loginWithSupabase(email: string, password: string): Promise<AuthResult> {
   const cleanEmail = email.trim().toLowerCase();
 
+  if (!cleanEmail || !password) {
+    return { session: null, error: "Veuillez saisir votre email et votre mot de passe." };
+  }
+
   if (!isSupabaseConfigured || !supabase) {
-    // Mode dégradé si variables non encore chargées
-    return fallbackLocalAuth(cleanEmail, password);
+    return { session: null, error: "Le service Supabase n'est pas accessible." };
   }
 
   try {
@@ -24,28 +28,30 @@ export async function loginWithSupabase(email: string, password: string): Promis
     });
 
     if (error) {
-      // Cas 1 : Email non confirmé dans Supabase (option "Confirm email" activée)
+      // Cas 1 : Email non confirmé dans Supabase
       if (error.message.includes('Email not confirmed') || error.message.includes('email_not_confirmed')) {
         return {
           session: null,
-          error: "⚠️ Email non confirmé dans Supabase. Rendez-vous dans votre console Supabase > Authentication > Providers > Email, et désactivez 'Confirm email' (ou validez l'utilisateur dans l'onglet Users).",
+          error: "⚠️ Cet email n'a pas encore été confirmé dans Supabase. Veuillez désactiver 'Confirm email' dans Supabase (Authentication > Providers > Email) ou valider l'utilisateur.",
         };
       }
 
       // Cas 2 : Identifiants incorrects
       if (error.message.includes('Invalid login credentials')) {
-        // Vérification si compte de secours prédéfini pour transition
-        return fallbackLocalAuth(cleanEmail, password);
+        return {
+          session: null,
+          error: "Email ou mot de passe incorrect. Veuillez vérifier vos identifiants.",
+        };
       }
 
       return { session: null, error: error.message };
     }
 
     if (!data.user) {
-      return { session: null, error: "Utilisateur non trouvé dans Supabase." };
+      return { session: null, error: "Utilisateur non trouvé dans la base Supabase." };
     }
 
-    // Récupération du rôle et des infos depuis user_metadata
+    // Récupération stricte du rôle et des métadonnées
     const metadata = data.user.user_metadata || {};
     const role: UserRole = metadata.role === 'ASSISTANTE' ? 'ASSISTANTE' : 'SUPERADMIN';
     const nom: string = metadata.nom || (role === 'SUPERADMIN' ? 'Direction Générale (Gérant)' : 'Assistante Opérations');
@@ -62,7 +68,7 @@ export async function loginWithSupabase(email: string, password: string): Promis
     return { session, error: null };
   } catch (err: any) {
     console.error('Erreur Supabase Auth:', err);
-    return { session: null, error: err.message || "Erreur de connexion à Supabase." };
+    return { session: null, error: err.message || "Erreur de connexion au serveur d'authentification." };
   }
 }
 
@@ -86,7 +92,7 @@ export async function registerSupabaseUser(
       password,
       options: {
         data: {
-          nom,
+          nom: nom.trim(),
           role,
           agence,
         },
@@ -97,7 +103,7 @@ export async function registerSupabaseUser(
       if (error.message.includes('rate limit')) {
         return {
           user: null,
-          error: "Limite d'envoi d'emails Supabase atteinte. Pour créer des comptes sans limite, désactivez 'Confirm email' dans Supabase > Authentication > Providers > Email.",
+          error: "Limite d'envoi d'emails Supabase atteinte. Pour créer des comptes immédiatement, désactivez 'Confirm email' dans votre console Supabase (Authentication > Providers > Email).",
         };
       }
       return { user: null, error: error.message };
@@ -105,7 +111,7 @@ export async function registerSupabaseUser(
 
     return { user: data.user, error: null };
   } catch (err: any) {
-    return { user: null, error: err.message || "Erreur lors de la création." };
+    return { user: null, error: err.message || "Erreur lors de la création du compte." };
   }
 }
 
@@ -149,40 +155,4 @@ export async function getActiveSupabaseSession(): Promise<UserSession | null> {
     console.error('Erreur getActiveSupabaseSession:', e);
     return null;
   }
-}
-
-/**
- * Authentification de secours locale en cas de problème réseau
- */
-function fallbackLocalAuth(email: string, password: string): AuthResult {
-  if (email.includes('admin') || email.includes('direction')) {
-    return {
-      session: {
-        id: 'usr-admin-local',
-        nom: 'Directeur Général (Gérant)',
-        email: email,
-        role: 'SUPERADMIN',
-        agence: 'Marrakech',
-      },
-      error: null,
-    };
-  }
-
-  if (email.includes('assistante') || email.includes('sanaa') || email.includes('operation')) {
-    return {
-      session: {
-        id: 'usr-assistante-local',
-        nom: 'Sanaa (Assistante Opérations)',
-        email: email,
-        role: 'ASSISTANTE',
-        agence: 'Marrakech',
-      },
-      error: null,
-    };
-  }
-
-  return {
-    session: null,
-    error: "Identifiants invalides dans la base Supabase.",
-  };
 }

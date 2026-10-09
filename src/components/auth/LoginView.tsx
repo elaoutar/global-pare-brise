@@ -16,7 +16,7 @@ import {
   UserPlus,
   CheckCircle2,
   Database,
-  Building2
+  AlertCircle
 } from 'lucide-react';
 import { GARAGE_INFO } from '@/lib/data';
 
@@ -37,28 +37,35 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
   const [registerNom, setRegisterNom] = useState('');
   const [registerRole, setRegisterRole] = useState<UserRole>('ASSISTANTE');
 
-  const handleCustomLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
 
-    if (!email || !password) {
-      setError('Veuillez renseigner votre email et mot de passe.');
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setError('Veuillez renseigner votre adresse email et votre mot de passe.');
       return;
     }
 
     setIsLoading(true);
 
     if (isRegisterMode) {
-      // Inscription dans Supabase Auth
-      if (!registerNom) {
+      // Inscription sécurisée d'un nouveau collaborateur dans Supabase
+      if (!registerNom.trim()) {
         setError("Veuillez renseigner le nom complet de l'utilisateur.");
         setIsLoading(false);
         return;
       }
 
+      if (password.length < 6) {
+        setError("Le mot de passe doit comporter au moins 6 caractères.");
+        setIsLoading(false);
+        return;
+      }
+
       const { user, error: regError } = await registerSupabaseUser(
-        email,
+        cleanEmail,
         password,
         registerNom,
         registerRole
@@ -71,13 +78,14 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
         return;
       }
 
-      setSuccessMsg(`Compte ${email} (${registerRole}) créé dans Supabase ! Vous pouvez vous connecter.`);
+      setSuccessMsg(`Compte créé avec succès dans Supabase ! Vous pouvez maintenant vous connecter avec votre mot de passe.`);
       setIsRegisterMode(false);
+      setPassword('');
       return;
     }
 
-    // Connexion officielle via Supabase Auth
-    const { session, error: loginError } = await loginWithSupabase(email, password);
+    // Connexion STRICTE à la base de données Supabase
+    const { session, error: loginError } = await loginWithSupabase(cleanEmail, password);
     setIsLoading(false);
 
     if (loginError) {
@@ -90,40 +98,13 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
     }
   };
 
-  const handleQuickLogin = async (role: UserRole) => {
-    setError(null);
-    setSuccessMsg(null);
-    setIsLoading(true);
-
-    const targetEmail = role === 'SUPERADMIN' 
-      ? 'direction.globalparebrise@gmail.com' 
-      : 'assistante.globalparebrise@gmail.com';
-
-    // Tente la connexion Supabase ou bascule sur la session assignée
-    const { session, error: loginError } = await loginWithSupabase(targetEmail, 'GlobalPareBrise2026!');
-    setIsLoading(false);
-
-    if (session) {
-      onLogin(session);
-    } else {
-      // Si compte Supabase non encore initialisé, connecte directement avec le rôle sélectionné
-      onLogin({
-        id: role === 'SUPERADMIN' ? 'usr-admin-gp' : 'usr-assistante-gp',
-        nom: role === 'SUPERADMIN' ? 'Directeur Général (Gérant)' : 'Sanaa (Assistante Opérations)',
-        email: targetEmail,
-        role: role,
-        agence: 'Marrakech',
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col justify-center items-center p-4 sm:p-6 text-slate-100">
       
       {/* Container principal */}
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden text-slate-800 animate-in fade-in zoom-in-95 duration-200">
         
-        {/* En-tête avec marque & Supabase Auth Badge */}
+        {/* En-tête avec marque */}
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 bg-brand-500/10 rounded-full blur-2xl pointer-events-none" />
           
@@ -135,25 +116,27 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
             {GARAGE_INFO.nom}
           </h1>
           <p className="text-xs text-indigo-300 font-semibold tracking-wide mt-1">
-            Gestion Globale & Partenaire AZUR GLASS
+            Espace Sécurisé • Authentification Obligatoire
           </p>
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold mt-2.5">
             <Database className="w-3 h-3 text-emerald-400" />
-            <span>Supabase Database Auth Connectée</span>
+            <span>Sécurité Base de Données Supabase Active</span>
           </div>
         </div>
 
-        {/* Corps de la modale de connexion */}
-        <div className="p-6 sm:p-8 space-y-6">
+        {/* Corps de connexion sécurisée */}
+        <div className="p-6 sm:p-8 space-y-5">
 
-          {/* Messages d'erreur et de succès */}
+          {/* Messages d'erreur */}
           {error && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold leading-relaxed">
-              {error}
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold leading-relaxed flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
+          {/* Message de succès */}
           {successMsg && (
             <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
@@ -161,114 +144,62 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
             </div>
           )}
 
-          {/* Sélecteur de rôle en 1-Clic pour test immédiat */}
-          {!isRegisterMode && (
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Accès Rapide par Rôle :
-              </label>
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => handleQuickLogin('SUPERADMIN')}
-                  className="p-3 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] bg-gradient-to-br from-indigo-50 to-slate-50 border-indigo-500 hover:border-indigo-600 shadow-sm group disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
-                      <Crown className="w-4 h-4 text-amber-300" />
-                    </div>
-                    <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
-                      Direction
-                    </span>
-                  </div>
-                  <p className="font-extrabold text-xs text-slate-900 group-hover:text-indigo-600 transition-colors">
-                    Super Admin
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                    CA Total, Finances & Rapports
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => handleQuickLogin('ASSISTANTE')}
-                  className="p-3 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] bg-gradient-to-br from-brand-50 to-slate-50 border-brand-500 hover:border-brand-600 shadow-sm group disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="text-[10px] font-bold bg-brand-100 text-brand-800 px-1.5 py-0.5 rounded">
-                      Opérations
-                    </span>
-                  </div>
-                  <p className="font-extrabold text-xs text-slate-900 group-hover:text-brand-600 transition-colors">
-                    Assistante
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                    Dossiers & Stock (Sans Chiffres)
-                  </p>
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="relative flex py-1 items-center">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="flex-shrink mx-3 text-slate-400 text-[10px] uppercase font-bold tracking-wider">
-              {isRegisterMode ? 'Enregistrer dans Supabase' : 'ou Connexion Email / Mot de Passe'}
-            </span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
-
-          {/* Formulaire de saisie Supabase Auth */}
-          <form onSubmit={handleCustomLogin} className="space-y-4">
+          {/* Formulaire strict de connexion */}
+          <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Champs additionnels en mode Création */}
+            {/* Champs additionnels lors de la création de compte */}
             {isRegisterMode && (
               <>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-medium">
+                  Création d'un nouveau compte enregistré dans la base Supabase.
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nom & Prénom :
+                    Nom & Prénom du collaborateur :
                   </label>
                   <input
                     type="text"
                     required
                     value={registerNom}
                     onChange={(e) => setRegisterNom(e.target.value)}
-                    placeholder="ex: Sanaa Alami"
+                    placeholder="ex: Ahmed El Mansouri"
                     className="w-full text-xs py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Rôle attribué :
+                    Rôle & Privilèges accordés :
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setRegisterRole('SUPERADMIN')}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all ${
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left ${
                         registerRole === 'SUPERADMIN'
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-slate-50 text-slate-700 border-slate-300'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      👑 Super Admin
+                      <p className="font-extrabold flex items-center gap-1">
+                        <Crown className="w-3.5 h-3.5" /> Super Admin
+                      </p>
+                      <p className="text-[10px] opacity-80 font-normal mt-0.5">Accès CA & Finances</p>
                     </button>
                     <button
                       type="button"
                       onClick={() => setRegisterRole('ASSISTANTE')}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all ${
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left ${
                         registerRole === 'ASSISTANTE'
-                          ? 'bg-brand-600 text-white border-brand-600'
-                          : 'bg-slate-50 text-slate-700 border-slate-300'
+                          ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      👩‍💼 Assistante
+                      <p className="font-extrabold flex items-center gap-1">
+                        <User className="w-3.5 h-3.5" /> Assistante
+                      </p>
+                      <p className="text-[10px] opacity-80 font-normal mt-0.5">Sans chiffres CA</p>
                     </button>
                   </div>
                 </div>
@@ -277,7 +208,7 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Adresse Email Supabase :
+                Adresse Email :
               </label>
               <div className="relative">
                 <input
@@ -285,7 +216,7 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ex: direction.globalparebrise@gmail.com"
+                  placeholder="ex: direction@globaleparebrise.ma"
                   className="w-full text-xs py-2.5 px-3 pl-9 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white"
                 />
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -324,16 +255,16 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
-                  <span>Vérification en base Supabase...</span>
+                  <span>Vérification en cours...</span>
                 </>
               ) : isRegisterMode ? (
                 <>
                   <UserPlus className="w-4 h-4 text-sky-400" />
-                  <span>Créer le Compte dans Supabase</span>
+                  <span>Enregistrer le compte</span>
                 </>
               ) : (
                 <>
-                  <span>Se Connecter à Supabase</span>
+                  <span>Connexion Sécurisée</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -351,8 +282,8 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
                 className="text-xs text-brand-600 hover:text-brand-800 font-semibold underline underline-offset-2"
               >
                 {isRegisterMode 
-                  ? '← Retour à la connexion' 
-                  : '+ Créer un nouveau compte utilisateur dans Supabase'}
+                  ? '← Retour au formulaire de connexion' 
+                  : '+ Créer un nouveau compte dans Supabase'}
               </button>
             </div>
           </form>
@@ -361,7 +292,7 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
 
         {/* Footer info */}
         <div className="p-4 bg-slate-50 border-t border-slate-100 text-center text-[10px] text-slate-400">
-          GLOBAL PARE-BRISE • Supabase Cloud Authentication • ICE: {GARAGE_INFO.ice}
+          GLOBAL PARE-BRISE • Accès Contrôlé • ICE: {GARAGE_INFO.ice}
         </div>
 
       </div>
