@@ -59,6 +59,7 @@ import { PartenairesView } from '@/components/views/PartenairesView';
 import { FournisseursView } from '@/components/views/FournisseursView';
 import { RapportsExportView } from '@/components/views/RapportsExportView';
 import { DevisView } from '@/components/views/DevisView';
+import { UtilisateursView } from '@/components/views/UtilisateursView';
 
 import { NewDossierModal } from '@/components/dossiers/NewDossierModal';
 import { QuittanceModal } from '@/components/documents/QuittanceModal';
@@ -166,9 +167,9 @@ export default function Home() {
     showToast('Déconnexion effectuée.');
   };
 
-  // Sécurité navigation : L'Assistante ne peut pas accéder aux recettes et rapports financiers
+  // Sécurité navigation : L'Assistante ne peut pas accéder aux recettes, rapports financiers ou gestion utilisateurs
   useEffect(() => {
-    if (currentUser?.role === 'ASSISTANTE' && (activeTab === 'recettes' || activeTab === 'rapports')) {
+    if (currentUser?.role === 'ASSISTANTE' && (activeTab === 'recettes' || activeTab === 'rapports' || activeTab === 'utilisateurs')) {
       setActiveTab('dashboard');
     }
   }, [currentUser, activeTab]);
@@ -1096,6 +1097,10 @@ export default function Home() {
             assurances={assurances}
             recettes={recettes}
           />
+        )}
+
+        {activeTab === 'utilisateurs' && currentUser?.role === 'SUPERADMIN' && (
+          <UtilisateursView currentAdmin={currentUser} />
         )}
 
         {activeTab === 'assurances' && (

@@ -96,10 +96,16 @@ export const Navigation: React.FC<Props> = ({
       label: 'Fournisseurs & Commandes',
       icon: Truck,
     },
+    {
+      id: 'utilisateurs',
+      label: 'Équipe & Gestion Accès',
+      icon: Users2,
+      superAdminOnly: true,
+    },
   ];
 
   const filteredNavItems = userSession?.role === 'ASSISTANTE'
-    ? navItems.filter((item) => item.id !== 'recettes' && item.id !== 'rapports')
+    ? navItems.filter((item) => item.id !== 'recettes' && item.id !== 'rapports' && !item.superAdminOnly)
     : navItems;
 
   return (

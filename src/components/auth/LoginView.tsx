@@ -1,22 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UserSession, UserRole } from '@/types';
-import { loginWithSupabase, registerSupabaseUser } from '@/lib/authService';
+import { UserSession } from '@/types';
+import { loginWithSupabase } from '@/lib/authService';
 import { 
   ShieldCheck, 
   Lock, 
   Mail, 
-  Crown, 
-  User, 
   ArrowRight, 
   Eye, 
   EyeOff, 
-  Loader2,
-  UserPlus,
-  CheckCircle2,
-  Database,
-  AlertCircle
+  Loader2, 
+  AlertCircle,
+  Database
 } from 'lucide-react';
 import { GARAGE_INFO } from '@/lib/data';
 
@@ -30,17 +26,10 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  // Mode création de compte dans Supabase
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [registerNom, setRegisterNom] = useState('');
-  const [registerRole, setRegisterRole] = useState<UserRole>('ASSISTANTE');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccessMsg(null);
 
     const cleanEmail = email.trim();
     if (!cleanEmail || !password) {
@@ -49,40 +38,6 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
     }
 
     setIsLoading(true);
-
-    if (isRegisterMode) {
-      // Inscription sécurisée d'un nouveau collaborateur dans Supabase
-      if (!registerNom.trim()) {
-        setError("Veuillez renseigner le nom complet de l'utilisateur.");
-        setIsLoading(false);
-        return;
-      }
-
-      if (password.length < 6) {
-        setError("Le mot de passe doit comporter au moins 6 caractères.");
-        setIsLoading(false);
-        return;
-      }
-
-      const { user, error: regError } = await registerSupabaseUser(
-        cleanEmail,
-        password,
-        registerNom,
-        registerRole
-      );
-
-      setIsLoading(false);
-
-      if (regError) {
-        setError(regError);
-        return;
-      }
-
-      setSuccessMsg(`Compte créé avec succès dans Supabase ! Vous pouvez maintenant vous connecter avec votre mot de passe.`);
-      setIsRegisterMode(false);
-      setPassword('');
-      return;
-    }
 
     // Connexion STRICTE à la base de données Supabase
     const { session, error: loginError } = await loginWithSupabase(cleanEmail, password);
@@ -136,76 +91,8 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
             </div>
           )}
 
-          {/* Message de succès */}
-          {successMsg && (
-            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
           {/* Formulaire strict de connexion */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {/* Champs additionnels lors de la création de compte */}
-            {isRegisterMode && (
-              <>
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-medium">
-                  Création d'un nouveau compte enregistré dans la base Supabase.
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nom & Prénom du collaborateur :
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={registerNom}
-                    onChange={(e) => setRegisterNom(e.target.value)}
-                    placeholder="ex: Ahmed El Mansouri"
-                    className="w-full text-xs py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Rôle & Privilèges accordés :
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRegisterRole('SUPERADMIN')}
-                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left ${
-                        registerRole === 'SUPERADMIN'
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                          : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
-                      }`}
-                    >
-                      <p className="font-extrabold flex items-center gap-1">
-                        <Crown className="w-3.5 h-3.5" /> Super Admin
-                      </p>
-                      <p className="text-[10px] opacity-80 font-normal mt-0.5">Accès CA & Finances</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRegisterRole('ASSISTANTE')}
-                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left ${
-                        registerRole === 'ASSISTANTE'
-                          ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
-                          : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
-                      }`}
-                    >
-                      <p className="font-extrabold flex items-center gap-1">
-                        <User className="w-3.5 h-3.5" /> Assistante
-                      </p>
-                      <p className="text-[10px] opacity-80 font-normal mt-0.5">Sans chiffres CA</p>
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Adresse Email :
@@ -257,11 +144,6 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
                   <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
                   <span>Vérification en cours...</span>
                 </>
-              ) : isRegisterMode ? (
-                <>
-                  <UserPlus className="w-4 h-4 text-sky-400" />
-                  <span>Enregistrer le compte</span>
-                </>
               ) : (
                 <>
                   <span>Connexion Sécurisée</span>
@@ -269,23 +151,6 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
                 </>
               )}
             </button>
-
-            {/* Basculer entre Inscription et Connexion */}
-            <div className="text-center pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegisterMode(!isRegisterMode);
-                  setError(null);
-                  setSuccessMsg(null);
-                }}
-                className="text-xs text-brand-600 hover:text-brand-800 font-semibold underline underline-offset-2"
-              >
-                {isRegisterMode 
-                  ? '← Retour au formulaire de connexion' 
-                  : '+ Créer un nouveau compte dans Supabase'}
-              </button>
-            </div>
           </form>
 
         </div>
