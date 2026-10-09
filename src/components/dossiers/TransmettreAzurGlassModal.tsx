@@ -132,7 +132,13 @@ Email: ${GARAGE_INFO.email}`;
     }, 1200);
   };
 
-  // Envoi via Mailto
+  // Envoi direct via Webmail Gmail (Google Workspace ou compte perso)
+  const handleOpenGmailWeb = () => {
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(destinataire)}&cc=${encodeURIComponent(cc)}&su=${encodeURIComponent(objet)}&body=${encodeURIComponent(message)}`;
+    window.open(gmailUrl, '_blank');
+  };
+
+  // Envoi via Client Mail par défaut (Apple Mail, Outlook, etc.)
   const handleOpenMailClient = () => {
     const mailtoUrl = `mailto:${encodeURIComponent(destinataire)}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(objet)}&body=${encodeURIComponent(message)}`;
     window.open(mailtoUrl, '_blank');
@@ -391,15 +397,29 @@ Email: ${GARAGE_INFO.email}`;
 
         {/* Sticky Footer with 1-Click Action Buttons */}
         <div className="sticky bottom-0 z-30 bg-slate-50 border-t border-slate-200 px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleOpenMailClient}
-            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-all shadow-sm"
-            title="Ouvrir dans Outlook, Gmail ou Apple Mail"
-          >
-            <ExternalLink className="w-4 h-4 text-slate-500" />
-            Ouvrir dans mon Webmail / Client Mail
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Bouton direct Gmail Web */}
+            <button
+              type="button"
+              onClick={handleOpenGmailWeb}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+              title="Ouvrir directement dans Gmail avec toutes les infos pré-remplies"
+            >
+              <Mail className="w-4 h-4 text-white" />
+              <span>Ouvrir dans Gmail</span>
+            </button>
+
+            {/* Bouton Client Mail par défaut (Outlook, Apple Mail) */}
+            <button
+              type="button"
+              onClick={handleOpenMailClient}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-medium transition-all shadow-sm"
+              title="Ouvrir dans Outlook ou Apple Mail"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+              <span>Autre Webmail</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
