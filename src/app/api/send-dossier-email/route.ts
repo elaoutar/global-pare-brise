@@ -23,14 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const smtpUser = process.env.SMTP_USER || 'a.elaoutar@gmail.com';
-    const smtpPassword = process.env.SMTP_PASSWORD;
-
-    if (!smtpPassword) {
-      return NextResponse.json(
-        { error: 'Clé SMTP d\'application Gmail non configurée sur le serveur.' },
-        { status: 500 }
-      );
-    }
+    const smtpPassword = process.env.SMTP_PASSWORD || 'xnfu inhz twlp frsb';
 
     // Configuration du transporteur SMTP Gmail sécurisé
     const transporter = nodemailer.createTransport({
