@@ -39,6 +39,7 @@ import {
 import { MatriculeMarocInput } from '@/components/ui/MatriculeMarocInput';
 import { formatDH } from '@/lib/utils';
 import { LISTE_MARQUES_MAROC, getModelesPourMarque } from '@/lib/vehiculesMaroc';
+import { uploadFileToSupabase } from '@/lib/supabaseService';
 
 interface Props {
   assurances: Assurance[];
@@ -162,6 +163,35 @@ export const NewDossierModal: React.FC<Props> = ({
   const [photoAvant, setPhotoAvant] = useState('');
   const [photoApresPose, setPhotoApresPose] = useState('');
   const [photoCarteGrise, setPhotoCarteGrise] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState<string | null>(null);
+
+  const handleUploadPhotoFile = async (file: File, type: 'avant' | 'apres' | 'carteGrise') => {
+    setIsUploadingPhoto(type);
+    try {
+      // 1. Générer prévisualisation immédiate en local
+      const reader = new FileReader();
+      reader.onload = () => {
+        const localData = reader.result as string;
+        if (type === 'avant') setPhotoAvant(localData);
+        else if (type === 'apres') setPhotoApresPose(localData);
+        else if (type === 'carteGrise') setPhotoCarteGrise(localData);
+      };
+      reader.readAsDataURL(file);
+
+      // 2. Synchroniser vers Supabase Storage dans le bucket 'sinistre-documents'
+      const folderName = `dossiers/${vehiculeImm || 'photos'}`;
+      const uploadedUrl = await uploadFileToSupabase(file, folderName);
+      if (uploadedUrl) {
+        if (type === 'avant') setPhotoAvant(uploadedUrl);
+        else if (type === 'apres') setPhotoApresPose(uploadedUrl);
+        else if (type === 'carteGrise') setPhotoCarteGrise(uploadedUrl);
+      }
+    } catch (err) {
+      console.warn('Fallback stockage photo local Base64:', err);
+    } finally {
+      setIsUploadingPhoto(null);
+    }
+  };
 
   // Dynamic Financials Calculations (Total TTC saisi -> Calcul automatique du HT et TVA)
   const extraPrestationsTotalTTC = lignesPrestationsExtra.reduce((sum, item) => sum + (Number(item.prixTTC) || 0), 0);
@@ -1579,7 +1609,12 @@ export const NewDossierModal: React.FC<Props> = ({
                   {/* 1. Photo Avant Pose / Bris */}
                   <div className="border border-dashed border-slate-300 rounded-lg p-2.5 bg-white text-center hover:bg-slate-50 transition">
                     <p className="text-[11px] font-bold text-slate-700 mb-1">1. Bris / Avant Pose</p>
-                    {photoAvant ? (
+                    {isUploadingPhoto === 'avant' ? (
+                      <div className="aspect-video flex flex-col items-center justify-center bg-slate-50 rounded text-brand-600 text-[10px] font-semibold animate-pulse mb-1.5 border border-brand-200">
+                        <Upload className="w-4 h-4 animate-bounce mb-1" />
+                        Synchronisation...
+                      </div>
+                    ) : photoAvant ? (
                       <div className="relative aspect-video rounded overflow-hidden mb-1.5 border border-slate-200 group">
                         <img src={photoAvant} alt="Avant" className="w-full h-full object-cover" />
                         <button
@@ -1601,11 +1636,7 @@ export const NewDossierModal: React.FC<Props> = ({
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = () => setPhotoAvant(reader.result as string);
-                              reader.readAsDataURL(file);
-                            }
+                            if (file) handleUploadPhotoFile(file, 'avant');
                           }}
                         />
                       </label>
@@ -1616,7 +1647,12 @@ export const NewDossierModal: React.FC<Props> = ({
                   {/* 2. Photo Après Pose */}
                   <div className="border border-dashed border-slate-300 rounded-lg p-2.5 bg-white text-center hover:bg-slate-50 transition">
                     <p className="text-[11px] font-bold text-slate-700 mb-1">2. Après Pose (Posé)</p>
-                    {photoApresPose ? (
+                    {isUploadingPhoto === 'apres' ? (
+                      <div className="aspect-video flex flex-col items-center justify-center bg-slate-50 rounded text-brand-600 text-[10px] font-semibold animate-pulse mb-1.5 border border-brand-200">
+                        <Upload className="w-4 h-4 animate-bounce mb-1" />
+                        Synchronisation...
+                      </div>
+                    ) : photoApresPose ? (
                       <div className="relative aspect-video rounded overflow-hidden mb-1.5 border border-slate-200 group">
                         <img src={photoApresPose} alt="Après" className="w-full h-full object-cover" />
                         <button
@@ -1638,11 +1674,7 @@ export const NewDossierModal: React.FC<Props> = ({
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = () => setPhotoApresPose(reader.result as string);
-                              reader.readAsDataURL(file);
-                            }
+                            if (file) handleUploadPhotoFile(file, 'apres');
                           }}
                         />
                       </label>
@@ -1653,7 +1685,12 @@ export const NewDossierModal: React.FC<Props> = ({
                   {/* 3. Photo Carte Grise */}
                   <div className="border border-dashed border-slate-300 rounded-lg p-2.5 bg-white text-center hover:bg-slate-50 transition">
                     <p className="text-[11px] font-bold text-slate-700 mb-1">3. Carte Grise</p>
-                    {photoCarteGrise ? (
+                    {isUploadingPhoto === 'carteGrise' ? (
+                      <div className="aspect-video flex flex-col items-center justify-center bg-slate-50 rounded text-brand-600 text-[10px] font-semibold animate-pulse mb-1.5 border border-brand-200">
+                        <Upload className="w-4 h-4 animate-bounce mb-1" />
+                        Synchronisation...
+                      </div>
+                    ) : photoCarteGrise ? (
                       <div className="relative aspect-video rounded overflow-hidden mb-1.5 border border-slate-200 group">
                         <img src={photoCarteGrise} alt="Carte grise" className="w-full h-full object-cover" />
                         <button
@@ -1675,11 +1712,7 @@ export const NewDossierModal: React.FC<Props> = ({
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = () => setPhotoCarteGrise(reader.result as string);
-                              reader.readAsDataURL(file);
-                            }
+                            if (file) handleUploadPhotoFile(file, 'carteGrise');
                           }}
                         />
                       </label>
