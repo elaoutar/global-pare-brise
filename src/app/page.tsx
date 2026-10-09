@@ -187,16 +187,16 @@ export default function Home() {
           fetchDevisFromSupabase(),
         ]);
 
-        if (supaDossiers && supaDossiers.length > 0) {
+        if (supaDossiers) {
           setDossiers(supaDossiers);
         }
-        if (supaStock && supaStock.length > 0) {
+        if (supaStock) {
           setStock(supaStock);
         }
-        if (supaFactures && supaFactures.length > 0) {
+        if (supaFactures) {
           setFactures(supaFactures);
         }
-        if (supaDevis && supaDevis.length > 0) {
+        if (supaDevis) {
           setDevisList(supaDevis);
         }
       } catch (err) {
