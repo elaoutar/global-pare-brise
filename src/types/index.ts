@@ -169,11 +169,17 @@ export interface DossierSinistre {
   dateDepotAssurance?: string;
   dateReglementAssurance?: string;
   
-  // Photos obligatoires assurance
+  // Photos d'expertise & contrôle assurance (Jusqu'à 8 photos optimisées)
   photos: {
-    avantSinistreUrl?: string;
-    apresPoseUrl?: string;
-    carteGriseUrl?: string;
+    avantSinistreUrl?: string; // 1. Bris / Avant Pose
+    apresPoseUrl?: string; // 2. Après Pose / Vitrage Neuf
+    carteGriseUrl?: string; // 3. Carte Grise
+    vinChassisUrl?: string; // 4. Numéro de Châssis (VIN)
+    compteurKmUrl?: string; // 5. Compteur Kilométrique
+    permisUrl?: string; // 6. Permis de conduire / CIN
+    angle360Url?: string; // 7. Vue d'ensemble du véhicule
+    autreUrl?: string; // 8. Autre photo d'expertise / Détail
+    [key: string]: string | undefined;
   };
 
   // Pièces jointes assurance & documents

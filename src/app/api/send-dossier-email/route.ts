@@ -39,26 +39,28 @@ export async function POST(req: NextRequest) {
     // Préparation des pièces jointes
     const attachments: Array<{ filename: string; path?: string; content?: string | Buffer }> = [];
 
-    // Ajouter les photos du dossier en pièces jointes si des URLs existent
-    if (photos) {
-      if (photos.avantSinistreUrl && photos.avantSinistreUrl.startsWith('http')) {
-        attachments.push({
-          filename: `Photo_1_Avant_Sinistre_${dossierNumero || 'Dossier'}.jpg`,
-          path: photos.avantSinistreUrl,
-        });
-      }
-      if (photos.apresPoseUrl && photos.apresPoseUrl.startsWith('http')) {
-        attachments.push({
-          filename: `Photo_2_Apres_Pose_${dossierNumero || 'Dossier'}.jpg`,
-          path: photos.apresPoseUrl,
-        });
-      }
-      if (photos.carteGriseUrl && photos.carteGriseUrl.startsWith('http')) {
-        attachments.push({
-          filename: `Photo_3_Carte_Grise_${dossierNumero || 'Dossier'}.jpg`,
-          path: photos.carteGriseUrl,
-        });
-      }
+    // Ajouter les photos du dossier en pièces jointes si des URLs existent (jusqu'à 8 photos)
+    if (photos && typeof photos === 'object') {
+      const photoLabels: Record<string, string> = {
+        avantSinistreUrl: 'Photo_1_Avant_Sinistre',
+        apresPoseUrl: 'Photo_2_Apres_Pose',
+        carteGriseUrl: 'Photo_3_Carte_Grise',
+        vinChassisUrl: 'Photo_4_Chassis_VIN',
+        compteurKmUrl: 'Photo_5_Compteur_Km',
+        permisUrl: 'Photo_6_Permis_CIN',
+        angle360Url: 'Photo_7_Vue_Ensemble',
+        autreUrl: 'Photo_8_Detail_Complementaire',
+      };
+
+      Object.entries(photos).forEach(([key, url]) => {
+        if (typeof url === 'string' && url.startsWith('http')) {
+          const label = photoLabels[key] || `Photo_${key}`;
+          attachments.push({
+            filename: `${label}_${dossierNumero || 'Dossier'}.jpg`,
+            path: url,
+          });
+        }
+      });
     }
 
     // Ajouter les documents joints si disponibles

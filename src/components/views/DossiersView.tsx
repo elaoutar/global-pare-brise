@@ -661,41 +661,53 @@ export const DossiersView: React.FC<Props> = ({
                     Aucune photo ajoutée pour ce dossier.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {selectedDossier.photos.avantSinistreUrl && (
                       <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img
-                          src={selectedDossier.photos.avantSinistreUrl}
-                          alt="Avant pose"
-                          className="w-full h-full object-cover"
-                        />
-                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
-                          Avant (Sinistre)
-                        </span>
+                        <img src={selectedDossier.photos.avantSinistreUrl} alt="1. Bris / Avant" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">1. Bris / Avant</span>
                       </div>
                     )}
                     {selectedDossier.photos.apresPoseUrl && (
                       <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img
-                          src={selectedDossier.photos.apresPoseUrl}
-                          alt="Après pose"
-                          className="w-full h-full object-cover"
-                        />
-                        <span className="absolute bottom-0 inset-x-0 bg-emerald-900/80 text-white text-[9px] p-0.5 text-center">
-                          Après (Posé)
-                        </span>
+                        <img src={selectedDossier.photos.apresPoseUrl} alt="2. Après Pose" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-emerald-900/80 text-white text-[9px] p-0.5 text-center">2. Après Pose</span>
                       </div>
                     )}
                     {selectedDossier.photos.carteGriseUrl && (
                       <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img
-                          src={selectedDossier.photos.carteGriseUrl}
-                          alt="Carte grise"
-                          className="w-full h-full object-cover"
-                        />
-                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">
-                          Carte Grise
-                        </span>
+                        <img src={selectedDossier.photos.carteGriseUrl} alt="3. Carte Grise" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">3. Carte Grise</span>
+                      </div>
+                    )}
+                    {selectedDossier.photos.vinChassisUrl && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img src={selectedDossier.photos.vinChassisUrl} alt="4. N° Châssis" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-indigo-900/80 text-white text-[9px] p-0.5 text-center">4. N° Châssis</span>
+                      </div>
+                    )}
+                    {selectedDossier.photos.compteurKmUrl && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img src={selectedDossier.photos.compteurKmUrl} alt="5. Compteur Km" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[9px] p-0.5 text-center">5. Compteur Km</span>
+                      </div>
+                    )}
+                    {selectedDossier.photos.permisUrl && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img src={selectedDossier.photos.permisUrl} alt="6. Permis / CIN" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[9px] p-0.5 text-center">6. Permis / CIN</span>
+                      </div>
+                    )}
+                    {selectedDossier.photos.angle360Url && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img src={selectedDossier.photos.angle360Url} alt="7. Vue d'Ensemble" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-blue-900/80 text-white text-[9px] p-0.5 text-center">7. Vue d'Ensemble</span>
+                      </div>
+                    )}
+                    {selectedDossier.photos.autreUrl && (
+                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                        <img src={selectedDossier.photos.autreUrl} alt="8. Autre Détail" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 bg-purple-900/80 text-white text-[9px] p-0.5 text-center">8. Autre Détail</span>
                       </div>
                     )}
                   </div>
