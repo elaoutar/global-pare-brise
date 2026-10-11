@@ -379,12 +379,12 @@ export const DossiersView: React.FC<Props> = ({
                           Transmission AZUR GLASS
                           {selectedDossier.statut === 'ENVOYE_AZUR_GLASS' && (
                             <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded-full font-bold">
-                              ✓ Déjà Envoyé
+                              ✓ Envoyé
                             </span>
                           )}
                         </span>
                         <p className="text-[10px] text-slate-300">
-                          Pack complet : Facture, Quittance signée, Bon de sortie, Photos
+                          Documents et photos du dossier
                         </p>
                       </div>
                     </div>
@@ -403,8 +403,8 @@ export const DossiersView: React.FC<Props> = ({
                   >
                     <Send className="w-3.5 h-3.5" />
                     {selectedDossier.statut === 'ENVOYE_AZUR_GLASS'
-                      ? 'Renvoyer / Consulter Transmission Email (AZUR GLASS)'
-                      : '✉️ Envoyer Dossier Complet à AZUR GLASS (1-Clic)'}
+                      ? 'Consulter / Renvoyer la Transmission'
+                      : 'Envoyer le Dossier à AZUR GLASS'}
                   </button>
                 </div>
               )}
@@ -541,7 +541,7 @@ export const DossiersView: React.FC<Props> = ({
                   {/* Intermédiaire AZUR GLASS banner */}
                   <div className="flex justify-between items-center pb-2 border-b border-slate-200 text-[11px]">
                     <span className="font-bold text-indigo-950 flex items-center gap-1">
-                      🏛️ Intermédiaire : <strong>AZUR GLASS</strong>
+                      Intermédiaire Déclarant : <strong>AZUR GLASS</strong>
                     </span>
                     <span className="text-slate-500 font-mono">
                       Réf: {selectedDossier.referenceDossierAzurGlass || `AZUR-${selectedDossier.numeroDossier.slice(-4)}`}
@@ -804,7 +804,7 @@ export const DossiersView: React.FC<Props> = ({
                 <p className="font-semibold text-slate-800">
                   {selectedFile ? `Fichier prêt : ${selectedFile.name}` : (newDocNom ? `Fichier prêt : ${newDocNom}` : 'Cliquez pour choisir la photo ou le scan signé')}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, JPG, PNG (Stocké sur Supabase Storage)</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, JPG, PNG</p>
                 <input
                   type="file"
                   accept="image/*,.pdf"
@@ -836,7 +836,7 @@ export const DossiersView: React.FC<Props> = ({
                   disabled={isUploadingDoc}
                   className="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold disabled:opacity-50"
                 >
-                  {isUploadingDoc ? 'Téléversement Cloud...' : 'Enregistrer sur Supabase'}
+                  {isUploadingDoc ? 'Enregistrement...' : 'Enregistrer le document'}
                 </button>
               </div>
             </form>

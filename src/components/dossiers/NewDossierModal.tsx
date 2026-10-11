@@ -32,7 +32,6 @@ import {
   Plus,
   Trash2,
   Calculator,
-  Sparkles,
   Upload,
   Image as ImageIcon,
   Loader2
@@ -1070,19 +1069,14 @@ export const NewDossierModal: React.FC<Props> = ({
                 /* SECTION DOSSIER ASSURANCE (VIA AZUR GLASS) */
                 <div className="space-y-4">
                   {/* Banner Partenaire Exclusif AZUR GLASS */}
-                  <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between">
+                  <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
                         AG
                       </div>
-                      <div>
-                        <span className="text-xs font-black text-indigo-950 uppercase tracking-wide block">
-                          Intermédiaire Déclarant : AZUR GLASS (Partenaire Agréé)
-                        </span>
-                        <p className="text-[11px] text-indigo-700">
-                          Ce dossier sera transmis à AZUR GLASS pour déclaration officielle et remboursement compagnie.
-                        </p>
-                      </div>
+                      <span className="text-xs font-bold text-indigo-950 uppercase tracking-wide">
+                        Partenaire Déclarant : AZUR GLASS
+                      </span>
                     </div>
                     <span className="text-[10px] bg-indigo-200/70 text-indigo-900 font-bold px-2 py-0.5 rounded">
                       Facturation AZUR GLASS
@@ -1193,9 +1187,6 @@ export const NewDossierModal: React.FC<Props> = ({
                           />
                           <span className="absolute right-3 top-2 text-xs font-bold text-amber-700">DH</span>
                         </div>
-                        <p className="text-[10px] text-amber-800 mt-1">
-                          ⚠️ Cette TVA sera déduite du reversement d'AZUR GLASS et réglée directement par le client Pro / Location.
-                        </p>
                       </div>
                     )}
                   </div>
@@ -1403,9 +1394,6 @@ export const NewDossierModal: React.FC<Props> = ({
                           className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono bg-white"
                         />
                       </div>
-                      <div className="flex items-center text-[11px] text-slate-500 pt-3">
-                        ✓ Attribué automatiquement au Bon de Sortie, Bon de Livraison et Facture.
-                      </div>
                     </div>
                   </div>
                 )}
@@ -1498,7 +1486,7 @@ export const NewDossierModal: React.FC<Props> = ({
                   {lignesPrestationsExtra.map((extra) => (
                     <div key={extra.id} className="flex items-center justify-between gap-3 p-2.5 bg-brand-50/40 rounded-lg border border-brand-200 animate-in fade-in duration-150">
                       <div className="flex-1 flex items-center gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-brand-600 flex-shrink-0" />
+                        <Plus className="w-3.5 h-3.5 text-brand-600 flex-shrink-0" />
                         <span className="font-semibold text-slate-800">{extra.designation}</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1616,15 +1604,10 @@ export const NewDossierModal: React.FC<Props> = ({
 
               {/* Photos de la voiture (Upload groupé 1 à 8 photos avec compression automatique) */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 pb-2 border-b border-slate-200">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <Camera className="w-4 h-4 text-brand-600" /> Photos de la voiture
-                    </span>
-                    <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
-                      ⚡ Sélection multiple en 1 seul clic (3, 5 ou jusqu'à 8 photos). Compression automatique HD (~200 Ko) pour préserver le stockage Supabase.
-                    </p>
-                  </div>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-brand-600" /> Photos de la voiture
+                  </span>
                   <span className="px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-full text-[11px] font-bold text-brand-700">
                     {photosVoiture.length} / 8 photo{photosVoiture.length > 1 ? 's' : ''}
                   </span>
@@ -1635,9 +1618,8 @@ export const NewDossierModal: React.FC<Props> = ({
                   <div className="p-6 border-2 border-dashed border-brand-300 rounded-xl bg-brand-50/60 flex flex-col items-center justify-center text-center space-y-2">
                     <Loader2 className="w-6 h-6 text-brand-600 animate-spin" />
                     <p className="text-xs font-bold text-brand-900">
-                      {uploadProgressText || 'Optimisation et envoi des photos en cours...'}
+                      {uploadProgressText || 'Envoi des photos en cours...'}
                     </p>
-                    <p className="text-[10px] text-brand-700">Veuillez patienter pendant le traitement des images HD.</p>
                   </div>
                 ) : (
                   <>
@@ -1663,11 +1645,11 @@ export const NewDossierModal: React.FC<Props> = ({
                           <div>
                             <span className="text-xs font-bold text-slate-800 block">
                               {photosVoiture.length === 0 
-                                ? 'Importer les photos de la voiture (sélectionner 1 à 8 photos)' 
-                                : '+ Ajouter d\'autres photos de la voiture'}
+                                ? 'Importer les photos de la voiture' 
+                                : '+ Ajouter d\'autres photos'}
                             </span>
                             <span className="text-[11px] text-slate-500">
-                              Cliquez ici pour sélectionner toutes vos photos en une seule fois
+                              Sélectionnez jusqu'à 8 photos (JPEG, PNG)
                             </span>
                           </div>
                         </div>
@@ -1689,7 +1671,6 @@ export const NewDossierModal: React.FC<Props> = ({
                             />
                             <div className="absolute inset-x-0 bottom-0 bg-slate-900/80 text-white text-[10px] px-1.5 py-0.5 flex justify-between items-center">
                               <span className="truncate font-medium">Photo de voiture {idx + 1}</span>
-                              <span className="text-[9px] text-emerald-300 font-semibold">HD ~200Ko</span>
                             </div>
                             <button
                               type="button"
@@ -1705,18 +1686,6 @@ export const NewDossierModal: React.FC<Props> = ({
                     )}
                   </>
                 )}
-              </div>
-
-              {/* Summary box */}
-              <div className="p-4 bg-brand-50/50 rounded-xl border border-brand-200 text-xs text-brand-900 space-y-1.5">
-                <p className="font-bold flex items-center gap-1.5 text-brand-950">
-                  <Check className="w-4 h-4 text-brand-600" /> Ce dossier va automatiquement générer :
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-slate-700">
-                  <li>La <strong>Quittance subrogative d'assurance</strong> prête pour signature</li>
-                  <li>Le <strong>Bon de Sortie Stock</strong> pour l'atelier (-1 pare-brise, -1 cartouche de colle)</li>
-                  <li>La <strong>Facture proforma / définitive</strong> à adresser à la compagnie d'assurance ou au client</li>
-                </ul>
               </div>
 
               <div className="flex justify-between pt-4">

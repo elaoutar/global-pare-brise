@@ -217,7 +217,7 @@ export const Navigation: React.FC<Props> = ({
         </div>
         <div className="pt-2 border-t border-slate-800/60 flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Supabase Cloud Connecté</span>
+          <span>Système En Ligne</span>
         </div>
       </div>
     </aside>

@@ -259,10 +259,6 @@ export const AssurancesView: React.FC<Props> = ({
               </span>
             </h1>
 
-            <p className="text-xs text-indigo-200 mt-1 max-w-3xl leading-relaxed">
-              Global Pare-Brise traite les déclarations d'assurance en collaboration avec <strong>AZUR GLASS SARL</strong> (ICE: {AZUR_GLASS_INFO.ice}). AZUR GLASS centralise les dossiers (quittances, factures, déclarations bris de glaces pour personnes morales), obtient les accords auprès des compagnies et assure le reversement à notre garage.
-            </p>
-
             <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-slate-300">
               <span className="flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-indigo-400" /> {AZUR_GLASS_INFO.adresse}
@@ -706,7 +702,7 @@ export const AssurancesView: React.FC<Props> = ({
                 Répertoire des Compagnies d'Assurance
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Compagnies conventionnées transitant par l'intermédiaire AZUR GLASS
+                Compagnies d'assurance conventionnées
               </p>
             </div>
 

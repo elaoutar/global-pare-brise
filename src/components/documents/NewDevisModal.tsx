@@ -9,7 +9,6 @@ import {
   X, 
   Plus, 
   Trash2, 
-  Sparkles, 
   Calculator, 
   User, 
   Car, 
@@ -230,7 +229,7 @@ export const NewDevisModal: React.FC<Props> = ({
                 {initialDevis ? `Modifier Devis ${initialDevis.numeroDevis}` : 'Créer un Nouveau Devis Client'}
               </h3>
               <p className="text-[11px] text-slate-400">
-                Tarification directe en TTC • Calcul automatique du HT & TVA (20%) • Format A4 officiel
+                Proposition tarifaire officielle
               </p>
             </div>
           </div>
@@ -481,7 +480,7 @@ export const NewDevisModal: React.FC<Props> = ({
                 </h4>
               </div>
               <span className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-bold border border-amber-200">
-                ✓ Saisie en TTC • Le HT et la TVA (20%) sont calculés automatiquement
+                Tarifs TTC
               </span>
             </div>
 

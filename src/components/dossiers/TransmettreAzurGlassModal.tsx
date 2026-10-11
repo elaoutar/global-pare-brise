@@ -20,7 +20,6 @@ import {
   Copy, 
   ExternalLink, 
   Clock, 
-  Sparkles,
   Info,
   Building2
 } from 'lucide-react';
@@ -199,11 +198,11 @@ Email: ${GARAGE_INFO.email}`;
                   Transmission Dossier Complet à AZUR GLASS
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
-                  Email 1-Clic
+                  Transmission Dossier
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Envoi officiel de la facture, quittance signée, bon de sortie et photos
+                Transmission de la facture, quittance, bon de sortie et photos
               </p>
             </div>
           </div>
@@ -224,9 +223,9 @@ Email: ${GARAGE_INFO.email}`;
           <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-xl p-4 shadow-sm border border-indigo-700/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
+                <ShieldCheck className="w-4 h-4 text-indigo-400" />
                 <span className="text-xs uppercase font-extrabold tracking-wider text-indigo-200">
-                  Partenaire Déclarant Conventionné
+                  Partenaire Déclarant
                 </span>
               </div>
               <h4 className="text-base font-black text-white mt-0.5">
@@ -432,13 +431,6 @@ Email: ${GARAGE_INFO.email}`;
               <span>{sendError}</span>
             </div>
           )}
-
-          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
-            <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <strong>Action automatique après envoi :</strong> Dès confirmation, le statut du dossier passera automatiquement à <span className="font-bold underline">« ENVOYÉ À AZUR GLASS »</span> avec horodatage de la date d'envoi.
-            </div>
-          </div>
 
         </div>
 

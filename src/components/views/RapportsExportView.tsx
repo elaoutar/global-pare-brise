@@ -21,7 +21,6 @@ import {
   Download,
   Filter,
   CheckCircle2,
-  Sparkles,
   Building2
 } from 'lucide-react';
 import { formatMatricule } from '@/lib/matriculeMaroc';
@@ -177,7 +176,7 @@ export const RapportsExportView: React.FC<Props> = ({
                 : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Building2 className="w-4 h-4 text-indigo-400" />
             1. État AZUR GLASS (Assurances & Reversements)
           </button>
 

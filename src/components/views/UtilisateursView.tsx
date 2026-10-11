@@ -144,7 +144,7 @@ export const UtilisateursView: React.FC<Props> = ({ currentAdmin }) => {
     };
 
     setCollaborateurs([newCollab, ...collaborateurs]);
-    setSuccess(`Compte ${role === 'ASSISTANTE' ? 'Assistante' : 'Administrateur'} créé pour ${nom} (${cleanEmail}) enregistré dans Supabase !`);
+    setSuccess(`Compte ${role === 'ASSISTANTE' ? 'Assistante' : 'Administrateur'} créé pour ${nom} (${cleanEmail}) avec succès !`);
     
     setNom('');
     setEmail('');
@@ -167,7 +167,7 @@ export const UtilisateursView: React.FC<Props> = ({ currentAdmin }) => {
   };
 
   const handleDeleteCollab = async (id: string, nomCollab: string) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer définitivement le compte de ${nomCollab} dans Supabase ?`)) {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer définitivement le compte de ${nomCollab} ?`)) {
       return;
     }
 
@@ -204,7 +204,7 @@ export const UtilisateursView: React.FC<Props> = ({ currentAdmin }) => {
             </h1>
           </div>
           <p className="text-xs text-indigo-200 mt-1">
-            Espace réservé au Super Administrateur. Synchronisé directement avec la table <code className="bg-slate-800 px-1.5 py-0.5 rounded text-sky-300">utilisateurs</code> de Supabase.
+            Espace réservé au Super Administrateur pour la gestion des accès et rôles.
           </p>
         </div>
 
@@ -234,7 +234,7 @@ export const UtilisateursView: React.FC<Props> = ({ currentAdmin }) => {
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
             <Users className="w-4 h-4 text-slate-500" />
-            <span>Collaborateurs enregistrés dans Supabase ({collaborateurs.length})</span>
+            <span>Collaborateurs enregistrés ({collaborateurs.length})</span>
           </h2>
         </div>
 
@@ -480,7 +480,7 @@ export const UtilisateursView: React.FC<Props> = ({ currentAdmin }) => {
                       <span>Enregistrement...</span>
                     </>
                   ) : (
-                    <span>Valider & Enregistrer dans Supabase</span>
+                    <span>Créer le Compte</span>
                   )}
                 </button>
               </div>

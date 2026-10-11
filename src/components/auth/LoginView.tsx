@@ -76,7 +76,7 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold mt-2.5">
             <Database className="w-3 h-3 text-emerald-400" />
-            <span>Sécurité Base de Données Supabase Active</span>
+            <span>Connexion Sécurisée Chiffrée</span>
           </div>
         </div>
 
