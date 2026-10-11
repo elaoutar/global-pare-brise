@@ -852,6 +852,7 @@ export default function Home() {
     let matchedBS = bonsSortie.find((b) => b.dossierId === dossier.id);
     if (!matchedBS) {
       const seq = Math.floor(1000 + Math.random() * 9000);
+      const matchedArt = stock.find((s) => s.designation.toLowerCase().includes(dossier.vehicule.marque.toLowerCase())) || stock[0];
       matchedBS = {
         id: `bs-${Date.now()}`,
         numeroBS: `BS-2026-${seq}`,
@@ -860,16 +861,18 @@ export default function Home() {
         poseur: dossier.poseur || 'Poseur Atelier',
         lignes: [
           {
-            articleId: `art-auto-${dossier.id}`,
-            reference: `PB-${(dossier.vehicule.marque || 'VEH').slice(0, 3).toUpperCase()}`,
+            articleId: matchedArt?.id || `art-auto-${dossier.id}`,
+            reference: matchedArt?.reference || `PB-${(dossier.vehicule.marque || 'VEH').slice(0, 3).toUpperCase()}`,
             designation: `Pare-Brise conforme ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`,
             quantite: 1,
+            rayon: matchedArt?.rayon || matchedArt?.emplacement || 'A6',
           },
           {
             articleId: 'art-6',
             reference: 'COLLE-SIKA-DRIVE',
             designation: 'Cartouche Mastic Polyuréthane SikaTack Drive (300ml)',
             quantite: 1,
+            rayon: 'ACC-01',
           },
         ],
         notes: `Affecté au véhicule ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation})`,

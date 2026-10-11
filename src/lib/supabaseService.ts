@@ -194,6 +194,7 @@ export const fetchStockFromSupabase = async (): Promise<ArticleStock[] | null> =
       prixAchatHT: Number(row.prix_achat_ht || 0),
       prixVenteHT: Number(row.prix_vente_ht || 0),
       emplacement: row.emplacement,
+      rayon: row.rayon || row.emplacement,
     }));
   } catch (err) {
     console.error('Exception fetch stock Supabase:', err);
@@ -215,7 +216,8 @@ export const saveStockArticleToSupabase = async (article: ArticleStock): Promise
       stock_minimum_alerte: article.stockMinimumAlerte,
       prix_achat_ht: article.prixAchatHT,
       prix_vente_ht: article.prixVenteHT,
-      emplacement: article.emplacement,
+      emplacement: article.emplacement || article.rayon,
+      rayon: article.rayon,
       updated_at: new Date().toISOString(),
     };
 

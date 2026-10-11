@@ -65,6 +65,7 @@ export interface ArticleStock {
   prixAchatHT: number;
   prixVenteHT: number;
   emplacement?: string;
+  rayon?: string; // Ex: "A6", "B2", "RACK-03" (repère pour magasinier au dépôt)
 }
 
 export interface Fournisseur {
@@ -82,6 +83,7 @@ export interface BonSortieLigne {
   reference: string;
   designation: string;
   quantite: number;
+  rayon?: string;
 }
 
 export interface BonSortie {

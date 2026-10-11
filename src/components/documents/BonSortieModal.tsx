@@ -77,6 +77,7 @@ export const BonSortieModal: React.FC<Props> = ({ bonSortie, dossier, onClose })
                 <tr>
                   <th className="py-2.5 px-4">Référence</th>
                   <th className="py-2.5 px-4">Désignation de l'article</th>
+                  <th className="py-2.5 px-4 text-center">Rayon / Dépôt</th>
                   <th className="py-2.5 px-4 text-center">Quantité délivrée</th>
                   <th className="py-2.5 px-4 text-center">Contrôle état</th>
                 </tr>
@@ -86,6 +87,15 @@ export const BonSortieModal: React.FC<Props> = ({ bonSortie, dossier, onClose })
                   <tr key={idx}>
                     <td className="py-3 px-4 font-mono font-semibold text-slate-700">{ligne.reference}</td>
                     <td className="py-3 px-4 font-medium text-slate-900">{ligne.designation}</td>
+                    <td className="py-3 px-4 text-center">
+                      {ligne.rayon ? (
+                        <span className="inline-block px-2 py-0.5 font-mono font-black text-amber-900 bg-amber-100 rounded border border-amber-300">
+                          {ligne.rayon}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 italic text-[11px]">-</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-center font-bold text-base text-slate-900">{ligne.quantite}</td>
                     <td className="py-3 px-4 text-center text-slate-400">☐ Conforme</td>
                   </tr>
