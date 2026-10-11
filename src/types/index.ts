@@ -169,7 +169,7 @@ export interface DossierSinistre {
   dateDepotAssurance?: string;
   dateReglementAssurance?: string;
   
-  // Photos d'expertise & contrôle assurance (Jusqu'à 8 photos optimisées)
+  // Photos du véhicule & dossier (Upload groupé ou ciblé, jusqu'à 8 photos optimisées)
   photos: {
     avantSinistreUrl?: string; // 1. Bris / Avant Pose
     apresPoseUrl?: string; // 2. Après Pose / Vitrage Neuf
@@ -179,7 +179,8 @@ export interface DossierSinistre {
     permisUrl?: string; // 6. Permis de conduire / CIN
     angle360Url?: string; // 7. Vue d'ensemble du véhicule
     autreUrl?: string; // 8. Autre photo d'expertise / Détail
-    [key: string]: string | undefined;
+    galerieUrls?: string[]; // Liste complète des photos de la voiture
+    [key: string]: string | string[] | undefined;
   };
 
   // Pièces jointes assurance & documents

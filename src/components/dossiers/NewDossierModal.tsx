@@ -34,7 +34,8 @@ import {
   Calculator,
   Sparkles,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { MatriculeMarocInput } from '@/components/ui/MatriculeMarocInput';
 import { formatDH } from '@/lib/utils';
@@ -160,54 +161,54 @@ export const NewDossierModal: React.FC<Props> = ({
   const [refPaiementClient, setRefPaiementClient] = useState('');
   const [echeancePaiementClient, setEcheancePaiementClient] = useState(new Date().toISOString().split('T')[0]);
 
-  // Photos Sinistre & Contrôle (Jusqu'à 8 photos optimisées pour Supabase)
-  const [photoAvant, setPhotoAvant] = useState('');
-  const [photoApresPose, setPhotoApresPose] = useState('');
-  const [photoCarteGrise, setPhotoCarteGrise] = useState('');
-  const [photoVinChassis, setPhotoVinChassis] = useState('');
-  const [photoCompteurKm, setPhotoCompteurKm] = useState('');
-  const [photoPermis, setPhotoPermis] = useState('');
-  const [photoAngle360, setPhotoAngle360] = useState('');
-  const [photoAutre, setPhotoAutre] = useState('');
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState<string | null>(null);
+  // Photos de la voiture (Upload groupé 1 à 8 photos ou plus, optimisées pour Supabase)
+  const [photosVoiture, setPhotosVoiture] = useState<string[]>([]);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
+  const [uploadProgressText, setUploadProgressText] = useState<string>('');
 
-  const handleUploadPhotoFile = async (
-    file: File, 
-    type: 'avant' | 'apres' | 'carteGrise' | 'vin' | 'km' | 'permis' | 'angle' | 'autre'
-  ) => {
-    setIsUploadingPhoto(type);
-    try {
-      // 1. Optimiser & compresser l'image côté client (1600px max, compression haute qualité ~200-300 Ko max)
-      const { file: optimizedFile, dataUrl } = await optimizeImageFile(file, 1600, 1600, 0.8);
+  const handleMultiPhotoUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
-      // Prévisualisation immédiate en local
-      if (type === 'avant') setPhotoAvant(dataUrl);
-      else if (type === 'apres') setPhotoApresPose(dataUrl);
-      else if (type === 'carteGrise') setPhotoCarteGrise(dataUrl);
-      else if (type === 'vin') setPhotoVinChassis(dataUrl);
-      else if (type === 'km') setPhotoCompteurKm(dataUrl);
-      else if (type === 'permis') setPhotoPermis(dataUrl);
-      else if (type === 'angle') setPhotoAngle360(dataUrl);
-      else if (type === 'autre') setPhotoAutre(dataUrl);
+    // Limiter à 8 photos au total dans le dossier pour ne pas surcharger
+    const availableSlots = Math.max(0, 8 - photosVoiture.length);
+    const selectedFiles = fileArray.slice(0, availableSlots);
 
-      // 2. Synchroniser le fichier allégé vers Supabase Storage
-      const folderName = `dossiers/${vehiculeImm || 'photos'}`;
-      const uploadedUrl = await uploadFileToSupabase(optimizedFile, folderName);
-      if (uploadedUrl) {
-        if (type === 'avant') setPhotoAvant(uploadedUrl);
-        else if (type === 'apres') setPhotoApresPose(uploadedUrl);
-        else if (type === 'carteGrise') setPhotoCarteGrise(uploadedUrl);
-        else if (type === 'vin') setPhotoVinChassis(uploadedUrl);
-        else if (type === 'km') setPhotoCompteurKm(uploadedUrl);
-        else if (type === 'permis') setPhotoPermis(uploadedUrl);
-        else if (type === 'angle') setPhotoAngle360(uploadedUrl);
-        else if (type === 'autre') setPhotoAutre(uploadedUrl);
-      }
-    } catch (err) {
-      console.warn('Fallback stockage photo local Base64:', err);
-    } finally {
-      setIsUploadingPhoto(null);
+    if (selectedFiles.length === 0) {
+      alert("Vous avez déjà atteint la limite recommandée de 8 photos pour ce dossier.");
+      return;
     }
+
+    setIsUploadingPhoto(true);
+    setUploadProgressText(`Compression de ${selectedFiles.length} photo(s)...`);
+
+    try {
+      const folderName = `dossiers/${vehiculeImm || 'photos'}`;
+      const newUrls: string[] = [];
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        setUploadProgressText(`Optimisation photo ${i + 1}/${selectedFiles.length}...`);
+
+        // 1. Compression HD côté client (réduction drastique du poids vers ~200-250 Ko)
+        const { file: optimizedFile, dataUrl } = await optimizeImageFile(file, 1600, 1600, 0.8);
+
+        // 2. Upload vers Supabase Storage
+        const uploadedUrl = await uploadFileToSupabase(optimizedFile, folderName);
+        newUrls.push(uploadedUrl || dataUrl);
+      }
+
+      setPhotosVoiture((prev) => [...prev, ...newUrls].slice(0, 8));
+    } catch (err) {
+      console.warn('Erreur lors de l\'upload des photos de la voiture:', err);
+    } finally {
+      setIsUploadingPhoto(false);
+      setUploadProgressText('');
+    }
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setPhotosVoiture((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
   // Dynamic Financials Calculations (Total TTC saisi -> Calcul automatique du HT et TVA)
@@ -508,14 +509,15 @@ export const NewDossierModal: React.FC<Props> = ({
         ? 'VALIDE_REGLE' 
         : (isAssurance ? 'ENVOYE_AZUR_GLASS' : 'EN_COURS_POSE'),
       photos: {
-        avantSinistreUrl: photoAvant || undefined,
-        apresPoseUrl: photoApresPose || undefined,
-        carteGriseUrl: photoCarteGrise || undefined,
-        vinChassisUrl: photoVinChassis || undefined,
-        compteurKmUrl: photoCompteurKm || undefined,
-        permisUrl: photoPermis || undefined,
-        angle360Url: photoAngle360 || undefined,
-        autreUrl: photoAutre || undefined,
+        avantSinistreUrl: photosVoiture[0] || undefined,
+        apresPoseUrl: photosVoiture[1] || undefined,
+        carteGriseUrl: photosVoiture[2] || undefined,
+        vinChassisUrl: photosVoiture[3] || undefined,
+        compteurKmUrl: photosVoiture[4] || undefined,
+        permisUrl: photosVoiture[5] || undefined,
+        angle360Url: photosVoiture[6] || undefined,
+        autreUrl: photosVoiture[7] || undefined,
+        galerieUrls: photosVoiture,
       },
       bonSortieId: bonSortie ? bsId : undefined,
       factureAssuranceId: isAssurance ? facId : undefined,
@@ -1612,319 +1614,97 @@ export const NewDossierModal: React.FC<Props> = ({
                 />
               </div>
 
-              {/* Photos Sinistre & Contrôle (8 Photos avec compression automatique pour Supabase) */}
+              {/* Photos de la voiture (Upload groupé 1 à 8 photos avec compression automatique) */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 pb-2 border-b border-slate-200">
                   <div>
                     <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <Camera className="w-4 h-4 text-brand-600" /> Photos Dossier & Expertise (Jusqu'à 8 photos)
+                      <Camera className="w-4 h-4 text-brand-600" /> Photos de la voiture
                     </span>
                     <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
-                      ⚡ Compression automatique HD : photos réduites à ~200 Ko pour préserver le quota Supabase sans perte de netteté.
+                      ⚡ Sélection multiple en 1 seul clic (3, 5 ou jusqu'à 8 photos). Compression automatique HD (~200 Ko) pour préserver le stockage Supabase.
                     </p>
                   </div>
                   <span className="px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-full text-[11px] font-bold text-brand-700">
-                    {[photoAvant, photoApresPose, photoCarteGrise, photoVinChassis, photoCompteurKm, photoPermis, photoAngle360, photoAutre].filter(Boolean).length} / 8 ajoutée(s)
+                    {photosVoiture.length} / 8 photo{photosVoiture.length > 1 ? 's' : ''}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {/* Carte 1 : Bris / Avant Pose */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">1. Bris / Avant Pose</p>
-                    {isUploadingPhoto === 'avant' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
-                      </div>
-                    ) : photoAvant ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoAvant} alt="Avant" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoAvant('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
+                {/* Upload Zone / State */}
+                {isUploadingPhoto ? (
+                  <div className="p-6 border-2 border-dashed border-brand-300 rounded-xl bg-brand-50/60 flex flex-col items-center justify-center text-center space-y-2">
+                    <Loader2 className="w-6 h-6 text-brand-600 animate-spin" />
+                    <p className="text-xs font-bold text-brand-900">
+                      {uploadProgressText || 'Optimisation et envoi des photos en cours...'}
+                    </p>
+                    <p className="text-[10px] text-brand-700">Veuillez patienter pendant le traitement des images HD.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Zone de sélection unique */}
+                    {photosVoiture.length < 8 && (
+                      <label className="cursor-pointer group block border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 bg-white hover:bg-brand-50/30 transition text-center">
                         <input
                           type="file"
+                          multiple
                           accept="image/*"
                           className="hidden"
                           onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'avant');
+                            if (e.target.files && e.target.files.length > 0) {
+                              handleMultiPhotoUpload(e.target.files);
+                            }
+                            e.target.value = '';
                           }}
                         />
+                        <div className="flex flex-col items-center justify-center gap-1.5">
+                          <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Upload className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-slate-800 block">
+                              {photosVoiture.length === 0 
+                                ? 'Importer les photos de la voiture (sélectionner 1 à 8 photos)' 
+                                : '+ Ajouter d\'autres photos de la voiture'}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              Cliquez ici pour sélectionner toutes vos photos en une seule fois
+                            </span>
+                          </div>
+                        </div>
                       </label>
                     )}
-                    <span className="text-[8px] text-slate-400">Impact ou fissure</span>
-                  </div>
 
-                  {/* Carte 2 : Après Pose */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">2. Après Pose</p>
-                    {isUploadingPhoto === 'apres' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
+                    {/* Grille des photos de la voiture importées */}
+                    {photosVoiture.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                        {photosVoiture.map((photoUrl, idx) => (
+                          <div 
+                            key={idx} 
+                            className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100 shadow-sm"
+                          >
+                            <img 
+                              src={photoUrl} 
+                              alt={`Photo de voiture ${idx + 1}`} 
+                              className="w-full h-full object-cover" 
+                            />
+                            <div className="absolute inset-x-0 bottom-0 bg-slate-900/80 text-white text-[10px] px-1.5 py-0.5 flex justify-between items-center">
+                              <span className="truncate font-medium">Photo de voiture {idx + 1}</span>
+                              <span className="text-[9px] text-emerald-300 font-semibold">HD ~200Ko</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePhoto(idx)}
+                              className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md p-1 shadow transition"
+                              title="Supprimer cette photo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                    ) : photoApresPose ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoApresPose} alt="Après" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoApresPose('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'apres');
-                          }}
-                        />
-                      </label>
                     )}
-                    <span className="text-[8px] text-slate-400">Vitrage neuf posé</span>
-                  </div>
-
-                  {/* Carte 3 : Carte Grise */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">3. Carte Grise</p>
-                    {isUploadingPhoto === 'carteGrise' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
-                      </div>
-                    ) : photoCarteGrise ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoCarteGrise} alt="Carte Grise" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoCarteGrise('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'carteGrise');
-                          }}
-                        />
-                      </label>
-                    )}
-                    <span className="text-[8px] text-slate-400">Carte grise recto/verso</span>
-                  </div>
-
-                  {/* Carte 4 : N° de Châssis (VIN) */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">4. N° Châssis (VIN)</p>
-                    {isUploadingPhoto === 'vin' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
-                      </div>
-                    ) : photoVinChassis ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoVinChassis} alt="VIN" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoVinChassis('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'vin');
-                          }}
-                        />
-                      </label>
-                    )}
-                    <span className="text-[8px] text-slate-400">Plaque constructeur</span>
-                  </div>
-
-                  {/* Carte 5 : Compteur Kilométrique */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">5. Compteur Km</p>
-                    {isUploadingPhoto === 'km' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
-                      </div>
-                    ) : photoCompteurKm ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoCompteurKm} alt="Km" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoCompteurKm('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'km');
-                          }}
-                        />
-                      </label>
-                    )}
-                    <span className="text-[8px] text-slate-400">Tableau de bord</span>
-                  </div>
-
-                  {/* Carte 6 : Permis / CIN */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">6. Permis / CIN</p>
-                    {isUploadingPhoto === 'permis' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
-                      </div>
-                    ) : photoPermis ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoPermis} alt="Permis" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoPermis('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'permis');
-                          }}
-                        />
-                      </label>
-                    )}
-                    <span className="text-[8px] text-slate-400">Conducteur / Assuré</span>
-                  </div>
-
-                  {/* Carte 7 : Vue d'ensemble Véhicule */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">7. Vue d'Ensemble</p>
-                    {isUploadingPhoto === 'angle' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
-                      </div>
-                    ) : photoAngle360 ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoAngle360} alt="Vue d'ensemble" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoAngle360('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'angle');
-                          }}
-                        />
-                      </label>
-                    )}
-                    <span className="text-[8px] text-slate-400">Véhicule avec immatriculation</span>
-                  </div>
-
-                  {/* Carte 8 : Autre Photo / Détail */}
-                  <div className="border border-dashed border-slate-300 rounded-lg p-2 bg-white text-center hover:bg-slate-50 transition flex flex-col justify-between">
-                    <p className="text-[10px] font-bold text-slate-800 mb-1 truncate">8. Autre Détail</p>
-                    {isUploadingPhoto === 'autre' ? (
-                      <div className="aspect-video flex flex-col items-center justify-center bg-brand-50 rounded text-brand-600 text-[9px] font-bold animate-pulse mb-1">
-                        <Upload className="w-3.5 h-3.5 animate-bounce mb-0.5" /> Optimisation...
-                      </div>
-                    ) : photoAutre ? (
-                      <div className="relative aspect-video rounded overflow-hidden mb-1 border border-slate-200">
-                        <img src={photoAutre} alt="Autre" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setPhotoAutre('')}
-                          className="absolute top-1 right-1 bg-rose-600 text-white rounded p-0.5 text-[9px]"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer block py-2.5 border border-slate-200 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 transition mb-1">
-                        <Upload className="w-3.5 h-3.5 mx-auto mb-0.5 text-slate-400" />
-                        <span className="text-[9px] block font-semibold">+ Photo</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleUploadPhotoFile(file, 'autre');
-                          }}
-                        />
-                      </label>
-                    )}
-                    <span className="text-[8px] text-slate-400">Photo complémentaire</span>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
 
               {/* Summary box */}

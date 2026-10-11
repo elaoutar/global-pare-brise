@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
 
     // Ajouter les photos du dossier en pièces jointes si des URLs existent (jusqu'à 8 photos)
     if (photos && typeof photos === 'object') {
+      const addedUrls = new Set<string>();
       const photoLabels: Record<string, string> = {
         avantSinistreUrl: 'Photo_1_Avant_Sinistre',
         apresPoseUrl: 'Photo_2_Apres_Pose',
@@ -53,7 +54,8 @@ export async function POST(req: NextRequest) {
       };
 
       Object.entries(photos).forEach(([key, url]) => {
-        if (typeof url === 'string' && url.startsWith('http')) {
+        if (typeof url === 'string' && url.startsWith('http') && !addedUrls.has(url)) {
+          addedUrls.add(url);
           const label = photoLabels[key] || `Photo_${key}`;
           attachments.push({
             filename: `${label}_${dossierNumero || 'Dossier'}.jpg`,
@@ -61,6 +63,18 @@ export async function POST(req: NextRequest) {
           });
         }
       });
+
+      if (Array.isArray(photos.galerieUrls)) {
+        photos.galerieUrls.forEach((url: any, idx: number) => {
+          if (typeof url === 'string' && url.startsWith('http') && !addedUrls.has(url)) {
+            addedUrls.add(url);
+            attachments.push({
+              filename: `Photo_Voiture_${idx + 1}_${dossierNumero || 'Dossier'}.jpg`,
+              path: url,
+            });
+          }
+        });
+      }
     }
 
     // Ajouter les documents joints si disponibles

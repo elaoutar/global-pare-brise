@@ -651,67 +651,57 @@ export const DossiersView: React.FC<Props> = ({
 
               {/* Photos Gallery */}
               <div>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Camera className="w-3.5 h-3.5" /> Photos Expert & Contrôle ({selectedDossier.photos ? Object.values(selectedDossier.photos).filter(Boolean).length : 0})
-                  </span>
-                </p>
-                {(!selectedDossier.photos || Object.values(selectedDossier.photos).filter(Boolean).length === 0) ? (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center text-slate-400 text-xs italic">
-                    Aucune photo ajoutée pour ce dossier.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {selectedDossier.photos.avantSinistreUrl && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.avantSinistreUrl} alt="1. Bris / Avant" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">1. Bris / Avant</span>
-                      </div>
-                    )}
-                    {selectedDossier.photos.apresPoseUrl && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.apresPoseUrl} alt="2. Après Pose" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-emerald-900/80 text-white text-[9px] p-0.5 text-center">2. Après Pose</span>
-                      </div>
-                    )}
-                    {selectedDossier.photos.carteGriseUrl && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.carteGriseUrl} alt="3. Carte Grise" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] p-0.5 text-center">3. Carte Grise</span>
-                      </div>
-                    )}
-                    {selectedDossier.photos.vinChassisUrl && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.vinChassisUrl} alt="4. N° Châssis" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-indigo-900/80 text-white text-[9px] p-0.5 text-center">4. N° Châssis</span>
-                      </div>
-                    )}
-                    {selectedDossier.photos.compteurKmUrl && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.compteurKmUrl} alt="5. Compteur Km" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[9px] p-0.5 text-center">5. Compteur Km</span>
-                      </div>
-                    )}
-                    {selectedDossier.photos.permisUrl && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.permisUrl} alt="6. Permis / CIN" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[9px] p-0.5 text-center">6. Permis / CIN</span>
-                      </div>
-                    )}
-                    {selectedDossier.photos.angle360Url && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.angle360Url} alt="7. Vue d'Ensemble" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-blue-900/80 text-white text-[9px] p-0.5 text-center">7. Vue d'Ensemble</span>
-                      </div>
-                    )}
-                    {selectedDossier.photos.autreUrl && (
-                      <div className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-                        <img src={selectedDossier.photos.autreUrl} alt="8. Autre Détail" className="w-full h-full object-cover" />
-                        <span className="absolute bottom-0 inset-x-0 bg-purple-900/80 text-white text-[9px] p-0.5 text-center">8. Autre Détail</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {(() => {
+                  const photosObj = (selectedDossier.photos || {}) as Record<string, any>;
+                  const galerieList: string[] = Array.isArray(photosObj.galerieUrls) && photosObj.galerieUrls.length > 0
+                    ? photosObj.galerieUrls.filter((u: any): u is string => typeof u === 'string' && Boolean(u))
+                    : [
+                        photosObj.avantSinistreUrl,
+                        photosObj.apresPoseUrl,
+                        photosObj.carteGriseUrl,
+                        photosObj.vinChassisUrl,
+                        photosObj.compteurKmUrl,
+                        photosObj.permisUrl,
+                        photosObj.angle360Url,
+                        photosObj.autreUrl,
+                      ].filter((url): url is string => typeof url === 'string' && Boolean(url));
+
+                  return (
+                    <>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Camera className="w-3.5 h-3.5" /> Photos de la voiture ({galerieList.length})
+                        </span>
+                      </p>
+                      {galerieList.length === 0 ? (
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center text-slate-400 text-xs italic">
+                          Aucune photo ajoutée pour ce dossier.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {galerieList.map((url, idx) => (
+                            <a
+                              key={idx}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100 hover:ring-2 hover:ring-brand-500 transition shadow-sm"
+                            >
+                              <img
+                                src={url}
+                                alt={`Photo de voiture ${idx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                              />
+                              <span className="absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-xs text-white text-[9px] p-0.5 text-center font-medium">
+                                Photo de voiture {idx + 1}
+                              </span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : (
