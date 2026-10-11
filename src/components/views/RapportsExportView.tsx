@@ -40,15 +40,23 @@ export const RapportsExportView: React.FC<Props> = ({
   const [typeRapport, setTypeRapport] = useState<'AZUR_GLASS' | 'MENSUEL' | 'ASSURANCE' | 'CLIENT' | 'RECETTES'>('AZUR_GLASS');
   const [selectedAssuranceId, setSelectedAssuranceId] = useState<string>('ALL');
   const [selectedClientNom, setSelectedClientNom] = useState<string>('ALL');
-  const [selectedMois, setSelectedMois] = useState<string>('2026-10'); // YYYY-MM
+  const [selectedMois, setSelectedMois] = useState<string>('ALL'); // 'ALL' ou 'YYYY-MM'
   const [selectedTypeClientAzur, setSelectedTypeClientAzur] = useState<string>('ALL'); // 'ALL', 'PARTICULIER', 'PROFESSIONNEL', 'AGENCE_LOCATION'
   const [selectedStatutAzur, setSelectedStatutAzur] = useState<string>('ALL'); // 'ALL', 'TRANSMIS', 'EN_COURS', 'REGLE'
 
   // Unique list of client names
   const clientNames = Array.from(new Set(dossiers.map((d) => d.client.nom)));
 
-  // Filter dossiers according to selected report settings
+  // Filter dossiers according to selected report settings (avec filtre par mois universel)
   const filteredDossiers = dossiers.filter((d) => {
+    // 1. Filtre par mois universel (applicable à TOUS les états si différent de 'ALL')
+    if (selectedMois !== 'ALL') {
+      const matchMonth = (d.dateCreation && d.dateCreation.startsWith(selectedMois)) || 
+                         (d.dateEnvoiAzurGlass && d.dateEnvoiAzurGlass.startsWith(selectedMois));
+      if (!matchMonth) return false;
+    }
+
+    // 2. Filtres spécifiques par type d'état
     if (typeRapport === 'AZUR_GLASS') {
       if (d.typeDossier !== 'ASSURANCE') return false;
 
@@ -67,7 +75,7 @@ export const RapportsExportView: React.FC<Props> = ({
       return true;
     }
     if (typeRapport === 'MENSUEL') {
-      return d.dateCreation.startsWith(selectedMois);
+      return true; // Déjà filtré par selectedMois
     }
     if (typeRapport === 'ASSURANCE') {
       if (selectedAssuranceId === 'ALL') return d.typeDossier === 'ASSURANCE';
@@ -82,8 +90,8 @@ export const RapportsExportView: React.FC<Props> = ({
 
   // Filtered recettes
   const filteredRecettes = recettes.filter((r) => {
-    if (typeRapport === 'RECETTES') {
-      return r.datePaiement.startsWith(selectedMois);
+    if (selectedMois !== 'ALL') {
+      return r.datePaiement && r.datePaiement.startsWith(selectedMois);
     }
     return true;
   });
@@ -228,6 +236,31 @@ export const RapportsExportView: React.FC<Props> = ({
             <Filter className="w-3.5 h-3.5 text-slate-400" /> Filtres applicables :
           </span>
 
+          {/* Filtre par Mois Universel (applicable à TOUS les états) */}
+          <div className="flex items-center gap-2">
+            <label className="text-slate-700 font-bold flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Période / Mois :
+            </label>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="month"
+                value={selectedMois === 'ALL' ? '' : selectedMois}
+                onChange={(e) => setSelectedMois(e.target.value || 'ALL')}
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono font-bold text-slate-800 text-xs"
+              />
+              {selectedMois !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMois('ALL')}
+                  className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[11px] font-semibold transition"
+                  title="Afficher tout l'historique sans filtrer par mois"
+                >
+                  Tous les mois
+                </button>
+              )}
+            </div>
+          </div>
+
           {typeRapport === 'AZUR_GLASS' && (
             <>
               <div className="flex items-center gap-2">
@@ -271,18 +304,6 @@ export const RapportsExportView: React.FC<Props> = ({
                 </select>
               </div>
             </>
-          )}
-
-          {(typeRapport === 'MENSUEL' || typeRapport === 'RECETTES') && (
-            <div className="flex items-center gap-2">
-              <label className="text-slate-600 font-semibold">Mois sélectionné :</label>
-              <input
-                type="month"
-                value={selectedMois}
-                onChange={(e) => setSelectedMois(e.target.value)}
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono font-bold text-slate-800"
-              />
-            </div>
           )}
 
           {typeRapport === 'ASSURANCE' && (
@@ -337,11 +358,11 @@ export const RapportsExportView: React.FC<Props> = ({
 
           <div className="text-right">
             <span className="inline-block px-3 py-1 bg-slate-900 text-white font-bold text-xs uppercase rounded mb-1">
-              {typeRapport === 'AZUR_GLASS' && `BORDEREAU & ÉTAT DES DOSSIERS TRANSMIS À AZUR GLASS`}
-              {typeRapport === 'MENSUEL' && `ÉTAT MENSUEL D'ACTIVITÉ - ${selectedMois}`}
-              {typeRapport === 'ASSURANCE' && `SITUATION BRIS DE GLACE PAR ASSURANCE`}
-              {typeRapport === 'CLIENT' && `RELEVÉ DE FACTURATION CLIENT`}
-              {typeRapport === 'RECETTES' && `JOURNAL DES RECETTES & ENCAISSEMENTS - ${selectedMois}`}
+              {typeRapport === 'AZUR_GLASS' && `BORDEREAU AZUR GLASS ${selectedMois !== 'ALL' ? `(${selectedMois})` : '(TOUS MOIS)'}`}
+              {typeRapport === 'MENSUEL' && `ÉTAT MENSUEL D'ACTIVITÉ ${selectedMois !== 'ALL' ? `(${selectedMois})` : '(GLOBAL)'}`}
+              {typeRapport === 'ASSURANCE' && `SITUATION PAR COMPAGNIE ${selectedMois !== 'ALL' ? `(${selectedMois})` : ''}`}
+              {typeRapport === 'CLIENT' && `RELEVÉ CLIENT ${selectedMois !== 'ALL' ? `(${selectedMois})` : ''}`}
+              {typeRapport === 'RECETTES' && `JOURNAL DES RECETTES ${selectedMois !== 'ALL' ? `(${selectedMois})` : '(GLOBAL)'}`}
             </span>
             {typeRapport === 'AZUR_GLASS' && (
               <p className="text-[11px] font-bold text-indigo-700">
