@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Facture, DossierSinistre } from '@/types';
 import { formatDH, formatDate, getStatutPaiementBadge } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
-import { FileText, Printer, Search, CheckCircle2, Clock, AlertCircle, Coins } from 'lucide-react';
+import { FileText, Printer, Search, CheckCircle2, Clock, AlertCircle, Coins, Calendar } from 'lucide-react';
 
 interface Props {
   factures: Facture[];
@@ -23,8 +23,13 @@ export const FacturationView: React.FC<Props> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPaiement, setFilterPaiement] = useState<string>('ALL');
+  const [filterMois, setFilterMois] = useState<string>('ALL');
 
-  const filteredFactures = factures.filter((f) => {
+  const baseFactures = filterMois === 'ALL'
+    ? factures
+    : factures.filter((f) => f.dateEmission && f.dateEmission.startsWith(filterMois));
+
+  const filteredFactures = baseFactures.filter((f) => {
     const matchedDossier = dossiers.find((d) => d.id === f.dossierId);
     const imm = matchedDossier?.vehicule.immatriculation || '';
     const searchString = `
@@ -41,8 +46,8 @@ export const FacturationView: React.FC<Props> = ({
     return matchSearch && matchFilter;
   });
 
-  const totalFacture = factures.reduce((acc, f) => acc + f.totalTTC, 0);
-  const totalEncaisse = factures.reduce((acc, f) => acc + f.montantRegle, 0);
+  const totalFacture = baseFactures.reduce((acc, f) => acc + f.totalTTC, 0);
+  const totalEncaisse = baseFactures.reduce((acc, f) => acc + f.montantRegle, 0);
   const totalReste = Math.max(0, totalFacture - totalEncaisse);
 
   return (
@@ -80,16 +85,40 @@ export const FacturationView: React.FC<Props> = ({
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
-          <select
-            value={filterPaiement}
-            onChange={(e) => setFilterPaiement(e.target.value)}
-            className="text-xs py-1.5 px-3 bg-white border border-slate-200 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="ALL">Tous les statuts de paiement</option>
-            <option value="REGLE">Réglées</option>
-            <option value="EN_ATTENTE">En attente de paiement</option>
-            <option value="PARTIEL">Partiel</option>
-          </select>
+          <div className="flex items-center gap-2">
+            {/* Filtre par Mois */}
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
+              <Calendar className="w-3.5 h-3.5 text-brand-600 flex-shrink-0" />
+              <input
+                type="month"
+                value={filterMois === 'ALL' ? '' : filterMois}
+                onChange={(e) => setFilterMois(e.target.value || 'ALL')}
+                className="text-xs bg-transparent font-mono font-bold text-slate-800 focus:outline-none"
+                title="Filtrer par mois"
+              />
+              {filterMois !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterMois('ALL')}
+                  className="text-[10px] bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-semibold"
+                  title="Tous les mois"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <select
+              value={filterPaiement}
+              onChange={(e) => setFilterPaiement(e.target.value)}
+              className="text-xs py-1.5 px-3 bg-white border border-slate-200 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="ALL">Tous les statuts de paiement</option>
+              <option value="REGLE">Réglées</option>
+              <option value="EN_ATTENTE">En attente de paiement</option>
+              <option value="PARTIEL">Partiel</option>
+            </select>
+          </div>
         </div>
 
         {/* Table */}

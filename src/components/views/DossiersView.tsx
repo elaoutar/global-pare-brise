@@ -27,7 +27,8 @@ import {
   Building,
   Building2,
   Mail,
-  Send
+  Send,
+  Calendar
 } from 'lucide-react';
 import { DocumentAttache } from '@/types';
 import { exportEtatMensuelExcel } from '@/lib/exportUtils';
@@ -67,6 +68,7 @@ export const DossiersView: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatut, setFilterStatut] = useState<string>('ALL');
   const [filterVille, setFilterVille] = useState<string>('ALL');
+  const [filterMois, setFilterMois] = useState<string>('ALL');
   const [selectedDossierId, setSelectedDossierId] = useState<string | null>(dossiers[0]?.id || null);
   const selectedDossier = dossiers.find((d) => d.id === (selectedDossierId || dossiers[0]?.id)) || dossiers[0] || null;
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -107,7 +109,15 @@ export const DossiersView: React.FC<Props> = ({
       matchVille = (d.client.ville || '').toLowerCase() === filterVille.toLowerCase();
     }
 
-    return matchSearch && matchStatut && matchVille;
+    let matchMois = true;
+    if (filterMois !== 'ALL') {
+      matchMois = Boolean(
+        (d.dateCreation && d.dateCreation.startsWith(filterMois)) ||
+        (d.dateEnvoiAzurGlass && d.dateEnvoiAzurGlass.startsWith(filterMois))
+      );
+    }
+
+    return matchSearch && matchStatut && matchVille && matchMois;
   });
 
   return (
@@ -169,6 +179,28 @@ export const DossiersView: React.FC<Props> = ({
                 <option value="REJETE">Rejeté / Litige</option>
               </optgroup>
             </select>
+          </div>
+
+          {/* Month / Date Filter */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+            <Calendar className="w-3.5 h-3.5 text-brand-600 flex-shrink-0" />
+            <input
+              type="month"
+              value={filterMois === 'ALL' ? '' : filterMois}
+              onChange={(e) => setFilterMois(e.target.value || 'ALL')}
+              className="text-xs bg-transparent font-mono font-bold text-slate-800 focus:outline-none"
+              title="Filtrer par mois"
+            />
+            {filterMois !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setFilterMois('ALL')}
+                className="text-[10px] bg-slate-200 hover:bg-slate-300 px-1.5 py-0.5 rounded text-slate-700 font-semibold"
+                title="Tous les mois"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 

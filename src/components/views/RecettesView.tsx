@@ -38,6 +38,7 @@ export const RecettesView: React.FC<Props> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMode, setFilterMode] = useState<string>('ALL');
   const [filterStatut, setFilterStatut] = useState<string>('ALL');
+  const [filterMois, setFilterMois] = useState<string>('ALL');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBordereauModal, setShowBordereauModal] = useState(false);
 
@@ -55,29 +56,33 @@ export const RecettesView: React.FC<Props> = ({
   const [banque, setBanque] = useState('Attijariwafa Bank');
   const [notes, setNotes] = useState('');
 
-  // Calculations
-  const totalEncaisse = recettes
+  // Calculations (sur les recettes filtrées par mois ou globales)
+  const baseRecettes = filterMois === 'ALL' 
+    ? recettes 
+    : recettes.filter((r) => r.datePaiement && r.datePaiement.startsWith(filterMois));
+
+  const totalEncaisse = baseRecettes
     .filter((r) => r.statut === 'ENCAISSE')
     .reduce((acc, r) => acc + r.montant, 0);
 
-  const totalChequesEnAttente = recettes
+  const totalChequesEnAttente = baseRecettes
     .filter((r) => r.modePaiement === 'CHEQUE' && r.statut === 'EN_ATTENTE_ECHEANCE')
     .reduce((acc, r) => acc + r.montant, 0);
 
-  const totalEffetsEnAttente = recettes
+  const totalEffetsEnAttente = baseRecettes
     .filter((r) => r.modePaiement === 'EFFET' && r.statut === 'EN_ATTENTE_ECHEANCE')
     .reduce((acc, r) => acc + r.montant, 0);
 
-  const totalEspeces = recettes
+  const totalEspeces = baseRecettes
     .filter((r) => r.modePaiement === 'ESPECES')
     .reduce((acc, r) => acc + r.montant, 0);
 
-  const totalVirements = recettes
+  const totalVirements = baseRecettes
     .filter((r) => r.modePaiement === 'VIREMENT')
     .reduce((acc, r) => acc + r.montant, 0);
 
   // Filtered list
-  const filteredRecettes = recettes.filter((r) => {
+  const filteredRecettes = baseRecettes.filter((r) => {
     const matchSearch =
       r.payeurNom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.numeroRecu.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -236,7 +241,29 @@ export const RecettesView: React.FC<Props> = ({
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filtre par Mois */}
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
+              <Calendar className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+              <input
+                type="month"
+                value={filterMois === 'ALL' ? '' : filterMois}
+                onChange={(e) => setFilterMois(e.target.value || 'ALL')}
+                className="text-xs bg-transparent font-mono font-bold text-slate-800 focus:outline-none"
+                title="Filtrer par mois"
+              />
+              {filterMois !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterMois('ALL')}
+                  className="text-[10px] bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-semibold"
+                  title="Tous les mois"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             <select
               value={filterMode}
               onChange={(e) => setFilterMode(e.target.value)}

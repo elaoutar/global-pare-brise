@@ -30,7 +30,8 @@ import {
   CheckCircle2,
   Send,
   Coins,
-  ChevronDown
+  ChevronDown,
+  Calendar
 } from 'lucide-react';
 
 interface Props {
@@ -60,6 +61,7 @@ export const AssurancesView: React.FC<Props> = ({
   const [selectedTypeClient, setSelectedTypeClient] = useState<string>('ALL'); // 'ALL', 'PARTICULIER', 'PROFESSIONNEL', 'AGENCE_LOCATION'
   const [selectedAssuranceId, setSelectedAssuranceId] = useState<string>('ALL');
   const [selectedStatutAzur, setSelectedStatutAzur] = useState<string>('ALL'); // 'ALL', 'A_TRANSMETTRE', 'TRANSMIS', 'ACCORD', 'REGLE'
+  const [selectedMois, setSelectedMois] = useState<string>('ALL'); // 'ALL' ou 'YYYY-MM'
 
   // Modal Bordereau d'envoi récapitulatif AZUR GLASS
   const [showBordereauModal, setShowBordereauModal] = useState(false);
@@ -120,9 +122,16 @@ export const AssurancesView: React.FC<Props> = ({
         matchStatut = d.statut === 'VALIDE_REGLE';
       }
 
+      // Filtre Période / Mois
+      if (selectedMois !== 'ALL') {
+        const matchMonth = (d.dateCreation && d.dateCreation.startsWith(selectedMois)) || 
+                           (d.dateEnvoiAzurGlass && d.dateEnvoiAzurGlass.startsWith(selectedMois));
+        if (!matchMonth) return false;
+      }
+
       return matchSearch && matchType && matchAssurance && matchStatut;
     });
-  }, [allDossiersAssurance, searchTerm, selectedTypeClient, selectedAssuranceId, selectedStatutAzur]);
+  }, [allDossiersAssurance, searchTerm, selectedTypeClient, selectedAssuranceId, selectedStatutAzur, selectedMois]);
 
   // Totaux financiers pour les dossiers AZUR GLASS
   const statsAzur = useMemo(() => {
@@ -414,12 +423,13 @@ export const AssurancesView: React.FC<Props> = ({
               </div>
 
               {/* Bouton pour réinitialiser les filtres */}
-              {(selectedTypeClient !== 'ALL' || selectedAssuranceId !== 'ALL' || selectedStatutAzur !== 'ALL' || searchTerm) && (
+              {(selectedTypeClient !== 'ALL' || selectedAssuranceId !== 'ALL' || selectedStatutAzur !== 'ALL' || selectedMois !== 'ALL' || searchTerm) && (
                 <button
                   onClick={() => {
                     setSelectedTypeClient('ALL');
                     setSelectedAssuranceId('ALL');
                     setSelectedStatutAzur('ALL');
+                    setSelectedMois('ALL');
                     setSearchTerm('');
                   }}
                   className="text-xs text-rose-600 hover:underline font-semibold"
@@ -429,8 +439,8 @@ export const AssurancesView: React.FC<Props> = ({
               )}
             </div>
 
-            {/* Ligne 2 : Sélecteurs & Recherche textuelle */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+            {/* Ligne 2 : Sélecteurs, Filtre par mois & Recherche textuelle */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100">
               {/* Recherche globale */}
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -443,6 +453,28 @@ export const AssurancesView: React.FC<Props> = ({
                 />
               </div>
 
+              {/* Filtre par Mois / Date */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1">
+                <Calendar className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                <input
+                  type="month"
+                  value={selectedMois === 'ALL' ? '' : selectedMois}
+                  onChange={(e) => setSelectedMois(e.target.value || 'ALL')}
+                  className="w-full text-xs bg-transparent font-mono font-bold text-slate-800 focus:outline-none"
+                  title="Filtrer par mois"
+                />
+                {selectedMois !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMois('ALL')}
+                    className="text-[10px] bg-slate-200 hover:bg-slate-300 px-1.5 py-0.5 rounded text-slate-700 font-semibold"
+                    title="Tous les mois"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
               {/* Filtre Compagnie d'assurance */}
               <div>
                 <select
@@ -450,7 +482,7 @@ export const AssurancesView: React.FC<Props> = ({
                   onChange={(e) => setSelectedAssuranceId(e.target.value)}
                   className="w-full text-xs py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="ALL">Toutes les Compagnies d'Assurance</option>
+                  <option value="ALL">Toutes les Compagnies</option>
                   {assurances.map((ass) => (
                     <option key={ass.id} value={ass.id}>
                       {ass.nom} ({ass.code})
@@ -466,17 +498,17 @@ export const AssurancesView: React.FC<Props> = ({
                   onChange={(e) => setSelectedStatutAzur(e.target.value)}
                   className="w-full text-xs py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="ALL">Tous les Statuts AZUR GLASS</option>
-                  <option value="A_TRANSMETTRE">1. À Transmettre à AZUR GLASS</option>
-                  <option value="TRANSMIS">2. Transmis / Déposé chez AZUR GLASS</option>
-                  <option value="ACCORD">3. Accord Reçu d'AZUR GLASS</option>
-                  <option value="REGLE">4. Réglé / Virement Reçu d'AZUR GLASS</option>
+                  <option value="ALL">Tous les Statuts AZUR</option>
+                  <option value="A_TRANSMETTRE">1. À Transmettre</option>
+                  <option value="TRANSMIS">2. Transmis / Déposé</option>
+                  <option value="ACCORD">3. Accord Reçu</option>
+                  <option value="REGLE">4. Réglé / Virement Reçu</option>
                 </select>
               </div>
 
               {/* Compteur résultats */}
               <div className="flex items-center justify-end text-xs font-bold text-slate-500 pr-2">
-                <span>{filteredDossiersAzur.length} dossier(s) affiché(s)</span>
+                <span>{filteredDossiersAzur.length} dossier(s)</span>
               </div>
             </div>
 
@@ -813,10 +845,10 @@ export const AssurancesView: React.FC<Props> = ({
               {/* Titre du bordereau */}
               <div className="text-center py-2">
                 <h2 className="text-base font-black uppercase tracking-wider text-slate-950 border-b border-t border-slate-300 py-2">
-                  Bordereau Récapitulatif des Dossiers d'Assurances Transmis
+                  Bordereau Récapitulatif des Dossiers d'Assurances Transmis {selectedMois !== 'ALL' ? `(${selectedMois})` : ''}
                 </h2>
                 <div className="flex justify-between text-[11px] text-slate-500 mt-2">
-                  <span>Date d'édition : {new Date().toLocaleDateString('fr-FR')}</span>
+                  <span>Période : {selectedMois !== 'ALL' ? selectedMois : 'Tous les mois'} | Édité le : {new Date().toLocaleDateString('fr-FR')}</span>
                   <span>Nombre de dossiers : {filteredDossiersAzur.length}</span>
                 </div>
               </div>
