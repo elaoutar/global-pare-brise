@@ -3,12 +3,13 @@
 import React, { useState } from 'react';
 import { DossierSinistre, Assurance, ReglementRecette } from '@/types';
 import { formatDH, formatDate } from '@/lib/utils';
-import { GARAGE_INFO } from '@/lib/data';
+import { GARAGE_INFO, AZUR_GLASS_INFO } from '@/lib/data';
 import { 
   exportEtatMensuelExcel, 
   exportEtatAssuranceExcel, 
   exportEtatClientExcel, 
-  exportEtatRecettesExcel 
+  exportEtatRecettesExcel,
+  exportEtatAzurGlassExcel 
 } from '@/lib/exportUtils';
 import { 
   FileSpreadsheet, 
@@ -19,8 +20,11 @@ import {
   Coins, 
   Download,
   Filter,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles,
+  Building2
 } from 'lucide-react';
+import { formatMatricule } from '@/lib/matriculeMaroc';
 
 interface Props {
   dossiers: DossierSinistre[];
@@ -33,16 +37,35 @@ export const RapportsExportView: React.FC<Props> = ({
   assurances,
   recettes,
 }) => {
-  const [typeRapport, setTypeRapport] = useState<'MENSUEL' | 'ASSURANCE' | 'CLIENT' | 'RECETTES'>('MENSUEL');
+  const [typeRapport, setTypeRapport] = useState<'AZUR_GLASS' | 'MENSUEL' | 'ASSURANCE' | 'CLIENT' | 'RECETTES'>('AZUR_GLASS');
   const [selectedAssuranceId, setSelectedAssuranceId] = useState<string>('ALL');
   const [selectedClientNom, setSelectedClientNom] = useState<string>('ALL');
   const [selectedMois, setSelectedMois] = useState<string>('2026-10'); // YYYY-MM
+  const [selectedTypeClientAzur, setSelectedTypeClientAzur] = useState<string>('ALL'); // 'ALL', 'PARTICULIER', 'PROFESSIONNEL', 'AGENCE_LOCATION'
+  const [selectedStatutAzur, setSelectedStatutAzur] = useState<string>('ALL'); // 'ALL', 'TRANSMIS', 'EN_COURS', 'REGLE'
 
   // Unique list of client names
   const clientNames = Array.from(new Set(dossiers.map((d) => d.client.nom)));
 
   // Filter dossiers according to selected report settings
   const filteredDossiers = dossiers.filter((d) => {
+    if (typeRapport === 'AZUR_GLASS') {
+      if (d.typeDossier !== 'ASSURANCE') return false;
+
+      // Filtre Type Client
+      if (selectedTypeClientAzur === 'PARTICULIER' && d.typeClientAssurance && d.typeClientAssurance !== 'PARTICULIER') return false;
+      if (selectedTypeClientAzur === 'PROFESSIONNEL' && d.typeClientAssurance !== 'PROFESSIONNEL') return false;
+      if (selectedTypeClientAzur === 'AGENCE_LOCATION' && d.typeClientAssurance !== 'AGENCE_LOCATION') return false;
+
+      // Filtre Compagnie
+      if (selectedAssuranceId !== 'ALL' && d.assurance?.id !== selectedAssuranceId) return false;
+
+      // Filtre Statut
+      if (selectedStatutAzur === 'TRANSMIS' && d.statut !== 'ENVOYE_AZUR_GLASS' && d.statut !== 'DEPOSE_ASSURANCE') return false;
+      if (selectedStatutAzur === 'REGLE' && d.statut !== 'VALIDE_REGLE') return false;
+
+      return true;
+    }
     if (typeRapport === 'MENSUEL') {
       return d.dateCreation.startsWith(selectedMois);
     }
@@ -66,15 +89,27 @@ export const RapportsExportView: React.FC<Props> = ({
   });
 
   // Financial totals
-  const totalTTC = filteredDossiers.reduce((acc, d) => acc + d.montantTotalTTC, 0);
-  const totalAssurance = filteredDossiers.reduce((acc, d) => acc + d.montantPriseEnChargeAssurance, 0);
-  const totalFranchise = filteredDossiers.reduce((acc, d) => acc + d.montantFranchise, 0);
+  const totalTTC = filteredDossiers.reduce((acc, d) => acc + (d.montantTotalTTC || 0), 0);
+  const totalAssurance = filteredDossiers.reduce((acc, d) => acc + (d.montantPriseEnChargeAssurance || 0), 0);
+  const totalFranchise = filteredDossiers.reduce((acc, d) => acc + (!d.franchiseOfferte ? (d.montantFranchise || 0) : 0), 0);
+  const totalTvaExclue = filteredDossiers.reduce((acc, d) => acc + (d.tvaExclueParAssurance || 0), 0);
+  const totalNetReversementAzur = filteredDossiers.reduce((acc, d) => {
+    const montantTTC = d.montantTotalTTC || 0;
+    const franchiseDeduite = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
+    const tva = d.tvaExclueParAssurance || 0;
+    return acc + (d.montantReversementAzurGlass || Math.max(0, montantTTC - franchiseDeduite - tva));
+  }, 0);
 
   const totalRecettesMois = filteredRecettes.reduce((acc, r) => acc + r.montant, 0);
 
   // Handle Export to Excel
   const handleExportExcel = () => {
-    if (typeRapport === 'MENSUEL') {
+    if (typeRapport === 'AZUR_GLASS') {
+      const filtreLabel = selectedAssuranceId !== 'ALL' 
+        ? assurances.find((a) => a.id === selectedAssuranceId)?.nom || 'Compagnie' 
+        : selectedTypeClientAzur;
+      exportEtatAzurGlassExcel(filteredDossiers, filtreLabel);
+    } else if (typeRapport === 'MENSUEL') {
       exportEtatMensuelExcel(filteredDossiers, selectedMois);
     } else if (typeRapport === 'ASSURANCE') {
       const assNom = assurances.find((a) => a.id === selectedAssuranceId)?.nom || 'Toutes_Assurances';
@@ -102,7 +137,7 @@ export const RapportsExportView: React.FC<Props> = ({
               Exports & Rapports (Excel / PDF)
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Générez des états mensuels, des situations par compagnie d'assurance ou par client au format Excel (.xlsx) et PDF
+              Générez et téléchargez les états AZUR GLASS, les situations assurances, mensuelles et comptables au format Excel (.xlsx) et PDF
             </p>
           </div>
 
@@ -127,6 +162,18 @@ export const RapportsExportView: React.FC<Props> = ({
         {/* Report Type Selector Tabs */}
         <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
           <button
+            onClick={() => setTypeRapport('AZUR_GLASS')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+              typeRapport === 'AZUR_GLASS'
+                ? 'bg-indigo-900 text-white shadow-sm ring-2 ring-indigo-500/20'
+                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            1. État AZUR GLASS (Assurances & Reversements)
+          </button>
+
+          <button
             onClick={() => setTypeRapport('MENSUEL')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
               typeRapport === 'MENSUEL'
@@ -135,7 +182,7 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Calendar className="w-4 h-4" />
-            1. État Mensuel Global
+            2. État Mensuel Global
           </button>
 
           <button
@@ -147,7 +194,7 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Shield className="w-4 h-4" />
-            2. État par Assurance
+            3. État par Compagnie
           </button>
 
           <button
@@ -159,7 +206,7 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            3. État par Client / Flotte
+            4. État par Client / Flotte
           </button>
 
           <button
@@ -171,7 +218,7 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Coins className="w-4 h-4" />
-            4. Journal des Recettes
+            5. Journal des Recettes
           </button>
         </div>
 
@@ -180,6 +227,51 @@ export const RapportsExportView: React.FC<Props> = ({
           <span className="font-bold text-slate-700 flex items-center gap-1">
             <Filter className="w-3.5 h-3.5 text-slate-400" /> Filtres applicables :
           </span>
+
+          {typeRapport === 'AZUR_GLASS' && (
+            <>
+              <div className="flex items-center gap-2">
+                <label className="text-slate-600 font-semibold">Catégorie Client :</label>
+                <select
+                  value={selectedTypeClientAzur}
+                  onChange={(e) => setSelectedTypeClientAzur(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800"
+                >
+                  <option value="ALL">Tous (Particuliers & Pros)</option>
+                  <option value="PARTICULIER">Particuliers (100% Remboursé)</option>
+                  <option value="PROFESSIONNEL">Professionnels (TVA Exclue)</option>
+                  <option value="AGENCE_LOCATION">Agences de Location</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-slate-600 font-semibold">Compagnie d'Assurance :</label>
+                <select
+                  value={selectedAssuranceId}
+                  onChange={(e) => setSelectedAssuranceId(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800"
+                >
+                  <option value="ALL">Toutes les compagnies</option>
+                  {assurances.map((a) => (
+                    <option key={a.id} value={a.id}>{a.nom}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-slate-600 font-semibold">Statut Dossier :</label>
+                <select
+                  value={selectedStatutAzur}
+                  onChange={(e) => setSelectedStatutAzur(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800"
+                >
+                  <option value="ALL">Tous les statuts</option>
+                  <option value="TRANSMIS">Transmis à AZUR GLASS</option>
+                  <option value="REGLE">Virement Reçu & Réglé</option>
+                </select>
+              </div>
+            </>
+          )}
 
           {(typeRapport === 'MENSUEL' || typeRapport === 'RECETTES') && (
             <div className="flex items-center gap-2">
@@ -245,17 +337,48 @@ export const RapportsExportView: React.FC<Props> = ({
 
           <div className="text-right">
             <span className="inline-block px-3 py-1 bg-slate-900 text-white font-bold text-xs uppercase rounded mb-1">
+              {typeRapport === 'AZUR_GLASS' && `BORDEREAU & ÉTAT DES DOSSIERS TRANSMIS À AZUR GLASS`}
               {typeRapport === 'MENSUEL' && `ÉTAT MENSUEL D'ACTIVITÉ - ${selectedMois}`}
               {typeRapport === 'ASSURANCE' && `SITUATION BRIS DE GLACE PAR ASSURANCE`}
               {typeRapport === 'CLIENT' && `RELEVÉ DE FACTURATION CLIENT`}
               {typeRapport === 'RECETTES' && `JOURNAL DES RECETTES & ENCAISSEMENTS - ${selectedMois}`}
             </span>
+            {typeRapport === 'AZUR_GLASS' && (
+              <p className="text-[11px] font-bold text-indigo-700">
+                Intermédiaire Conventionné : {AZUR_GLASS_INFO.designationComplete}
+              </p>
+            )}
             <p className="text-[11px] text-slate-500">Date d'édition : {formatDate(new Date().toISOString())}</p>
           </div>
         </div>
 
         {/* Summary Metric Ribbon */}
-        {typeRapport !== 'RECETTES' ? (
+        {typeRapport === 'AZUR_GLASS' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 mb-5 text-center">
+            <div>
+              <span className="text-[10px] text-indigo-800 font-bold uppercase">Dossiers Sinistre</span>
+              <p className="font-black text-slate-900 text-base">{filteredDossiers.length}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-indigo-800 font-bold uppercase">Total Prestations (TTC)</span>
+              <p className="font-black text-slate-900 text-sm font-mono">{formatDH(totalTTC)}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-500 font-bold uppercase">Franchises Déduites</span>
+              <p className="font-bold text-slate-700 text-sm font-mono">{formatDH(totalFranchise)}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-amber-800 font-bold uppercase">TVA Pro Exclue</span>
+              <p className="font-bold text-amber-700 text-sm font-mono">{formatDH(totalTvaExclue)}</p>
+            </div>
+            <div className="bg-indigo-900 text-white p-2 rounded-lg">
+              <span className="text-[9px] uppercase tracking-wider text-indigo-200 font-bold block">
+                Net Attendu AZUR GLASS
+              </span>
+              <p className="font-black text-emerald-400 text-sm font-mono">{formatDH(totalNetReversementAzur)}</p>
+            </div>
+          </div>
+        ) : typeRapport !== 'RECETTES' ? (
           <div className="grid grid-cols-4 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 mb-5 text-center">
             <div>
               <span className="text-[10px] text-slate-400 font-bold uppercase">Total Dossiers</span>
@@ -282,7 +405,97 @@ export const RapportsExportView: React.FC<Props> = ({
         )}
 
         {/* Main Data Table */}
-        {typeRapport !== 'RECETTES' ? (
+        {typeRapport === 'AZUR_GLASS' ? (
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 uppercase text-[11px]">
+                <tr>
+                  <th className="p-2.5">Dossier / Réf Azur</th>
+                  <th className="p-2.5">Client & Véhicule</th>
+                  <th className="p-2.5">Compagnie & Agence Locale</th>
+                  <th className="p-2.5 text-center">Catégorie</th>
+                  <th className="p-2.5 text-right">Total TTC</th>
+                  <th className="p-2.5 text-right">Franchise</th>
+                  <th className="p-2.5 text-right">TVA Pro</th>
+                  <th className="p-2.5 text-right text-indigo-950 font-black">Net Reversement</th>
+                  <th className="p-2.5 text-center">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDossiers.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-6 text-center text-slate-400 italic">
+                      Aucun dossier assurance AZUR GLASS enregistré.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDossiers.map((d) => {
+                    const montantTTC = d.montantTotalTTC || 0;
+                    const franchiseDeduite = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
+                    const tva = d.tvaExclueParAssurance || 0;
+                    const net = d.montantReversementAzurGlass || Math.max(0, montantTTC - franchiseDeduite - tva);
+
+                    return (
+                      <tr key={d.id} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="p-2.5">
+                          <span className="font-mono font-bold text-slate-900 block">{d.numeroDossier}</span>
+                          <span className="text-[10px] text-indigo-700 font-semibold">
+                            {d.referenceDossierAzurGlass || `AZUR-${d.numeroDossier.slice(-4)}`}
+                          </span>
+                        </td>
+                        <td className="p-2.5">
+                          <strong className="text-slate-900 block">{d.client.nom}</strong>
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            {d.vehicule.marque} {d.vehicule.modele} ({formatMatricule(d.vehicule.immatriculation, 'LATIN')})
+                          </span>
+                        </td>
+                        <td className="p-2.5">
+                          <strong className="text-slate-900 block">{d.assurance?.nom}</strong>
+                          <span className="text-[10px] text-slate-600 block">
+                            {d.agenceAssurance || 'Agence Principale'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Sinistre : {d.numeroSinistre || '-'}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {d.typeClientAssurance === 'PROFESSIONNEL' ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">
+                              Pro (TVA Exclue)
+                            </span>
+                          ) : d.typeClientAssurance === 'AGENCE_LOCATION' ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800">
+                              Location
+                            </span>
+                          ) : (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
+                              Particulier
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-right font-mono">{formatDH(montantTTC)}</td>
+                        <td className="p-2.5 text-right font-mono text-slate-600">
+                          {franchiseDeduite > 0 ? `-${formatDH(franchiseDeduite)}` : '0 DH'}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-amber-700">
+                          {tva > 0 ? `-${formatDH(tva)}` : '0 DH'}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-bold text-indigo-950 bg-indigo-50/50">
+                          {formatDH(net)}
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
+                            {d.statut}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : typeRapport !== 'RECETTES' ? (
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 uppercase">

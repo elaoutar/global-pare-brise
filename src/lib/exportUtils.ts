@@ -122,3 +122,43 @@ export function exportEtatRecettesExcel(
 
   exportTableToExcel(rows, `Etat_Recettes_Tresorerie_${periode}`, 'Recettes');
 }
+
+// 5. Export État Intermédiaire AZUR GLASS (Bordereau / Réconciliation Financière)
+export function exportEtatAzurGlassExcel(
+  dossiers: DossierSinistre[],
+  periodeOuFiltre: string = 'Global'
+) {
+  const dossiersAzur = dossiers.filter((d) => d.typeDossier === 'ASSURANCE');
+  const rows = dossiersAzur.map((d) => {
+    const montantTTC = d.montantTotalTTC || 0;
+    const franchiseDeduite = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
+    const tvaExclue = d.tvaExclueParAssurance || 0;
+    const netReversement = d.montantReversementAzurGlass || Math.max(0, montantTTC - franchiseDeduite - tvaExclue);
+
+    return {
+      'Réf Dossier Global': d.numeroDossier,
+      'Réf Partenaire AZUR GLASS': d.referenceDossierAzurGlass || `AZUR-${d.numeroDossier.slice(-4)}`,
+      'Date Envoi AZUR': d.dateEnvoiAzurGlass ? formatDate(d.dateEnvoiAzurGlass) : 'Non envoyé',
+      'Compagnie Assurance': d.assurance?.nom || 'Assurance',
+      'Agence Locale': d.agenceAssurance || 'Principale',
+      'N° Sinistre': d.numeroSinistre || '-',
+      'N° Police': d.numeroPolice || '-',
+      'Catégorie Client': d.typeClientAssurance === 'PROFESSIONNEL' 
+        ? 'Professionnel (TVA exclue)' 
+        : (d.typeClientAssurance === 'AGENCE_LOCATION' ? 'Agence de Location' : 'Particulier'),
+      'Assuré (Client)': d.client.nom,
+      'Téléphone': d.client.telephone,
+      'Véhicule': `${d.vehicule.marque} ${d.vehicule.modele}`,
+      'Immatriculation': formatMatricule(d.vehicule.immatriculation, 'LATIN'),
+      'Montant Prestation TTC (DH)': montantTTC,
+      'Franchise Client Déduite (DH)': franchiseDeduite,
+      'Franchise Offerte par Garage': d.franchiseOfferte ? 'OUI' : 'NON',
+      'TVA Pro/Location Exclue (DH)': tvaExclue,
+      'Net Reversement Attendu AZUR GLASS (DH)': netReversement,
+      'Statut Dossier': d.statut,
+    };
+  });
+
+  const cleanName = periodeOuFiltre.replace(/[^a-zA-Z0-9]/g, '_');
+  exportTableToExcel(rows, `Etat_AZUR_GLASS_Assurances_${cleanName}`, 'Etat_AZUR_GLASS');
+}
