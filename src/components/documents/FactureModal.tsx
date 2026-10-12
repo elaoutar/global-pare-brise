@@ -230,115 +230,49 @@ export const FactureModal: React.FC<Props> = ({
                     </tr>
                   ))}
 
-                  {/* Lignes Décompte Prise en Charge : Franchise & TVA (si dossier Assurance / AZUR GLASS) */}
+                  {/* Lignes Franchise & TVA (si dossier Assurance / AZUR GLASS) */}
                   {isAssuranceOrAzur && (
                     <>
-                      <tr className="bg-slate-50/80 border-t-2 border-slate-300">
-                        <td colSpan={3} className="py-2.5 px-4 font-semibold text-slate-800">
-                          <span className="font-bold text-[10px] text-slate-500 uppercase block tracking-wider">
-                            Règlement Direct :
-                          </span>
-                          Franchise {dossier.franchiseOfferte ? '(Offerte)' : '(Réglée en espèces)'}
-                        </td>
-                        <td className="py-2.5 px-4 text-right font-mono text-slate-600 text-[11px]">
-                          Espèces
-                        </td>
-                        <td className="py-2.5 px-4 text-center text-slate-500 text-[11px]">-</td>
-                        <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-800">
-                          {formatDH(effectiveFranchise)}
-                        </td>
-                      </tr>
-
-                      {effectiveTvaExclue > 0 && (
-                        <tr className="bg-slate-50/80 border-t border-slate-200">
-                          <td colSpan={3} className="py-2.5 px-4 font-semibold text-slate-800">
-                            <span className="font-bold text-[10px] text-amber-700 uppercase block tracking-wider">
-                              À Charge Client / Société :
-                            </span>
-                            TVA exclue de prise en charge assurance (Régime Pro / Location)
+                      {(dossier.montantFranchise || 0) > 0 && (
+                        <tr className="bg-slate-50/70 border-t border-slate-200">
+                          <td colSpan={5} className="py-2.5 px-4 font-semibold text-slate-800">
+                            Franchise
                           </td>
-                          <td className="py-2.5 px-4 text-right font-mono text-slate-600 text-[11px]">
-                            Espèces / Chèque
-                          </td>
-                          <td className="py-2.5 px-4 text-center text-slate-500 text-[11px]">20%</td>
-                          <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-800">
-                            {formatDH(effectiveTvaExclue)}
+                          <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                            {formatDH(dossier.montantFranchise)}
                           </td>
                         </tr>
                       )}
 
-                      <tr className="bg-indigo-50/70 border-t border-indigo-200 font-bold">
-                        <td colSpan={3} className="py-2.5 px-4 text-indigo-950">
-                          <span className="font-bold text-[10px] text-indigo-700 uppercase block tracking-wider">
-                            Prise en Charge Compagnie :
-                          </span>
-                          Solde net pris en charge (À virer par AZUR GLASS / Assurance)
-                        </td>
-                        <td className="py-2.5 px-4 text-right font-mono text-indigo-800 text-[11px]">
-                          Virement
-                        </td>
-                        <td className="py-2.5 px-4 text-center text-slate-500 text-[11px]">-</td>
-                        <td className="py-2.5 px-4 text-right font-mono font-bold text-indigo-900">
-                          {formatDH(resteVirement)}
-                        </td>
-                      </tr>
+                      {effectiveTvaExclue > 0 && (
+                        <tr className="bg-slate-50/70 border-t border-slate-200">
+                          <td colSpan={5} className="py-2.5 px-4 font-semibold text-slate-800">
+                            TVA
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                            {formatDH(effectiveTvaExclue)}
+                          </td>
+                        </tr>
+                      )}
                     </>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Totals & Tax Calculation Breakdown */}
+            {/* Totals & Observations */}
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 my-6 pt-2">
-              {/* Modalités de règlement & Observations */}
-              <div className="flex-1 w-full sm:max-w-md text-xs text-slate-600 space-y-2.5">
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
-                  <p className="font-bold text-slate-900 uppercase text-[10px] tracking-wide">
-                    Modalités de Règlement :
-                  </p>
-                  
-                  {isAssuranceOrAzur ? (
-                    montantCash > 0 ? (
-                      <div className="space-y-1 text-slate-800 pt-0.5">
-                        <p className="font-medium">
-                          • Montant de <strong className="font-mono text-emerald-800">{formatDH(montantCash)}</strong> réglé en espèces.
-                        </p>
-                        <p className="font-medium">
-                          • Solde de <strong className="font-mono text-indigo-900">{formatDH(resteVirement)}</strong> à régler par virement bancaire.
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="font-medium text-slate-800 pt-0.5">
-                        • Totalité de <strong className="font-mono text-indigo-900">{formatDH(facture.totalTTC)}</strong> à régler par virement bancaire.
-                      </p>
-                    )
-                  ) : (
-                    <p className="text-slate-700">
-                      Règlement client direct ({facture.referencePaiement || 'Comptant'})
-                    </p>
-                  )}
-
-                  <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-600">
-                    <p className="font-semibold text-slate-700">Coordonnées de virement bancaire :</p>
-                    <p className="font-mono text-slate-900 font-bold bg-white px-2 py-1 rounded border border-slate-200 mt-1">
-                      RIB : {GARAGE_INFO.rib}
-                    </p>
-                    <p className="text-[10px] text-slate-500 italic mt-1">
-                      Banque : Attijariwafa Bank • Titulaire : {GARAGE_INFO.nom}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Bloc Observations imprimable */}
+              {/* Bloc Observations imprimable */}
+              <div className="flex-1 w-full sm:max-w-md text-xs text-slate-600">
                 {observations && (
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-0.5">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-1">
                     <span className="font-bold text-slate-900 uppercase text-[10px] block">Observations & Remarques :</span>
                     <p className="italic text-slate-800 whitespace-pre-wrap">{observations}</p>
                   </div>
                 )}
               </div>
 
-              {/* Totaux & répartition */}
+              {/* Totaux */}
               <div className="w-full sm:w-72 bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Total Hors Taxes (HT) :</span>
@@ -352,33 +286,6 @@ export const FactureModal: React.FC<Props> = ({
                   <span>Total T.T.C :</span>
                   <span className="font-mono text-emerald-800 text-base">{formatDH(facture.totalTTC)}</span>
                 </div>
-
-                {/* Décompte Espèces vs Virement pour AZUR GLASS */}
-                {isAssuranceOrAzur && (
-                  <div className="border-t border-dashed border-slate-300 pt-2.5 space-y-1.5 text-xs">
-                    <div className="flex justify-between text-slate-700">
-                      <span>Réglé en espèces (Franchise) :</span>
-                      <span className="font-mono font-bold text-emerald-800">{formatDH(montantCash)}</span>
-                    </div>
-                    {effectiveTvaExclue > 0 && (
-                      <div className="flex justify-between text-slate-700">
-                        <span>TVA exclue (À charge) :</span>
-                        <span className="font-mono font-bold text-amber-800">{formatDH(effectiveTvaExclue)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-indigo-950 font-bold bg-indigo-50/90 p-2 rounded-lg border border-indigo-200">
-                      <span>Reste virement (AZUR) :</span>
-                      <span className="font-mono text-indigo-900">{formatDH(resteVirement)}</span>
-                    </div>
-                  </div>
-                )}
-
-                {!isAssuranceOrAzur && facture.montantRegle > 0 && (
-                  <div className="border-t border-dashed border-slate-300 pt-2 flex justify-between text-emerald-700 font-semibold text-xs">
-                    <span>Montant Déjà Réglé :</span>
-                    <span className="font-mono">{formatDH(facture.montantRegle)}</span>
-                  </div>
-                )}
               </div>
             </div>
 
