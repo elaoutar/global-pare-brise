@@ -229,6 +229,61 @@ export const FactureModal: React.FC<Props> = ({
                       <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">{ligne.totalHT.toFixed(2)}</td>
                     </tr>
                   ))}
+
+                  {/* Lignes Décompte Prise en Charge : Franchise & TVA (si dossier Assurance / AZUR GLASS) */}
+                  {isAssuranceOrAzur && (
+                    <>
+                      <tr className="bg-slate-50/80 border-t-2 border-slate-300">
+                        <td colSpan={3} className="py-2.5 px-4 font-semibold text-slate-800">
+                          <span className="font-bold text-[10px] text-slate-500 uppercase block tracking-wider">
+                            Règlement Direct :
+                          </span>
+                          Franchise {dossier.franchiseOfferte ? '(Offerte)' : '(Réglée en espèces)'}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-600 text-[11px]">
+                          Espèces
+                        </td>
+                        <td className="py-2.5 px-4 text-center text-slate-500 text-[11px]">-</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-800">
+                          {formatDH(effectiveFranchise)}
+                        </td>
+                      </tr>
+
+                      {effectiveTvaExclue > 0 && (
+                        <tr className="bg-slate-50/80 border-t border-slate-200">
+                          <td colSpan={3} className="py-2.5 px-4 font-semibold text-slate-800">
+                            <span className="font-bold text-[10px] text-amber-700 uppercase block tracking-wider">
+                              À Charge Client / Société :
+                            </span>
+                            TVA exclue de prise en charge assurance (Régime Pro / Location)
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-mono text-slate-600 text-[11px]">
+                            Espèces / Chèque
+                          </td>
+                          <td className="py-2.5 px-4 text-center text-slate-500 text-[11px]">20%</td>
+                          <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-800">
+                            {formatDH(effectiveTvaExclue)}
+                          </td>
+                        </tr>
+                      )}
+
+                      <tr className="bg-indigo-50/70 border-t border-indigo-200 font-bold">
+                        <td colSpan={3} className="py-2.5 px-4 text-indigo-950">
+                          <span className="font-bold text-[10px] text-indigo-700 uppercase block tracking-wider">
+                            Prise en Charge Compagnie :
+                          </span>
+                          Solde net pris en charge (À virer par AZUR GLASS / Assurance)
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-indigo-800 text-[11px]">
+                          Virement
+                        </td>
+                        <td className="py-2.5 px-4 text-center text-slate-500 text-[11px]">-</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-indigo-900">
+                          {formatDH(resteVirement)}
+                        </td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -302,11 +357,17 @@ export const FactureModal: React.FC<Props> = ({
                 {isAssuranceOrAzur && (
                   <div className="border-t border-dashed border-slate-300 pt-2.5 space-y-1.5 text-xs">
                     <div className="flex justify-between text-slate-700">
-                      <span>Réglé en espèces :</span>
+                      <span>Réglé en espèces (Franchise) :</span>
                       <span className="font-mono font-bold text-emerald-800">{formatDH(montantCash)}</span>
                     </div>
+                    {effectiveTvaExclue > 0 && (
+                      <div className="flex justify-between text-slate-700">
+                        <span>TVA exclue (À charge) :</span>
+                        <span className="font-mono font-bold text-amber-800">{formatDH(effectiveTvaExclue)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-indigo-950 font-bold bg-indigo-50/90 p-2 rounded-lg border border-indigo-200">
-                      <span>Reste virement :</span>
+                      <span>Reste virement (AZUR) :</span>
                       <span className="font-mono text-indigo-900">{formatDH(resteVirement)}</span>
                     </div>
                   </div>
