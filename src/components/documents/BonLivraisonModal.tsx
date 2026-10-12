@@ -285,14 +285,12 @@ export const BonLivraisonModal: React.FC<Props> = ({
                       Détail Prise en Charge Assurance :
                     </p>
                     <div className="space-y-1 text-slate-700 pt-1">
-                      {franchiseMontant > 0 && (
-                        <div className="flex justify-between">
-                          <span>Franchise {franchiseOfferte ? '(Offerte)' : '(À régler par le client)'} :</span>
-                          <span className={`font-mono font-bold ${franchiseOfferte ? 'text-emerald-700' : 'text-slate-900'}`}>
-                            {formatDH(franchiseMontant)}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex justify-between">
+                        <span>Franchise {franchiseOfferte ? '(Offerte)' : '(À régler par le client)'} :</span>
+                        <span className={`font-mono font-bold ${franchiseOfferte ? 'text-emerald-700' : 'text-slate-900'}`}>
+                          {formatDH(franchiseMontant)}
+                        </span>
+                      </div>
                       {effectiveTvaExclue > 0 && (
                         <div className="flex justify-between">
                           <span>TVA exclue (Régime Pro / Location) :</span>

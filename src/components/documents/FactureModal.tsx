@@ -299,7 +299,7 @@ export const FactureModal: React.FC<Props> = ({
                 </div>
 
                 {/* Décompte Espèces vs Virement pour AZUR GLASS */}
-                {isAssuranceOrAzur && montantCash > 0 && (
+                {isAssuranceOrAzur && (
                   <div className="border-t border-dashed border-slate-300 pt-2.5 space-y-1.5 text-xs">
                     <div className="flex justify-between text-slate-700">
                       <span>Réglé en espèces :</span>
