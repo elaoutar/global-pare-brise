@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Facture, DossierSinistre } from '@/types';
-import { GARAGE_INFO } from '@/lib/data';
+import { GARAGE_INFO, AZUR_GLASS_INFO } from '@/lib/data';
 import { formatDH, formatDate } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
 import { CheckCircle2 } from 'lucide-react';
@@ -79,9 +79,10 @@ export const FactureModal: React.FC<Props> = ({ facture, dossier, onClose }) => 
                   </div>
                   <p className="text-base font-black text-slate-900">AZUR GLASS SARL</p>
                   <p className="text-xs text-slate-600">Centre Conventionné Assurances</p>
-                  <p className="text-xs text-slate-600">Angle Bd Yacoub El Mansour & Rue Al Fourat, Marrakech</p>
+                  <p className="text-xs text-slate-600">{AZUR_GLASS_INFO.adresse}</p>
+                  <p className="text-xs text-slate-600">Tél : {AZUR_GLASS_INFO.telephone} • {AZUR_GLASS_INFO.email}</p>
                   <p className="text-xs text-slate-700 font-mono mt-1">
-                    <strong>ICE :</strong> 002987123000089 | <strong>IF :</strong> 48901234
+                    <strong>ICE :</strong> {AZUR_GLASS_INFO.ice}
                   </p>
                   <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-700 space-y-0.5">
                     <p><strong>Cie Assurance :</strong> {dossier.assurance?.nom || 'Assurance'} {dossier.agenceAssurance ? `(${dossier.agenceAssurance})` : ''}</p>

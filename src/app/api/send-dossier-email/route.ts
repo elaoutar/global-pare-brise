@@ -22,8 +22,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const smtpUser = process.env.SMTP_USER || 'a.elaoutar@gmail.com';
-    const smtpPassword = process.env.SMTP_PASSWORD || 'xnfu inhz twlp frsb';
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPassword = process.env.SMTP_PASSWORD;
+
+    if (!smtpUser || !smtpPassword) {
+      return NextResponse.json(
+        { error: 'Configuration email manquante (SMTP_USER / SMTP_PASSWORD).' },
+        { status: 500 }
+      );
+    }
 
     // Configuration du transporteur SMTP Gmail sécurisé
     const transporter = nodemailer.createTransport({

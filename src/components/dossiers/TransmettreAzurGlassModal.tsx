@@ -47,7 +47,7 @@ export const TransmettreAzurGlassModal: React.FC<TransmettreAzurGlassModalProps>
   onClose,
   onSendComplete,
 }) => {
-  const [destinataire, setDestinataire] = useState(AZUR_GLASS_INFO.email || 'sinistres@azurglass.ma');
+  const [destinataire, setDestinataire] = useState(AZUR_GLASS_INFO.email || '1azurglass@gmail.com');
   const [cc, setCc] = useState(GARAGE_INFO.email || 'globalazurmaroc@gmail.com');
   
   const immat = dossier.vehicule.immatriculation;
@@ -96,7 +96,7 @@ ${tvaPro > 0 ? `• TVA Pro / Location exclue par l'assurance : -${tvaPro.toFixe
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. PIÈCES JOINTES AU PACK DOSSIER
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[X] 1. Facture Officielle N° ${facture?.numeroFacture || `FA-2026-${numDossier.slice(-4)}`} libellée à AZUR GLASS SARL (ICE 002987123000089)
+[X] 1. Facture Officielle N° ${facture?.numeroFacture || `FA-2026-${numDossier.slice(-4)}`} libellée à AZUR GLASS SARL (ICE ${AZUR_GLASS_INFO.ice})
 [X] 2. Quittance Subrogative d'Assurance remplie et signée
 ${dossier.typeClientAssurance === 'PROFESSIONNEL' || dossier.typeClientAssurance === 'AGENCE_LOCATION' ? `[X] 3. Déclaration de bris de glaces signée & cachetée par la société (${dossier.client.nom})\n` : ''}[X] 4. Bon de Sortie Atelier N° ${bonSortie?.numeroBS || `BS-2026-${numDossier.slice(-4)}`} (Vitrage & fournitures de pose)
 [X] 5. Bon de Livraison & Décharge client N° ${bonLivraison?.numeroBL || `BL-2026-${numDossier.slice(-4)}`}
@@ -360,7 +360,7 @@ Email: ${GARAGE_INFO.email}`;
                     value={destinataire}
                     onChange={(e) => setDestinataire(e.target.value)}
                     className="w-full text-xs py-2 px-3 pl-8 bg-white border border-slate-300 rounded-lg font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    placeholder="sinistres@azurglass.ma"
+                    placeholder="1azurglass@gmail.com"
                   />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
                 </div>
