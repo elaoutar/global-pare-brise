@@ -162,3 +162,37 @@ export function exportEtatAzurGlassExcel(
   const cleanName = periodeOuFiltre.replace(/[^a-zA-Z0-9]/g, '_');
   exportTableToExcel(rows, `Etat_AZUR_GLASS_Assurances_${cleanName}`, 'Etat_AZUR_GLASS');
 }
+
+// 6. Export État des Particuliers (Sans Assurance / Directs & Comptant)
+export function exportEtatParticuliersExcel(
+  dossiers: DossierSinistre[],
+  periodeLibelle: string = 'Tous'
+) {
+  const dossiersParticuliers = dossiers.filter((d) => d.typeDossier !== 'ASSURANCE');
+  const rows = dossiersParticuliers.map((d) => {
+    const totalTTC = d.montantTotalTTC || 0;
+    const totalHT = +(totalTTC / 1.20).toFixed(2);
+    const totalTVA = +(totalTTC - totalHT).toFixed(2);
+
+    return {
+      'N° Dossier': d.numeroDossier,
+      'Date Création': formatDate(d.dateCreation),
+      'Client': d.client.nom,
+      'Téléphone': d.client.telephone,
+      'CIN': d.client.cin || '-',
+      'Véhicule': `${d.vehicule.marque} ${d.vehicule.modele} (${d.vehicule.annee})`,
+      'Immatriculation': formatMatricule(d.vehicule.immatriculation, 'LATIN'),
+      'N° Châssis (VIN)': d.vehicule.chassisVin || '-',
+      'Montant HT (DH)': totalHT,
+      'TVA 20% (DH)': totalTVA,
+      'Montant Total TTC (DH)': totalTTC,
+      'Statut Dossier': d.statut,
+      'Technicien Poseur': d.poseur || '-',
+      'Observations': d.observations || '-',
+    };
+  });
+
+  const cleanName = periodeLibelle.replace(/[^a-zA-Z0-9]/g, '_');
+  exportTableToExcel(rows, `Etat_Particuliers_Sans_Assurance_${cleanName}`, 'Particuliers');
+}
+

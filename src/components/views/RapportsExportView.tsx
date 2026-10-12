@@ -9,7 +9,8 @@ import {
   exportEtatAssuranceExcel, 
   exportEtatClientExcel, 
   exportEtatRecettesExcel,
-  exportEtatAzurGlassExcel 
+  exportEtatAzurGlassExcel,
+  exportEtatParticuliersExcel
 } from '@/lib/exportUtils';
 import { 
   FileSpreadsheet, 
@@ -21,7 +22,8 @@ import {
   Download,
   Filter,
   CheckCircle2,
-  Building2
+  Building2,
+  UserCheck
 } from 'lucide-react';
 import { formatMatricule } from '@/lib/matriculeMaroc';
 
@@ -36,9 +38,11 @@ export const RapportsExportView: React.FC<Props> = ({
   assurances,
   recettes,
 }) => {
-  const [typeRapport, setTypeRapport] = useState<'AZUR_GLASS' | 'MENSUEL' | 'ASSURANCE' | 'CLIENT' | 'RECETTES'>('AZUR_GLASS');
+  const [typeRapport, setTypeRapport] = useState<'AZUR_GLASS' | 'PARTICULIERS' | 'MENSUEL' | 'ASSURANCE' | 'CLIENT' | 'RECETTES'>('AZUR_GLASS');
   const [selectedAssuranceId, setSelectedAssuranceId] = useState<string>('ALL');
   const [selectedClientNom, setSelectedClientNom] = useState<string>('ALL');
+  const [dateDebut, setDateDebut] = useState<string>(''); // YYYY-MM-DD
+  const [dateFin, setDateFin] = useState<string>(''); // YYYY-MM-DD
   const [selectedMois, setSelectedMois] = useState<string>('ALL'); // 'ALL' ou 'YYYY-MM'
   const [selectedTypeClientAzur, setSelectedTypeClientAzur] = useState<string>('ALL'); // 'ALL', 'PARTICULIER', 'PROFESSIONNEL', 'AGENCE_LOCATION'
   const [selectedStatutAzur, setSelectedStatutAzur] = useState<string>('ALL'); // 'ALL', 'TRANSMIS', 'EN_COURS', 'REGLE'
@@ -46,14 +50,38 @@ export const RapportsExportView: React.FC<Props> = ({
   // Unique list of client names
   const clientNames = Array.from(new Set(dossiers.map((d) => d.client.nom)));
 
-  // Filter dossiers according to selected report settings (avec filtre par mois universel)
-  const filteredDossiers = dossiers.filter((d) => {
-    // 1. Filtre par mois universel (applicable à TOUS les états si différent de 'ALL')
-    if (selectedMois !== 'ALL') {
-      const matchMonth = (d.dateCreation && d.dateCreation.startsWith(selectedMois)) || 
-                         (d.dateEnvoiAzurGlass && d.dateEnvoiAzurGlass.startsWith(selectedMois));
-      if (!matchMonth) return false;
+  // Helper de filtrage par date universel (date début, date fin, et/ou mois)
+  const matchDateRange = (dateStr?: string) => {
+    if (!dateStr) return true;
+    const cleanDate = dateStr.slice(0, 10);
+    if (dateDebut && cleanDate < dateDebut) return false;
+    if (dateFin && cleanDate > dateFin) return false;
+    if (selectedMois !== 'ALL' && !cleanDate.startsWith(selectedMois)) return false;
+    return true;
+  };
+
+  // Libellé de la période filtrée pour affichage et export
+  const getPeriodeLibelle = () => {
+    if (dateDebut && dateFin) {
+      return `Du ${formatDate(dateDebut)} au ${formatDate(dateFin)}`;
     }
+    if (dateDebut) {
+      return `À partir du ${formatDate(dateDebut)}`;
+    }
+    if (dateFin) {
+      return `Jusqu'au ${formatDate(dateFin)}`;
+    }
+    if (selectedMois !== 'ALL') {
+      return `Mois : ${selectedMois}`;
+    }
+    return 'Historique Global';
+  };
+
+  // Filter dossiers according to selected report settings
+  const filteredDossiers = dossiers.filter((d) => {
+    // 1. Filtre par date universel
+    const dateToTest = d.dateCreation || d.dateSinistre || '';
+    if (!matchDateRange(dateToTest)) return false;
 
     // 2. Filtres spécifiques par type d'état
     if (typeRapport === 'AZUR_GLASS') {
@@ -73,8 +101,12 @@ export const RapportsExportView: React.FC<Props> = ({
 
       return true;
     }
+    if (typeRapport === 'PARTICULIERS') {
+      // Uniquement les dossiers de clients particuliers sans assurance (direct / comptant)
+      return d.typeDossier !== 'ASSURANCE';
+    }
     if (typeRapport === 'MENSUEL') {
-      return true; // Déjà filtré par selectedMois
+      return true;
     }
     if (typeRapport === 'ASSURANCE') {
       if (selectedAssuranceId === 'ALL') return d.typeDossier === 'ASSURANCE';
@@ -89,10 +121,7 @@ export const RapportsExportView: React.FC<Props> = ({
 
   // Filtered recettes
   const filteredRecettes = recettes.filter((r) => {
-    if (selectedMois !== 'ALL') {
-      return r.datePaiement && r.datePaiement.startsWith(selectedMois);
-    }
-    return true;
+    return matchDateRange(r.datePaiement);
   });
 
   // Financial totals
@@ -111,20 +140,23 @@ export const RapportsExportView: React.FC<Props> = ({
 
   // Handle Export to Excel
   const handleExportExcel = () => {
+    const periodeLabel = getPeriodeLibelle();
     if (typeRapport === 'AZUR_GLASS') {
       const filtreLabel = selectedAssuranceId !== 'ALL' 
         ? assurances.find((a) => a.id === selectedAssuranceId)?.nom || 'Compagnie' 
         : selectedTypeClientAzur;
-      exportEtatAzurGlassExcel(filteredDossiers, filtreLabel);
+      exportEtatAzurGlassExcel(filteredDossiers, `${filtreLabel}_${periodeLabel}`);
+    } else if (typeRapport === 'PARTICULIERS') {
+      exportEtatParticuliersExcel(filteredDossiers, periodeLabel);
     } else if (typeRapport === 'MENSUEL') {
-      exportEtatMensuelExcel(filteredDossiers, selectedMois);
+      exportEtatMensuelExcel(filteredDossiers, periodeLabel);
     } else if (typeRapport === 'ASSURANCE') {
       const assNom = assurances.find((a) => a.id === selectedAssuranceId)?.nom || 'Toutes_Assurances';
-      exportEtatAssuranceExcel(filteredDossiers, assNom);
+      exportEtatAssuranceExcel(filteredDossiers, `${assNom}_${periodeLabel}`);
     } else if (typeRapport === 'CLIENT') {
-      exportEtatClientExcel(filteredDossiers, selectedClientNom);
+      exportEtatClientExcel(filteredDossiers, `${selectedClientNom}_${periodeLabel}`);
     } else if (typeRapport === 'RECETTES') {
-      exportEtatRecettesExcel(filteredRecettes, selectedMois);
+      exportEtatRecettesExcel(filteredRecettes, periodeLabel);
     }
   };
 
@@ -177,7 +209,19 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Building2 className="w-4 h-4 text-indigo-400" />
-            1. État AZUR GLASS (Assurances & Reversements)
+            1. État AZUR GLASS (Assurances)
+          </button>
+
+          <button
+            onClick={() => setTypeRapport('PARTICULIERS')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+              typeRapport === 'PARTICULIERS'
+                ? 'bg-amber-800 text-white shadow-sm ring-2 ring-amber-500/20'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            <UserCheck className="w-4 h-4 text-amber-600" />
+            2. État Particuliers (Sans Assurance)
           </button>
 
           <button
@@ -189,7 +233,7 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Calendar className="w-4 h-4" />
-            2. État Mensuel Global
+            3. État Mensuel Global
           </button>
 
           <button
@@ -201,7 +245,7 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Shield className="w-4 h-4" />
-            3. État par Compagnie
+            4. État par Compagnie
           </button>
 
           <button
@@ -213,7 +257,7 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            4. État par Client / Flotte
+            5. État par Client / Flotte
           </button>
 
           <button
@@ -225,36 +269,101 @@ export const RapportsExportView: React.FC<Props> = ({
             }`}
           >
             <Coins className="w-4 h-4" />
-            5. Journal des Recettes
+            6. Journal des Recettes
           </button>
         </div>
 
         {/* Filter Controls Bar */}
         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap items-center gap-4 text-xs">
           <span className="font-bold text-slate-700 flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5 text-slate-400" /> Filtres applicables :
+            <Filter className="w-3.5 h-3.5 text-slate-400" /> Filtrer par date :
           </span>
 
-          {/* Filtre par Mois Universel (applicable à TOUS les états) */}
-          <div className="flex items-center gap-2">
-            <label className="text-slate-700 font-bold flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Période / Mois :
-            </label>
+          {/* Filtre par Plage de Dates (Du ... Au ...) */}
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
+              <label className="text-slate-700 font-bold flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Du :
+              </label>
+              <input
+                type="date"
+                value={dateDebut}
+                onChange={(e) => {
+                  setDateDebut(e.target.value);
+                  if (selectedMois !== 'ALL') setSelectedMois('ALL');
+                }}
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono font-medium text-slate-800 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <label className="text-slate-700 font-bold">Au :</label>
+              <input
+                type="date"
+                value={dateFin}
+                onChange={(e) => {
+                  setDateFin(e.target.value);
+                  if (selectedMois !== 'ALL') setSelectedMois('ALL');
+                }}
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono font-medium text-slate-800 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Ou sélection rapide par mois */}
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-300">
+              <label className="text-slate-500 font-medium">Ou Mois :</label>
               <input
                 type="month"
                 value={selectedMois === 'ALL' ? '' : selectedMois}
-                onChange={(e) => setSelectedMois(e.target.value || 'ALL')}
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono font-bold text-slate-800 text-xs"
+                onChange={(e) => {
+                  setSelectedMois(e.target.value || 'ALL');
+                  setDateDebut('');
+                  setDateFin('');
+                }}
+                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono font-medium text-slate-800 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
-              {selectedMois !== 'ALL' && (
+            </div>
+
+            {/* Raccourcis Aujourd'hui / Ce mois / Effacer */}
+            <div className="flex items-center gap-1 pl-2 border-l border-slate-300">
+              <button
+                type="button"
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setDateDebut(today);
+                  setDateFin(today);
+                  setSelectedMois('ALL');
+                }}
+                className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded text-[11px] font-semibold transition"
+              >
+                Aujourd'hui
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date();
+                  const year = now.getFullYear();
+                  const month = String(now.getMonth() + 1).padStart(2, '0');
+                  setSelectedMois(`${year}-${month}`);
+                  setDateDebut('');
+                  setDateFin('');
+                }}
+                className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded text-[11px] font-semibold transition"
+              >
+                Ce mois
+              </button>
+              {(dateDebut || dateFin || selectedMois !== 'ALL') && (
                 <button
                   type="button"
-                  onClick={() => setSelectedMois('ALL')}
-                  className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[11px] font-semibold transition"
-                  title="Afficher tout l'historique sans filtrer par mois"
+                  onClick={() => {
+                    setDateDebut('');
+                    setDateFin('');
+                    setSelectedMois('ALL');
+                  }}
+                  className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-[11px] font-bold border border-rose-200 transition"
+                  title="Afficher tout l'historique sans filtre de date"
                 >
-                  Tous les mois
+                  Tous (Sans filtre)
                 </button>
               )}
             </div>
@@ -357,11 +466,12 @@ export const RapportsExportView: React.FC<Props> = ({
 
           <div className="text-right">
             <span className="inline-block px-3 py-1 bg-slate-900 text-white font-bold text-xs uppercase rounded mb-1">
-              {typeRapport === 'AZUR_GLASS' && `BORDEREAU AZUR GLASS ${selectedMois !== 'ALL' ? `(${selectedMois})` : '(TOUS MOIS)'}`}
-              {typeRapport === 'MENSUEL' && `ÉTAT MENSUEL D'ACTIVITÉ ${selectedMois !== 'ALL' ? `(${selectedMois})` : '(GLOBAL)'}`}
-              {typeRapport === 'ASSURANCE' && `SITUATION PAR COMPAGNIE ${selectedMois !== 'ALL' ? `(${selectedMois})` : ''}`}
-              {typeRapport === 'CLIENT' && `RELEVÉ CLIENT ${selectedMois !== 'ALL' ? `(${selectedMois})` : ''}`}
-              {typeRapport === 'RECETTES' && `JOURNAL DES RECETTES ${selectedMois !== 'ALL' ? `(${selectedMois})` : '(GLOBAL)'}`}
+              {typeRapport === 'AZUR_GLASS' && `BORDEREAU AZUR GLASS (${getPeriodeLibelle()})`}
+              {typeRapport === 'PARTICULIERS' && `SITUATION PARTICULIERS SANS ASSURANCE (${getPeriodeLibelle()})`}
+              {typeRapport === 'MENSUEL' && `ÉTAT MENSUEL GLOBAL (${getPeriodeLibelle()})`}
+              {typeRapport === 'ASSURANCE' && `SITUATION PAR COMPAGNIE (${getPeriodeLibelle()})`}
+              {typeRapport === 'CLIENT' && `RELEVÉ CLIENT (${getPeriodeLibelle()})`}
+              {typeRapport === 'RECETTES' && `JOURNAL DES RECETTES (${getPeriodeLibelle()})`}
             </span>
             {typeRapport === 'AZUR_GLASS' && (
               <p className="text-[11px] font-bold text-indigo-700">
@@ -396,6 +506,25 @@ export const RapportsExportView: React.FC<Props> = ({
                 Net Attendu AZUR GLASS
               </span>
               <p className="font-black text-emerald-400 text-sm font-mono">{formatDH(totalNetReversementAzur)}</p>
+            </div>
+          </div>
+        ) : typeRapport === 'PARTICULIERS' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-amber-50/80 rounded-xl border border-amber-200 mb-5 text-center">
+            <div>
+              <span className="text-[10px] text-amber-900 font-bold uppercase">Dossiers Particuliers</span>
+              <p className="font-black text-slate-900 text-base">{filteredDossiers.length}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-amber-900 font-bold uppercase">Total TTC Encaissé</span>
+              <p className="font-black text-amber-950 text-sm font-mono">{formatDH(totalTTC)}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-600 font-bold uppercase">Total HT Estimé</span>
+              <p className="font-bold text-slate-800 text-sm font-mono">{formatDH(+(totalTTC / 1.20).toFixed(2))}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-600 font-bold uppercase">TVA Collectée (20%)</span>
+              <p className="font-bold text-slate-800 text-sm font-mono">{formatDH(+(totalTTC - totalTTC / 1.20).toFixed(2))}</p>
             </div>
           </div>
         ) : typeRapport !== 'RECETTES' ? (
@@ -511,6 +640,65 @@ export const RapportsExportView: React.FC<Props> = ({
                       </tr>
                     );
                   })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : typeRapport === 'PARTICULIERS' ? (
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-amber-50/70 border-b border-amber-200 font-bold text-amber-950 uppercase text-[11px]">
+                <tr>
+                  <th className="p-2.5">Date & Dossier</th>
+                  <th className="p-2.5">Client Particulier</th>
+                  <th className="p-2.5">Véhicule (Matricule)</th>
+                  <th className="p-2.5">N° Châssis (VIN)</th>
+                  <th className="p-2.5">Technicien Poseur</th>
+                  <th className="p-2.5 text-right">Montant TTC (DH)</th>
+                  <th className="p-2.5 text-center">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDossiers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-slate-400 italic">
+                      Aucun dossier particulier (sans assurance) enregistré sur cette période.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDossiers.map((d) => (
+                    <tr key={d.id} className="hover:bg-amber-50/30 transition-colors">
+                      <td className="p-2.5">
+                        <span className="font-mono font-bold text-slate-900 block">{d.numeroDossier}</span>
+                        <span className="text-[10px] text-slate-500">{formatDate(d.dateCreation)}</span>
+                      </td>
+                      <td className="p-2.5">
+                        <strong className="text-slate-900 block">{d.client.nom}</strong>
+                        <span className="text-[11px] text-slate-500 block">Tél: {d.client.telephone}</span>
+                        {d.client.cin && <span className="text-[10px] text-slate-400 font-mono">CIN: {d.client.cin}</span>}
+                      </td>
+                      <td className="p-2.5">
+                        <strong className="text-slate-900 block">{d.vehicule.marque} {d.vehicule.modele} ({d.vehicule.annee})</strong>
+                        <span className="font-mono text-[11px] font-bold text-slate-800">
+                          {formatMatricule(d.vehicule.immatriculation, 'LATIN')}
+                        </span>
+                      </td>
+                      <td className="p-2.5 font-mono text-[11px] text-slate-600">
+                        {d.vehicule.chassisVin || '-'}
+                      </td>
+                      <td className="p-2.5 text-slate-700">
+                        {d.poseur || 'Chef d\'atelier'}
+                      </td>
+                      <td className="p-2.5 text-right font-mono font-bold text-amber-950 text-xs">
+                        {formatDH(d.montantTotalTTC)}
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
+                          {d.statut}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
