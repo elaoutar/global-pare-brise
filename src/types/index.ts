@@ -120,6 +120,9 @@ export interface Facture {
   statutPaiement: StatutPaiement;
   datePaiement?: string;
   referencePaiement?: string; // Ex: Virement Wafa N° 987654
+  observations?: string;
+  montantRegleEspeces?: number; // Montant réglé en espèces (franchise / TVA)
+  montantSoldeVirement?: number; // Reste à régler par virement bancaire (reversement AZUR GLASS)
 }
 
 export type TypeDossier = 'ASSURANCE' | 'PARTICULIER_COMPTANT';
@@ -209,6 +212,10 @@ export interface BonLivraisonLigne {
   designation: string;
   codeEurocode?: string;
   quantite: number;
+  prixUnitaireHT?: number;
+  prixUnitaireTTC?: number;
+  totalHT?: number;
+  totalTTC?: number;
 }
 
 export interface BonLivraison {
@@ -220,6 +227,10 @@ export interface BonLivraison {
   receptionnaireNom: string;
   receptionnaireCin?: string;
   lignes: BonLivraisonLigne[];
+  totalHT?: number;
+  totalTTC?: number;
+  montantFranchise?: number;
+  tvaExclue?: number;
   observations?: string;
 }
 

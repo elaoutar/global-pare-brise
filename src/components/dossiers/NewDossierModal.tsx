@@ -457,15 +457,24 @@ export const NewDossierModal: React.FC<Props> = ({
       };
     }
 
-    // Calcul précis du reversement AZUR GLASS (Total TTC - Franchise payée par client - TVA exclue pour Pro/Location)
+    // Calcul précis du reversement AZUR GLASS (Total TTC - Franchise payée en espèces - TVA exclue pour Pro/Location)
     const effectiveFranchiseDeduite = franchiseOfferte ? 0 : montantFranchise;
     const effectiveTvaExclue = (typeClientAssurance === 'PROFESSIONNEL' || typeClientAssurance === 'AGENCE_LOCATION')
       ? Number(tvaExclueParAssurance) || 0
       : 0;
 
+    const montantCashAssurance = effectiveFranchiseDeduite + effectiveTvaExclue;
     const netReversementAzur = isAssurance
-      ? Math.max(0, +(computedTotalTTC - effectiveFranchiseDeduite - effectiveTvaExclue).toFixed(2))
+      ? Math.max(0, +(computedTotalTTC - montantCashAssurance).toFixed(2))
       : 0;
+
+    if (isAssurance) {
+      factureGeneree.montantRegleEspeces = montantCashAssurance;
+      factureGeneree.montantSoldeVirement = netReversementAzur;
+      factureGeneree.observations = montantCashAssurance > 0
+        ? `Règlement : ${montantCashAssurance.toFixed(2)} DH réglé en espèces et le solde de ${netReversementAzur.toFixed(2)} DH par virement bancaire.`
+        : `Règlement : ${computedTotalTTC.toFixed(2)} DH par virement bancaire.`;
+    }
 
     const newDossier: DossierSinistre = {
       id: dossierId,

@@ -7,6 +7,7 @@ import {
   Facture, 
   BonSortie, 
   BonLivraison,
+  BonLivraisonLigne,
   ReglementRecette,
   DocumentAttache,
   StatutDossier,
@@ -103,7 +104,7 @@ export default function Home() {
   const [activeDeclarationBrisGlaceDossier, setActiveDeclarationBrisGlaceDossier] = useState<DossierSinistre | null>(null);
   const [activeFactureModal, setActiveFactureModal] = useState<{ facture: Facture; dossier: DossierSinistre } | null>(null);
   const [activeBonSortieModal, setActiveBonSortieModal] = useState<{ bonSortie: BonSortie; dossier: DossierSinistre } | null>(null);
-  const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier: DossierSinistre } | null>(null);
+  const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier: DossierSinistre; facture?: Facture } | null>(null);
   const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier: DossierSinistre; facture?: Facture } | null>(null);
   const [activeCommandeFournisseurModal, setActiveCommandeFournisseurModal] = useState<{ commande: BonCommandeFournisseur; fournisseur: Fournisseur } | null>(null);
   const [activeTransmettreAzurGlassDossier, setActiveTransmettreAzurGlassDossier] = useState<DossierSinistre | null>(null);
@@ -239,7 +240,23 @@ export default function Home() {
       notes: `Affecté au véhicule ${newDossier.vehicule.marque} ${newDossier.vehicule.modele} (${newDossier.vehicule.immatriculation})`,
     };
 
-    // Auto-generate Bon de Livraison strictly matching the vehicle
+    // Auto-generate Bon de Livraison strictly matching the vehicle & all prestations with prices
+    const newBLLignes: BonLivraisonLigne[] = newFacture && newFacture.lignes.length > 0
+      ? newFacture.lignes.map((l) => ({
+          designation: l.designation,
+          codeEurocode: l.codeEurocode,
+          quantite: l.quantite,
+          prixUnitaireHT: l.prixUnitaireHT,
+          prixUnitaireTTC: +(l.prixUnitaireHT * 1.20).toFixed(2),
+          totalHT: l.totalHT,
+          totalTTC: +(l.totalHT * 1.20).toFixed(2),
+        }))
+      : finalBS.lignes.map((l) => ({
+          designation: l.designation,
+          codeEurocode: l.reference,
+          quantite: l.quantite,
+        }));
+
     const newBL: BonLivraison = {
       id: `bl-${Date.now()}`,
       numeroBL: `BL-2026-${seq}`,
@@ -248,11 +265,11 @@ export default function Home() {
       livreurPoseur: newDossier.poseur || 'Poseur Atelier',
       receptionnaireNom: newDossier.client.nom,
       receptionnaireCin: newDossier.client.cin,
-      lignes: finalBS.lignes.map((l) => ({
-        designation: l.designation,
-        codeEurocode: l.reference,
-        quantite: l.quantite,
-      })),
+      lignes: newBLLignes,
+      totalHT: newFacture?.totalHT,
+      totalTTC: newFacture?.totalTTC || newDossier.montantTotalTTC,
+      montantFranchise: newDossier.montantFranchise,
+      tvaExclue: newDossier.tvaExclueParAssurance,
       observations: `Véhicule ${newDossier.vehicule.marque} ${newDossier.vehicule.modele} (${newDossier.vehicule.immatriculation}) remis conforme. Garantie étanchéité validée.`,
     };
 
@@ -885,8 +902,41 @@ export default function Home() {
   // Helper to open Bon Livraison modal from dossier
   const handleOpenBonLivraisonFromDossier = (dossier: DossierSinistre) => {
     let matchedBL = bonsLivraison.find((b) => b.dossierId === dossier.id);
+    const matchedFacture = factures.find((f) => f.dossierId === dossier.id);
+
     if (!matchedBL) {
       const seq = Math.floor(1000 + Math.random() * 9000);
+      const newLignes: BonLivraisonLigne[] = matchedFacture && matchedFacture.lignes.length > 0
+        ? matchedFacture.lignes.map((l) => ({
+            designation: l.designation,
+            codeEurocode: l.codeEurocode,
+            quantite: l.quantite,
+            prixUnitaireHT: l.prixUnitaireHT,
+            prixUnitaireTTC: +(l.prixUnitaireHT * 1.20).toFixed(2),
+            totalHT: l.totalHT,
+            totalTTC: +(l.totalHT * 1.20).toFixed(2),
+          }))
+        : [
+            {
+              designation: `Pare-Brise conforme ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`,
+              quantite: 1,
+              prixUnitaireTTC: Math.max(0, dossier.montantTotalTTC - 300),
+              totalTTC: Math.max(0, dossier.montantTotalTTC - 300),
+            },
+            {
+              designation: 'Kit colle polyuréthane & primaire d\'adhérence certifié',
+              quantite: 1,
+              prixUnitaireTTC: 180,
+              totalTTC: 180,
+            },
+            {
+              designation: 'Main d\'œuvre pose et dépose vitrage collé',
+              quantite: 1,
+              prixUnitaireTTC: 120,
+              totalTTC: 120,
+            },
+          ];
+
       matchedBL = {
         id: `bl-${Date.now()}`,
         numeroBL: `BL-2026-${seq}`,
@@ -895,21 +945,38 @@ export default function Home() {
         livreurPoseur: dossier.poseur || 'Karim Bennani (Chef d\'atelier)',
         receptionnaireNom: dossier.client.nom,
         receptionnaireCin: dossier.client.cin,
-        lignes: [
-          {
-            designation: `Pare-Brise conforme ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`,
-            quantite: 1,
-          },
-          {
-            designation: 'Kit colle & étanchéité polyuréthane certifié',
-            quantite: 1,
-          },
-        ],
+        lignes: newLignes,
+        totalHT: matchedFacture?.totalHT,
+        totalTTC: matchedFacture?.totalTTC || dossier.montantTotalTTC,
+        montantFranchise: dossier.montantFranchise,
+        tvaExclue: dossier.tvaExclueParAssurance,
         observations: `Véhicule ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation}) remis au client en parfait état de conformité.`,
       };
       setBonsLivraison((prev) => [matchedBL!, ...prev]);
     }
-    setActiveBonLivraisonModal({ bonLivraison: matchedBL, dossier });
+    setActiveBonLivraisonModal({ bonLivraison: matchedBL, dossier, facture: matchedFacture });
+  };
+
+  const handleUpdateBonLivraisonObservations = (newObservations: string) => {
+    if (!activeBonLivraisonModal) return;
+    const blId = activeBonLivraisonModal.bonLivraison.id;
+    setBonsLivraison((prev) =>
+      prev.map((b) => (b.id === blId ? { ...b, observations: newObservations } : b))
+    );
+    setActiveBonLivraisonModal((prev) =>
+      prev ? { ...prev, bonLivraison: { ...prev.bonLivraison, observations: newObservations } } : null
+    );
+  };
+
+  const handleUpdateFactureObservations = (newObservations: string) => {
+    if (!activeFactureModal) return;
+    const facId = activeFactureModal.facture.id;
+    setFactures((prev) =>
+      prev.map((f) => (f.id === facId ? { ...f, observations: newObservations } : f))
+    );
+    setActiveFactureModal((prev) =>
+      prev ? { ...prev, facture: { ...prev.facture, observations: newObservations } } : null
+    );
   };
 
   const stockCritiqueCount = stock.filter((a) => a.quantiteEnStock <= a.stockMinimumAlerte).length;
@@ -1193,6 +1260,7 @@ export default function Home() {
           facture={activeFactureModal.facture}
           dossier={activeFactureModal.dossier}
           onClose={() => setActiveFactureModal(null)}
+          onUpdateObservations={handleUpdateFactureObservations}
         />
       )}
 
@@ -1208,7 +1276,9 @@ export default function Home() {
         <BonLivraisonModal
           bonLivraison={activeBonLivraisonModal.bonLivraison}
           dossier={activeBonLivraisonModal.dossier}
+          facture={activeBonLivraisonModal.facture}
           onClose={() => setActiveBonLivraisonModal(null)}
+          onUpdateObservations={handleUpdateBonLivraisonObservations}
         />
       )}
 
