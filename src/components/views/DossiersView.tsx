@@ -28,7 +28,13 @@ import {
   Building2,
   Mail,
   Send,
-  Calendar
+  Calendar,
+  Archive,
+  Trash2,
+  RotateCcw,
+  AlertTriangle,
+  Clock,
+  ShieldAlert
 } from 'lucide-react';
 import { DocumentAttache } from '@/types';
 import { exportEtatMensuelExcel } from '@/lib/exportUtils';
@@ -49,6 +55,10 @@ interface Props {
   onAddDocumentToDossier: (dossierId: string, doc: DocumentAttache) => void;
   onUpdateStatut: (dossierId: string, newStatut: StatutDossier) => void;
   onOpenEncaisserModal?: (dossier: DossierSinistre) => void;
+  onArchiveDossier?: (dossierId: string, motif?: string) => void;
+  onRestoreDossier?: (dossierId: string) => void;
+  onDeleteDossierPermanent?: (dossierId: string) => void;
+  onPurgeExpiredDossiers?: () => void;
 }
 
 export const DossiersView: React.FC<Props> = ({
@@ -64,25 +74,59 @@ export const DossiersView: React.FC<Props> = ({
   onAddDocumentToDossier,
   onUpdateStatut,
   onOpenEncaisserModal,
+  onArchiveDossier,
+  onRestoreDossier,
+  onDeleteDossierPermanent,
+  onPurgeExpiredDossiers,
 }) => {
+  const [tabVue, setTabVue] = useState<'ACTIFS' | 'ARCHIVES'>('ACTIFS');
+  const [dossierToArchive, setDossierToArchive] = useState<DossierSinistre | null>(null);
+  const [dossierToDeletePermanent, setDossierToDeletePermanent] = useState<DossierSinistre | null>(null);
+  const [archiveMotif, setArchiveMotif] = useState<string>('Dossier test / Annulation');
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatut, setFilterStatut] = useState<string>('ALL');
   const [filterVille, setFilterVille] = useState<string>('ALL');
   const [filterMois, setFilterMois] = useState<string>('ALL');
-  const [selectedDossierId, setSelectedDossierId] = useState<string | null>(dossiers[0]?.id || null);
-  const selectedDossier = dossiers.find((d) => d.id === (selectedDossierId || dossiers[0]?.id)) || dossiers[0] || null;
+  const [selectedDossierId, setSelectedDossierId] = useState<string | null>(null);
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newDocNom, setNewDocNom] = useState('');
   const [newDocType, setNewDocType] = useState<DocumentAttache['typeDocument']>('PRISE_EN_CHARGE_ASSURANCE');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
+  // Séparation stricte : Dossiers Actifs vs Corbeille / Archives 30j
+  const activeDossiers = dossiers.filter((d) => !d.isArchive && d.statut !== 'ARCHIVE');
+  const archivedDossiers = dossiers.filter((d) => Boolean(d.isArchive || d.statut === 'ARCHIVE'));
+
+  const getDaysRemaining = (dateArchivage?: string) => {
+    if (!dateArchivage) return 30;
+    const archTime = new Date(dateArchivage).getTime();
+    if (isNaN(archTime)) return 30;
+    const elapsedDays = Math.floor((Date.now() - archTime) / (1000 * 60 * 60 * 24));
+    return Math.max(0, 30 - elapsedDays);
+  };
+
+  const getPurgeDateFormatted = (dateArchivage?: string) => {
+    if (!dateArchivage) {
+      const d = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+      return formatDate(d.toISOString());
+    }
+    const d = new Date(dateArchivage);
+    d.setDate(d.getDate() + 30);
+    return formatDate(d.toISOString());
+  };
+
+  const expiredDossiers = archivedDossiers.filter((d) => getDaysRemaining(d.dateArchivage) === 0);
+  const currentPool = tabVue === 'ACTIFS' ? activeDossiers : archivedDossiers;
+
   // Extraire les villes uniques pour la liste de filtrage
   const villesDisponibles = Array.from(
-    new Set(dossiers.map((d) => d.client.ville).filter(Boolean))
+    new Set(currentPool.map((d) => d.client.ville).filter(Boolean))
   ).sort();
 
-  const filteredDossiers = dossiers.filter((d) => {
+  const filteredDossiers = currentPool.filter((d) => {
     const matchSearch =
       d.vehicule.immatriculation.toLowerCase().includes(searchTerm.toLowerCase()) ||
       formatMatricule(d.vehicule.immatriculation, 'LATIN').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -120,8 +164,98 @@ export const DossiersView: React.FC<Props> = ({
     return matchSearch && matchStatut && matchVille && matchMois;
   });
 
+  const selectedDossier = currentPool.find((d) => d.id === selectedDossierId) || filteredDossiers[0] || null;
+
   return (
     <div className="space-y-6">
+      {/* Top Switcher : Dossiers Actifs vs Archives (Rétention 30j) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setTabVue('ACTIFS');
+              setSelectedDossierId(null);
+            }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              tabVue === 'ACTIFS'
+                ? 'bg-slate-900 text-white shadow-md'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Car className="w-4 h-4 text-brand-400" />
+            <span>Dossiers Actifs</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                tabVue === 'ACTIFS' ? 'bg-brand-500 text-white' : 'bg-white text-slate-800'
+              }`}
+            >
+              {activeDossiers.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTabVue('ARCHIVES');
+              setSelectedDossierId(null);
+            }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              tabVue === 'ARCHIVES'
+                ? 'bg-amber-800 text-white shadow-md'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/70'
+            }`}
+          >
+            <Archive className="w-4 h-4 text-amber-500" />
+            <span>Archives & Corbeille (30 jours)</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                tabVue === 'ARCHIVES' ? 'bg-amber-600 text-white' : 'bg-amber-200 text-amber-950'
+              }`}
+            >
+              {archivedDossiers.length}
+            </span>
+            {expiredDossiers.length > 0 && (
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" title={`${expiredDossiers.length} dossier(s) expirés`}></span>
+            )}
+          </button>
+        </div>
+
+        {tabVue === 'ARCHIVES' && expiredDossiers.length > 0 && onPurgeExpiredDossiers && (
+          <button
+            type="button"
+            onClick={onPurgeExpiredDossiers}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black shadow-xs transition active:scale-95 whitespace-nowrap self-start sm:self-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Purger les {expiredDossiers.length} expirés (+30j)
+          </button>
+        )}
+      </div>
+
+      {/* Bannière explicative Rétention 30 Jours */}
+      {tabVue === 'ARCHIVES' && (
+        <div className="p-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-150">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2.5 bg-amber-200/80 text-amber-900 rounded-xl flex-shrink-0">
+              <ShieldAlert className="w-5 h-5 text-amber-800" />
+            </div>
+            <div>
+              <p className="font-bold text-amber-950 text-sm flex items-center gap-2">
+                Espace Sécurisé d'Archivage (Délai de Sécurité 30 Jours)
+                {expiredDossiers.length > 0 && (
+                  <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] rounded-full font-black">
+                    ⚠️ {expiredDossiers.length} dossier(s) prêt(s) pour purge
+                  </span>
+                )}
+              </p>
+              <p className="text-amber-800/90 mt-0.5">
+                Les dossiers supprimés (notamment les dossiers de test) sont mis en quarantaine ici pendant <strong>30 jours</strong> avant suppression automatique définitive. Vous pouvez <strong>restaurer</strong> un dossier à tout moment ou le <strong>supprimer définitivement</strong> dès maintenant.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top action bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
@@ -284,13 +418,67 @@ export const DossiersView: React.FC<Props> = ({
                       )}
                     </div>
 
-                    <div className="text-right space-y-1.5 flex-shrink-0">
+                    <div className="text-right space-y-1 flex-shrink-0">
                       <div className="font-bold text-sm font-mono text-slate-900">
                         {formatDH(dossier.montantTotalTTC)}
                       </div>
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.bg}`}>
-                        {badge.label}
-                      </span>
+                      {tabVue === 'ARCHIVES' ? (
+                        <>
+                          {(() => {
+                            const days = getDaysRemaining(dossier.dateArchivage);
+                            return days === 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-800 border border-red-300">
+                                <AlertTriangle className="w-3 h-3 text-red-600" /> Expiré (+30j)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                <Clock className="w-3 h-3 text-amber-600" /> Expire dans {days}j
+                              </span>
+                            );
+                          })()}
+                          <div className="flex items-center gap-1 justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onRestoreDossier) onRestoreDossier(dossier.id);
+                              }}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[10px] font-bold flex items-center gap-1"
+                              title="Restaurer ce dossier"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Restaurer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDossierToDeletePermanent(dossier);
+                              }}
+                              className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[10px] font-bold flex items-center gap-1"
+                              title="Supprimer définitivement"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.bg}`}>
+                            {badge.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDossierToArchive(dossier);
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Archiver / Supprimer ce dossier (Rétention 30j)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -346,24 +534,63 @@ export const DossiersView: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* Status Selector Dropdown */}
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-600">Changer Statut :</span>
-                  <select
-                    value={selectedDossier.statut}
-                    onChange={(e) => onUpdateStatut(selectedDossier.id, e.target.value as StatutDossier)}
-                    className="text-xs py-1.5 px-3 bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  >
-                    <option value="NOUVEAU">Nouveau dossier</option>
-                    <option value="EN_COURS_POSE">En cours de pose</option>
-                    <option value="POSE_TERMINEE">Pose terminée</option>
-                    <option value="ENVOYE_AZUR_GLASS">Envoyé à AZUR GLASS</option>
-                    <option value="ACCORD_RECUE_AZUR_GLASS">Accord reçu (AZUR GLASS)</option>
-                    <option value="EN_ATTENTE_REGLEMENT_AZUR">En attente reversement AZUR GLASS</option>
-                    <option value="VALIDE_REGLE">Soldé & Réglé par AZUR GLASS</option>
-                    <option value="REJETE">Rejeté / Litige</option>
-                  </select>
-                </div>
+                {/* Status Selector Dropdown ou Bandeau d'Archivage */}
+                {selectedDossier.isArchive || selectedDossier.statut === 'ARCHIVE' ? (
+                  <div className="mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <Archive className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-xs text-amber-950">Dossier en Archive Sécurisée (Corbeille)</p>
+                        <p className="text-[11px] text-amber-800 mt-0.5">
+                          Mis en archive le <strong>{formatDate(selectedDossier.dateArchivage || selectedDossier.dateCreation)}</strong>.
+                        </p>
+                        <p className="text-[11px] font-bold text-amber-900 mt-1 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-amber-700" />
+                          {getDaysRemaining(selectedDossier.dateArchivage) === 0 ? (
+                            <span className="text-red-600">Délai de rétention de 30 jours dépassé. Prêt pour purge automatique.</span>
+                          ) : (
+                            <span>Suppression automatique dans <strong>{getDaysRemaining(selectedDossier.dateArchivage)} jours</strong> (le {getPurgeDateFormatted(selectedDossier.dateArchivage)}).</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-amber-200">
+                      <button
+                        type="button"
+                        onClick={() => onRestoreDossier && onRestoreDossier(selectedDossier.id)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Restaurer le Dossier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDossierToDeletePermanent(selectedDossier)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Supprimer Définitivement
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600">Changer Statut :</span>
+                    <select
+                      value={selectedDossier.statut}
+                      onChange={(e) => onUpdateStatut(selectedDossier.id, e.target.value as StatutDossier)}
+                      className="text-xs py-1.5 px-3 bg-slate-100 border border-slate-200 rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    >
+                      <option value="NOUVEAU">Nouveau dossier</option>
+                      <option value="EN_COURS_POSE">En cours de pose</option>
+                      <option value="POSE_TERMINEE">Pose terminée</option>
+                      <option value="ENVOYE_AZUR_GLASS">Envoyé à AZUR GLASS</option>
+                      <option value="ACCORD_RECUE_AZUR_GLASS">Accord reçu (AZUR GLASS)</option>
+                      <option value="EN_ATTENTE_REGLEMENT_AZUR">En attente reversement AZUR GLASS</option>
+                      <option value="VALIDE_REGLE">Soldé & Réglé par AZUR GLASS</option>
+                      <option value="REJETE">Rejeté / Litige</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Transmission Dossier Complet AZUR GLASS (1-Clic) */}
@@ -531,6 +758,21 @@ export const DossiersView: React.FC<Props> = ({
                       <span>Devis Client / Estimation (Imprimer / A4)</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-amber-400" />
+                  </button>
+                )}
+
+                {/* 6. Bouton Archiver / Supprimer (Si dossier actif) */}
+                {!selectedDossier.isArchive && selectedDossier.statut !== 'ARCHIVE' && (
+                  <button
+                    type="button"
+                    onClick={() => setDossierToArchive(selectedDossier)}
+                    className="w-full flex items-center justify-between p-3 bg-red-50/70 hover:bg-red-100 text-red-700 rounded-xl border border-red-200 text-xs font-semibold transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <span>Archiver / Supprimer ce Dossier (Rétention 30j)</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-red-400" />
                   </button>
                 )}
               </div>
@@ -840,6 +1082,139 @@ export const DossiersView: React.FC<Props> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 1 : Confirmation d'archivage / suppression */}
+      {dossierToArchive && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-6 backdrop-blur-sm flex justify-center items-center">
+          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center px-6 py-4 bg-slate-900 text-white">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-400" />
+                <h3 className="font-bold text-sm">Gestion Suppression / Archivage Dossier</h3>
+              </div>
+              <button
+                onClick={() => setDossierToArchive(null)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 hover:text-white"
+                title="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              {/* Résumé du dossier */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <p className="font-mono font-bold text-slate-900 text-sm">{dossierToArchive.numeroDossier}</p>
+                <p className="text-slate-700 font-semibold">
+                  Client : {dossierToArchive.client.nom} {dossierToArchive.client.telephone ? `(${dossierToArchive.client.telephone})` : ''}
+                </p>
+                <p className="text-slate-600">
+                  Véhicule : {dossierToArchive.vehicule.marque} {dossierToArchive.vehicule.modele} ({formatMatricule(dossierToArchive.vehicule.immatriculation, 'LATIN')})
+                </p>
+                <p className="text-brand-700 font-bold font-mono">
+                  Montant : {formatDH(dossierToArchive.montantTotalTTC)} TTC
+                </p>
+              </div>
+
+              {/* Option A : Archivage Sécurisé (30 jours) */}
+              <div className="p-4 bg-amber-50/80 border-2 border-amber-300 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-amber-950 text-xs flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-700" /> Option A (Recommandée) : Placer en Archive Sécurisée (30 jours)
+                  </span>
+                  <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded">
+                    Sécurité 30j
+                  </span>
+                </div>
+                <p className="text-amber-900/80 text-[11px] leading-relaxed">
+                  Le dossier sera déplacé dans la <strong>Corbeille & Archives</strong>. Il restera conservé pendant <strong>30 jours</strong> avec possibilité de le restaurer à tout moment. Après 30 jours, le système effectuera la purge automatique définitive.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onArchiveDossier) onArchiveDossier(dossierToArchive.id, archiveMotif);
+                    setDossierToArchive(null);
+                  }}
+                  className="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 mt-2"
+                >
+                  <Archive className="w-4 h-4" /> Confirmer la mise en archive (30 jours)
+                </button>
+              </div>
+
+              {/* Option B : Suppression Définitive Immédiate (Idéal tests) */}
+              <div className="p-4 bg-red-50/70 border border-red-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-red-950 text-xs flex items-center gap-1.5">
+                    <Trash2 className="w-4 h-4 text-red-600" /> Option B : Supprimer Définitivement (Dossier Test)
+                  </span>
+                  <span className="bg-red-200 text-red-900 text-[10px] font-bold px-2 py-0.5 rounded">
+                    Irréversible
+                  </span>
+                </div>
+                <p className="text-red-900/80 text-[11px] leading-relaxed">
+                  Idéal pour supprimer rapidement les faux dossiers ou tests de saisie. Supprime définitivement et immédiatement le dossier de la base sans délai de 30 jours.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onDeleteDossierPermanent) onDeleteDossierPermanent(dossierToArchive.id);
+                    setDossierToArchive(null);
+                  }}
+                  className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 mt-2"
+                >
+                  <Trash2 className="w-4 h-4" /> Supprimer définitivement maintenant
+                </button>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDossierToArchive(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-semibold text-xs"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2 : Confirmation de Suppression Définitive */}
+      {dossierToDeletePermanent && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-6 backdrop-blur-sm flex justify-center items-center">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 text-center space-y-3">
+              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="font-black text-slate-900 text-base">Supprimer définitivement ce dossier ?</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Vous êtes sur le point d'effacer définitivement le dossier <strong className="font-mono text-slate-900">{dossierToDeletePermanent.numeroDossier}</strong> ({dossierToDeletePermanent.client.nom}). Cette action est irréversible.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 p-4 bg-slate-50 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDossierToDeletePermanent(null)}
+                className="flex-1 py-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteDossierPermanent) onDeleteDossierPermanent(dossierToDeletePermanent.id);
+                  setDossierToDeletePermanent(null);
+                }}
+                className="flex-1 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs"
+              >
+                Oui, supprimer
+              </button>
+            </div>
           </div>
         </div>
       )}

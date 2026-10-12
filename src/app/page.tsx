@@ -45,7 +45,8 @@ import {
   saveDossierToSupabase,
   saveStockArticleToSupabase,
   saveFactureToSupabase,
-  saveDevisToSupabase
+  saveDevisToSupabase,
+  deleteDossierFromSupabase
 } from '@/lib/supabaseService';
 import { getActiveSupabaseSession, logoutSupabase } from '@/lib/authService';
 
@@ -702,6 +703,75 @@ export default function Home() {
     showToast('Statut du dossier mis à jour.');
   };
 
+  // ----------------------------------------------------
+  // GESTION ARCHIVES / CORBEILLE & SÉCURITÉ 30 JOURS
+  // ----------------------------------------------------
+  const handleArchiveDossier = (dossierId: string, motif?: string) => {
+    setDossiers((prev) =>
+      prev.map((d) => {
+        if (d.id === dossierId) {
+          const updated: DossierSinistre = {
+            ...d,
+            isArchive: true,
+            dateArchivage: new Date().toISOString(),
+            statutPrecedent: d.statut !== 'ARCHIVE' ? d.statut : 'NOUVEAU',
+            statut: 'ARCHIVE',
+            motifArchivage: motif || 'Dossier archivé',
+          };
+          saveDossierToSupabase(updated);
+          return updated;
+        }
+        return d;
+      })
+    );
+    showToast('Dossier placé en archive sécurisée (conservé 30 jours avant suppression automatique).');
+  };
+
+  const handleRestoreDossier = (dossierId: string) => {
+    setDossiers((prev) =>
+      prev.map((d) => {
+        if (d.id === dossierId) {
+          const updated: DossierSinistre = {
+            ...d,
+            isArchive: false,
+            dateArchivage: undefined,
+            statut: d.statutPrecedent || 'NOUVEAU',
+          };
+          saveDossierToSupabase(updated);
+          return updated;
+        }
+        return d;
+      })
+    );
+    showToast('Dossier restauré avec succès dans les dossiers actifs.');
+  };
+
+  const handleDeleteDossierPermanent = async (dossierId: string) => {
+    setDossiers((prev) => prev.filter((d) => d.id !== dossierId));
+    await deleteDossierFromSupabase(dossierId);
+    showToast('Dossier supprimé définitivement de la base de données.');
+  };
+
+  const handlePurgeExpiredDossiers = async () => {
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const expired = dossiers.filter(
+      (d) => (d.isArchive || d.statut === 'ARCHIVE') && d.dateArchivage && (now - new Date(d.dateArchivage).getTime() >= thirtyDaysMs)
+    );
+
+    if (expired.length === 0) {
+      showToast("Aucun dossier archivé n'a atteint les 30 jours de rétention.");
+      return;
+    }
+
+    const expiredIds = expired.map((d) => d.id);
+    setDossiers((prev) => prev.filter((d) => !expiredIds.includes(d.id)));
+    for (const id of expiredIds) {
+      await deleteDossierFromSupabase(id);
+    }
+    showToast(`Suppression automatique : ${expired.length} dossier(s) archivés de plus de 30 jours ont été purgés.`);
+  };
+
   const handleOpenTransmettreAzurGlass = (dossier: DossierSinistre) => {
     setActiveTransmettreAzurGlassDossier(dossier);
   };
@@ -1127,6 +1197,10 @@ export default function Home() {
             onAddDocumentToDossier={handleAddDocumentToDossier}
             onUpdateStatut={handleUpdateStatutDossier}
             onOpenEncaisserModal={handleOpenEncaisserModalFromDossier}
+            onArchiveDossier={handleArchiveDossier}
+            onRestoreDossier={handleRestoreDossier}
+            onDeleteDossierPermanent={handleDeleteDossierPermanent}
+            onPurgeExpiredDossiers={handlePurgeExpiredDossiers}
           />
         )}
 

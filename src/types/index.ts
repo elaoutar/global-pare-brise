@@ -7,7 +7,8 @@ export type StatutDossier =
   | 'EN_ATTENTE_REGLEMENT_AZUR'
   | 'VALIDE_REGLE'
   | 'DEPOSE_ASSURANCE'
-  | 'REJETE';
+  | 'REJETE'
+  | 'ARCHIVE';
 
 export type StatutPaiement = 'EN_ATTENTE' | 'PARTIEL' | 'REGLE' | 'IMPAYE';
 
@@ -197,6 +198,12 @@ export interface DossierSinistre {
   
   poseur?: string;
   observations?: string;
+  
+  // Gestion Corbeille & Rétention 30 jours
+  isArchive?: boolean;
+  dateArchivage?: string;
+  statutPrecedent?: StatutDossier;
+  motifArchivage?: string;
 }
 
 export interface DocumentAttache {

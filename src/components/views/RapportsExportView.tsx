@@ -84,6 +84,9 @@ export const RapportsExportView: React.FC<Props> = ({
 
   // Filter dossiers according to selected report settings
   const filteredDossiers = dossiers.filter((d) => {
+    // Exclure les dossiers archivés / corbeille
+    if (d.isArchive || d.statut === 'ARCHIVE') return false;
+
     // 1. Filtre par date universel
     const dateToTest = d.dateCreation || d.dateSinistre || '';
     if (!matchDateRange(dateToTest)) return false;

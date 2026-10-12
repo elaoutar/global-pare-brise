@@ -76,6 +76,11 @@ export function getStatutDossierBadge(statut: StatutDossier) {
         label: 'Rejeté / Litige',
         bg: 'bg-rose-100 text-rose-800 border-rose-200',
       };
+    case 'ARCHIVE':
+      return {
+        label: 'Archivé (Corbeille)',
+        bg: 'bg-slate-100 text-slate-700 border-slate-300',
+      };
     default:
       return {
         label: statut,

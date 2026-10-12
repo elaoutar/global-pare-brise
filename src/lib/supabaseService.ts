@@ -95,6 +95,8 @@ export const fetchDossiersFromSupabase = async (): Promise<DossierSinistre[] | n
       montantReversementAzurGlass: Number(row.montant_reversement_azur_glass || 0),
       montantPriseEnChargeAssurance: Number(row.montant_prise_en_charge_assurance || 0),
       statut: row.statut,
+      isArchive: row.statut === 'ARCHIVE',
+      dateArchivage: row.statut === 'ARCHIVE' ? (row.updated_at || row.date_creation) : undefined,
       poseur: row.poseur,
       observations: row.observations,
       photos: row.photos || {},
@@ -137,7 +139,7 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
       tva_exclue_par_assurance: dossier.tvaExclueParAssurance,
       montant_reversement_azur_glass: dossier.montantReversementAzurGlass,
       montant_prise_en_charge_assurance: dossier.montantPriseEnChargeAssurance,
-      statut: dossier.statut,
+      statut: dossier.isArchive ? 'ARCHIVE' : dossier.statut,
       poseur: dossier.poseur,
       observations: dossier.observations,
       photos: dossier.photos,
@@ -160,6 +162,26 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
     return true;
   } catch (err) {
     console.error('Exception save dossier Supabase:', err);
+    return false;
+  }
+};
+
+export const deleteDossierFromSupabase = async (dossierId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('dossiers')
+      .delete()
+      .eq('id', dossierId);
+
+    if (error) {
+      console.error('Erreur delete dossier Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Exception delete dossier Supabase:', err);
     return false;
   }
 };

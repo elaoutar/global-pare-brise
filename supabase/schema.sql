@@ -39,8 +39,10 @@ CREATE TABLE IF NOT EXISTS public.dossiers (
     montant_reversement_azur_glass NUMERIC(12,2) DEFAULT 0,
     montant_prise_en_charge_assurance NUMERIC(12,2) DEFAULT 0,
     
-    -- Avancement
+    -- Avancement & Corbeille 30 jours
     statut TEXT NOT NULL DEFAULT 'NOUVEAU',
+    is_archive BOOLEAN DEFAULT false,
+    date_archivage TIMESTAMPTZ,
     poseur TEXT,
     observations TEXT,
     
