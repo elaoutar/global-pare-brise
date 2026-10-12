@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { DossierSinistre, Facture, ReglementRecette } from '@/types';
+import { DossierSinistre, Facture, ReglementRecette, BonSortie } from '@/types';
 import { formatDate } from './utils';
 import { formatMatricule } from './matriculeMaroc';
 import { GARAGE_INFO } from './data';
@@ -163,16 +163,71 @@ export function exportEtatAzurGlassExcel(
   exportTableToExcel(rows, `Etat_AZUR_GLASS_Assurances_${cleanName}`, 'Etat_AZUR_GLASS');
 }
 
+// Helper pour extraire uniquement le produit principal posé (sans colle, sans main d'œuvre)
+export function getProduitPrincipal(
+  dossier: DossierSinistre,
+  bonsSortie?: BonSortie[],
+  factures?: Facture[]
+): string {
+  // 1. Chercher dans le Bon de Sortie associé
+  if (bonsSortie && bonsSortie.length > 0) {
+    const bs = bonsSortie.find((b) => b.dossierId === dossier.id);
+    if (bs && bs.lignes && bs.lignes.length > 0) {
+      const ligneVitrage = bs.lignes.find((l) => {
+        const desc = (l.designation || '').toLowerCase();
+        return (
+          !desc.includes('colle') &&
+          !desc.includes('mastic') &&
+          !desc.includes('primaire') &&
+          !desc.includes('sika')
+        );
+      });
+      if (ligneVitrage && ligneVitrage.designation) {
+        return ligneVitrage.designation;
+      }
+    }
+  }
+
+  // 2. Chercher dans la Facture associée
+  if (factures && factures.length > 0) {
+    const fac = factures.find((f) => f.dossierId === dossier.id);
+    if (fac && fac.lignes && fac.lignes.length > 0) {
+      const ligneVitrage = fac.lignes.find((l) => {
+        const desc = (l.designation || '').toLowerCase();
+        return (
+          !desc.includes('colle') &&
+          !desc.includes('mastic') &&
+          !desc.includes('main d\'œuvre') &&
+          !desc.includes('main d\'oeuvre') &&
+          !desc.includes('pose') &&
+          !desc.includes('franchise') &&
+          !desc.includes('tva')
+        );
+      });
+      if (ligneVitrage && ligneVitrage.designation) {
+        return ligneVitrage.designation;
+      }
+    }
+  }
+
+  // 3. Fallback naturel basé sur la marque et le modèle du véhicule
+  const v = dossier.vehicule;
+  return `Pare-Brise conforme ${v.marque} ${v.modele} (${v.annee})`.trim();
+}
+
 // 6. Export État des Particuliers (Sans Assurance / Directs & Comptant)
 export function exportEtatParticuliersExcel(
   dossiers: DossierSinistre[],
-  periodeLibelle: string = 'Tous'
+  periodeLibelle: string = 'Tous',
+  bonsSortie?: BonSortie[],
+  factures?: Facture[]
 ) {
   const dossiersParticuliers = dossiers.filter((d) => d.typeDossier !== 'ASSURANCE');
   const rows = dossiersParticuliers.map((d) => {
     const totalTTC = d.montantTotalTTC || 0;
     const totalHT = +(totalTTC / 1.20).toFixed(2);
     const totalTVA = +(totalTTC - totalHT).toFixed(2);
+    const produitPose = getProduitPrincipal(d, bonsSortie, factures);
 
     return {
       'N° Dossier': d.numeroDossier,
@@ -182,6 +237,7 @@ export function exportEtatParticuliersExcel(
       'CIN': d.client.cin || '-',
       'Véhicule': `${d.vehicule.marque} ${d.vehicule.modele} (${d.vehicule.annee})`,
       'Immatriculation': formatMatricule(d.vehicule.immatriculation, 'LATIN'),
+      'Produit Principal Posé': produitPose,
       'N° Châssis (VIN)': d.vehicule.chassisVin || '-',
       'Montant HT (DH)': totalHT,
       'TVA 20% (DH)': totalTVA,

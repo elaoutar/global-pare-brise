@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DossierSinistre, Assurance, ReglementRecette } from '@/types';
+import { DossierSinistre, Assurance, ReglementRecette, BonSortie, Facture } from '@/types';
 import { formatDH, formatDate } from '@/lib/utils';
 import { GARAGE_INFO, AZUR_GLASS_INFO } from '@/lib/data';
 import { 
@@ -10,7 +10,8 @@ import {
   exportEtatClientExcel, 
   exportEtatRecettesExcel,
   exportEtatAzurGlassExcel,
-  exportEtatParticuliersExcel
+  exportEtatParticuliersExcel,
+  getProduitPrincipal
 } from '@/lib/exportUtils';
 import { 
   FileSpreadsheet, 
@@ -19,11 +20,11 @@ import {
   Shield, 
   Users, 
   Coins, 
-  Download,
-  Filter,
-  CheckCircle2,
-  Building2,
-  UserCheck
+  Download, 
+  Filter, 
+  CheckCircle2, 
+  Building2, 
+  UserCheck 
 } from 'lucide-react';
 import { formatMatricule } from '@/lib/matriculeMaroc';
 
@@ -31,12 +32,16 @@ interface Props {
   dossiers: DossierSinistre[];
   assurances: Assurance[];
   recettes: ReglementRecette[];
+  bonsSortie?: BonSortie[];
+  factures?: Facture[];
 }
 
 export const RapportsExportView: React.FC<Props> = ({
   dossiers,
   assurances,
   recettes,
+  bonsSortie,
+  factures,
 }) => {
   const [typeRapport, setTypeRapport] = useState<'AZUR_GLASS' | 'PARTICULIERS' | 'MENSUEL' | 'ASSURANCE' | 'CLIENT' | 'RECETTES'>('AZUR_GLASS');
   const [selectedAssuranceId, setSelectedAssuranceId] = useState<string>('ALL');
@@ -147,7 +152,7 @@ export const RapportsExportView: React.FC<Props> = ({
         : selectedTypeClientAzur;
       exportEtatAzurGlassExcel(filteredDossiers, `${filtreLabel}_${periodeLabel}`);
     } else if (typeRapport === 'PARTICULIERS') {
-      exportEtatParticuliersExcel(filteredDossiers, periodeLabel);
+      exportEtatParticuliersExcel(filteredDossiers, periodeLabel, bonsSortie, factures);
     } else if (typeRapport === 'MENSUEL') {
       exportEtatMensuelExcel(filteredDossiers, periodeLabel);
     } else if (typeRapport === 'ASSURANCE') {
@@ -652,6 +657,7 @@ export const RapportsExportView: React.FC<Props> = ({
                   <th className="p-2.5">Date & Dossier</th>
                   <th className="p-2.5">Client Particulier</th>
                   <th className="p-2.5">Véhicule (Matricule)</th>
+                  <th className="p-2.5">Produit Principal Posé</th>
                   <th className="p-2.5">N° Châssis (VIN)</th>
                   <th className="p-2.5">Technicien Poseur</th>
                   <th className="p-2.5 text-right">Montant TTC (DH)</th>
@@ -661,44 +667,54 @@ export const RapportsExportView: React.FC<Props> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredDossiers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-slate-400 italic">
+                    <td colSpan={8} className="p-6 text-center text-slate-400 italic">
                       Aucun dossier particulier (sans assurance) enregistré sur cette période.
                     </td>
                   </tr>
                 ) : (
-                  filteredDossiers.map((d) => (
-                    <tr key={d.id} className="hover:bg-amber-50/30 transition-colors">
-                      <td className="p-2.5">
-                        <span className="font-mono font-bold text-slate-900 block">{d.numeroDossier}</span>
-                        <span className="text-[10px] text-slate-500">{formatDate(d.dateCreation)}</span>
-                      </td>
-                      <td className="p-2.5">
-                        <strong className="text-slate-900 block">{d.client.nom}</strong>
-                        <span className="text-[11px] text-slate-500 block">Tél: {d.client.telephone}</span>
-                        {d.client.cin && <span className="text-[10px] text-slate-400 font-mono">CIN: {d.client.cin}</span>}
-                      </td>
-                      <td className="p-2.5">
-                        <strong className="text-slate-900 block">{d.vehicule.marque} {d.vehicule.modele} ({d.vehicule.annee})</strong>
-                        <span className="font-mono text-[11px] font-bold text-slate-800">
-                          {formatMatricule(d.vehicule.immatriculation, 'LATIN')}
-                        </span>
-                      </td>
-                      <td className="p-2.5 font-mono text-[11px] text-slate-600">
-                        {d.vehicule.chassisVin || '-'}
-                      </td>
-                      <td className="p-2.5 text-slate-700">
-                        {d.poseur || 'Chef d\'atelier'}
-                      </td>
-                      <td className="p-2.5 text-right font-mono font-bold text-amber-950 text-xs">
-                        {formatDH(d.montantTotalTTC)}
-                      </td>
-                      <td className="p-2.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
-                          {d.statut}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  filteredDossiers.map((d) => {
+                    const produitPose = getProduitPrincipal(d, bonsSortie, factures);
+
+                    return (
+                      <tr key={d.id} className="hover:bg-amber-50/30 transition-colors">
+                        <td className="p-2.5">
+                          <span className="font-mono font-bold text-slate-900 block">{d.numeroDossier}</span>
+                          <span className="text-[10px] text-slate-500">{formatDate(d.dateCreation)}</span>
+                        </td>
+                        <td className="p-2.5">
+                          <strong className="text-slate-900 block">{d.client.nom}</strong>
+                          <span className="text-[11px] text-slate-500 block">Tél: {d.client.telephone}</span>
+                          {d.client.cin && <span className="text-[10px] text-slate-400 font-mono">CIN: {d.client.cin}</span>}
+                        </td>
+                        <td className="p-2.5">
+                          <strong className="text-slate-900 block">{d.vehicule.marque} {d.vehicule.modele} ({d.vehicule.annee})</strong>
+                          <span className="font-mono text-[11px] font-bold text-slate-800">
+                            {formatMatricule(d.vehicule.immatriculation, 'LATIN')}
+                          </span>
+                        </td>
+                        <td className="p-2.5">
+                          <strong className="text-slate-900 block font-semibold">{produitPose}</strong>
+                          <span className="text-[10px] text-amber-800 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 inline-block mt-0.5">
+                            Vitrage principal posé
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-mono text-[11px] text-slate-600">
+                          {d.vehicule.chassisVin || '-'}
+                        </td>
+                        <td className="p-2.5 text-slate-700">
+                          {d.poseur || 'Chef d\'atelier'}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-bold text-amber-950 text-xs">
+                          {formatDH(d.montantTotalTTC)}
+                        </td>
+                        <td className="p-2.5 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
+                            {d.statut}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

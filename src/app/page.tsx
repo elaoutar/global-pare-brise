@@ -1166,6 +1166,8 @@ export default function Home() {
             dossiers={dossiers}
             assurances={assurances}
             recettes={recettes}
+            bonsSortie={bonsSortie}
+            factures={factures}
           />
         )}
 
