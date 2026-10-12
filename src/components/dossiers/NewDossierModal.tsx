@@ -1473,7 +1473,7 @@ export const NewDossierModal: React.FC<Props> = ({
                   {/* 3. Colle */}
                   <div className="flex items-center justify-between gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="flex-1">
-                      <span className="font-bold text-slate-800 block">3. Fourniture Kit Colle & Primaire d'étanchéité</span>
+                      <span className="font-bold text-slate-800 block">3. Fourniture Kit Colle & Primaire d'adhérence</span>
                       <span className="text-[11px] text-slate-500">Mastic polyuréthane certifié constructeur (300ml) + tampon activateur</span>
                     </div>
                     <div className="flex items-center gap-2">

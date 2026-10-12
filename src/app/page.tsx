@@ -270,7 +270,7 @@ export default function Home() {
       totalTTC: newFacture?.totalTTC || newDossier.montantTotalTTC,
       montantFranchise: newDossier.montantFranchise,
       tvaExclue: newDossier.tvaExclueParAssurance,
-      observations: `Véhicule ${newDossier.vehicule.marque} ${newDossier.vehicule.modele} (${newDossier.vehicule.immatriculation}) remis conforme. Garantie étanchéité validée.`,
+      observations: `Véhicule ${newDossier.vehicule.marque} ${newDossier.vehicule.modele} (${newDossier.vehicule.immatriculation}) remis conforme.`,
     };
 
     const dossierWithDocs: DossierSinistre = {
@@ -662,7 +662,7 @@ export default function Home() {
             totalHT: Math.max(0, +(totalHT - 250).toFixed(2)),
           },
           {
-            designation: 'Kit colle polyuréthane & primaire d\'étanchéité',
+            designation: 'Kit colle polyuréthane & primaire d\'adhérence',
             quantite: 1,
             prixUnitaireHT: 125,
             tauxTva: 20,

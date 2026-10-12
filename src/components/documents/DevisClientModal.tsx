@@ -151,9 +151,6 @@ export const DevisClientModal: React.FC<Props> = ({ devis, onClose }) => {
                 <p className="text-[11px]">
                   • Vitrages d'origine certifiés conformes 43R (normes européennes et constructeurs).
                 </p>
-                <p className="text-[11px]">
-                  • Garantie étanchéité 1 an sur toute pose collée.
-                </p>
                 {devis.observations && (
                   <div className="p-2 bg-amber-50 rounded border border-amber-200/80 text-[11px] text-amber-900 mt-2">
                     <strong>Observations :</strong> {devis.observations}

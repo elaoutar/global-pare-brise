@@ -92,7 +92,7 @@ export const NewDevisModal: React.FC<Props> = ({
       },
       {
         id: 'l-2',
-        designation: 'Kit colle polyuréthane & primaire d\'étanchéité',
+        designation: 'Kit colle polyuréthane & primaire d\'adhérence',
         codeEurocode: 'SIKA-300ML',
         quantite: 1,
         prixTTC: 150,
@@ -662,7 +662,7 @@ export const NewDevisModal: React.FC<Props> = ({
             </label>
             <input
               type="text"
-              placeholder="Ex: Garantie étanchéité 1 an incluse. Pose effectuée dans notre atelier."
+              placeholder="Ex: Pose effectuée dans notre atelier conforme aux normes de sécurité."
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
               className="w-full px-3 py-2 border rounded-lg bg-white"

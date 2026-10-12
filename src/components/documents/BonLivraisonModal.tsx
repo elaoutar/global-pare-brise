@@ -5,7 +5,7 @@ import { BonLivraison, DossierSinistre, Facture } from '@/types';
 import { GARAGE_INFO } from '@/lib/data';
 import { formatDate, formatDH } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
-import { CheckCircle2, FileText, Save, Check } from 'lucide-react';
+import { FileText, Save, Check } from 'lucide-react';
 import { DocumentActionBar } from './DocumentActionBar';
 
 interface Props {
@@ -28,7 +28,7 @@ export const BonLivraisonModal: React.FC<Props> = ({
   // État observation éditable
   const [observations, setObservations] = useState(
     bonLivraison.observations ||
-      `Véhicule ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation}) remis conforme. Garantie étanchéité validée.`
+      `Véhicule ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation}) remis en parfait état de conformité.`
   );
   const [hasSavedObs, setHasSavedObs] = useState(false);
 
@@ -326,25 +326,15 @@ export const BonLivraisonModal: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Observations and warranty */}
-            <div className="my-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5">
-              <p className="font-bold flex items-center gap-1.5 text-slate-900">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Garantie Pose & Étanchéité :
-              </p>
-              <p className="text-slate-600">
-                Le vitrage ci-dessus a été installé selon les règles de l'art avec colle polyuréthane certifiée première monte. 
-                Garantie d'étanchéité assurée par {GARAGE_INFO.nom}.
-              </p>
-              {observations && (
-                <div className="pt-2 border-t border-slate-200">
-                  <span className="font-bold text-slate-900 text-[11px] uppercase block">Observations & Remarques :</span>
-                  <p className="text-slate-800 font-medium italic mt-0.5 whitespace-pre-wrap">
-                    {observations}
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Observations */}
+            {observations && (
+              <div className="my-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                <span className="font-bold text-slate-900 text-[11px] uppercase block">Observations & Remarques :</span>
+                <p className="text-slate-800 font-medium italic mt-1 whitespace-pre-wrap">
+                  {observations}
+                </p>
+              </div>
+            )}
 
             {/* Signatures & Discharges */}
             <div className="grid grid-cols-2 gap-8 mt-10 pt-6 border-t-2 border-slate-800 text-xs">
