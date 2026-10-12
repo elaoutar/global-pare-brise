@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Assurance, 
   Partenaire, 
@@ -48,6 +48,7 @@ interface Props {
   stockArticles: ArticleStock[];
   onClose: () => void;
   onSubmit: (newDossier: DossierSinistre, newBonSortie?: BonSortie, newFacture?: Facture, newRecette?: ReglementRecette) => void;
+  onAddPartenaire?: (newPartenaire: Partenaire) => void;
 }
 
 const PRESTATIONS_RAPIDES = [
@@ -64,6 +65,7 @@ export const NewDossierModal: React.FC<Props> = ({
   stockArticles,
   onClose,
   onSubmit,
+  onAddPartenaire,
 }) => {
   // Step indicator & Option B Validation Error
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -125,6 +127,45 @@ export const NewDossierModal: React.FC<Props> = ({
   const [agenceAssurance, setAgenceAssurance] = useState('SANLAM JAAFAR'); // Ex: Agence locale
   const [typeClientAssurance, setTypeClientAssurance] = useState<'PARTICULIER' | 'PROFESSIONNEL' | 'AGENCE_LOCATION'>('PARTICULIER');
   const [partenaireId, setPartenaireId] = useState('');
+  const [localPartenaires, setLocalPartenaires] = useState<Partenaire[]>(partenaires);
+
+  useEffect(() => {
+    setLocalPartenaires(partenaires);
+  }, [partenaires]);
+
+  // Inline Partenaire Creation State
+  const [showNewPartenaireInline, setShowNewPartenaireInline] = useState(false);
+  const [newPartNom, setNewPartNom] = useState('');
+  const [newPartType, setNewPartType] = useState<Partenaire['type']>('CARROSSIER');
+  const [newPartCommission, setNewPartCommission] = useState<number>(5);
+  const [newPartTel, setNewPartTel] = useState('');
+  const [newPartVille, setNewPartVille] = useState('Marrakech');
+  const [newPartError, setNewPartError] = useState<string | null>(null);
+
+  const handleCreateInlinePartenaire = () => {
+    if (!newPartNom.trim()) {
+      setNewPartError('Veuillez renseigner le nom ou la raison sociale du partenaire.');
+      return;
+    }
+    const created: Partenaire = {
+      id: `part-${Date.now()}`,
+      nom: newPartNom.trim(),
+      type: newPartType,
+      telephone: newPartTel.trim() || '-',
+      ville: newPartVille.trim() || 'Marrakech',
+      tauxCommissionPourcent: Number(newPartCommission) || 0,
+    };
+    setLocalPartenaires((prev) => [created, ...prev]);
+    if (onAddPartenaire) {
+      onAddPartenaire(created);
+    }
+    setPartenaireId(created.id);
+    setNewPartNom('');
+    setNewPartTel('');
+    setNewPartCommission(5);
+    setNewPartError(null);
+    setShowNewPartenaireInline(false);
+  };
   const [numSinistre, setNumSinistre] = useState('');
   const [numPolice, setNumPolice] = useState('');
   const [dateSinistre, setDateSinistre] = useState(new Date().toISOString().split('T')[0]);
@@ -253,10 +294,6 @@ export const NewDossierModal: React.FC<Props> = ({
       setStepError('Veuillez renseigner le nom complet ou la société du client.');
       return false;
     }
-    if (!clientTel.trim()) {
-      setStepError('Veuillez renseigner le numéro de téléphone du client.');
-      return false;
-    }
     if (!vehiculeImm.trim()) {
       setStepError('Veuillez renseigner le matricule / immatriculation du véhicule.');
       return false;
@@ -319,7 +356,7 @@ export const NewDossierModal: React.FC<Props> = ({
     }
 
     const selectedAssurance = assurances.find((a) => a.id === assuranceId) || assurances[0];
-    const selectedPartenaire = partenaires.find((p) => p.id === partenaireId);
+    const selectedPartenaire = localPartenaires.find((p) => p.id === partenaireId);
     const selectedArticle = modeVitrage === 'STOCK' ? stockArticles.find((a) => a.id === selectedArticleId) : undefined;
 
     const dossierId = `dos-${Date.now()}`;
@@ -484,7 +521,7 @@ export const NewDossierModal: React.FC<Props> = ({
       client: {
         id: `cli-${Date.now()}`,
         nom: clientNom,
-        telephone: clientTel,
+        telephone: clientTel.trim() || '-',
         cin: clientCin,
         ville: clientVille,
       },
@@ -679,19 +716,16 @@ export const NewDossierModal: React.FC<Props> = ({
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Téléphone *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Téléphone (Optionnel)</label>
                   <input
                     type="tel"
-                    required
                     placeholder="06 61 00 00 00"
                     value={clientTel}
                     onChange={(e) => {
                       setClientTel(e.target.value);
                       if (stepError) setStepError(null);
                     }}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none ${
-                      !clientTel.trim() && stepError ? 'border-red-400 bg-red-50/20 ring-1 ring-red-400' : 'border-slate-300'
-                    }`}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -894,21 +928,161 @@ export const NewDossierModal: React.FC<Props> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Apporteur / Partenaire (Optionnel)
-                    </label>
-                    <select
-                      value={partenaireId}
-                      onChange={(e) => setPartenaireId(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                    >
-                      <option value="">Aucun (Client comptoir direct)</option>
-                      {partenaires.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nom} ({p.tauxCommissionPourcent}%)
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-700">
+                        Apporteur / Partenaire (Optionnel)
+                      </label>
+                      {!showNewPartenaireInline && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNewPartenaireInline(true);
+                            setNewPartError(null);
+                          }}
+                          className="text-[11px] font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1 hover:underline"
+                        >
+                          <Plus className="w-3 h-3" /> Nouveau Partenaire
+                        </button>
+                      )}
+                    </div>
+
+                    {!showNewPartenaireInline ? (
+                      <select
+                        value={partenaireId}
+                        onChange={(e) => {
+                          if (e.target.value === '__NEW__') {
+                            setShowNewPartenaireInline(true);
+                            setNewPartError(null);
+                          } else {
+                            setPartenaireId(e.target.value);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white"
+                      >
+                        <option value="">Aucun (Client comptoir direct)</option>
+                        {localPartenaires.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nom} ({p.tauxCommissionPourcent}%)
+                          </option>
+                        ))}
+                        <option value="__NEW__">➕ + Ajouter un nouveau partenaire...</option>
+                      </select>
+                    ) : (
+                      <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-3 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                          <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                            <Plus className="w-3.5 h-3.5 text-blue-600" /> Ajouter un Nouveau Partenaire / Apporteur
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowNewPartenaireInline(false);
+                              setNewPartError(null);
+                            }}
+                            className="text-[11px] text-slate-500 hover:text-slate-800"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+
+                        {newPartError && (
+                          <div className="p-2 bg-red-50 text-red-700 text-[11px] rounded-lg border border-red-200">
+                            {newPartError}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="col-span-2">
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              Nom du Partenaire / Garage *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ex: Garage Hassan, Carrosserie Moderne..."
+                              value={newPartNom}
+                              onChange={(e) => setNewPartNom(e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              Type d'Apporteur
+                            </label>
+                            <select
+                              value={newPartType}
+                              onChange={(e) => setNewPartType(e.target.value as Partenaire['type'])}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                            >
+                              <option value="CARROSSIER">Carrossier</option>
+                              <option value="COURTIER">Courtier / Assureur</option>
+                              <option value="DEPANNEUR">Dépanneur</option>
+                              <option value="AGENCE_LOCATION">Agence de Location</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              Commission (%)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="50"
+                              value={newPartCommission}
+                              onChange={(e) => setNewPartCommission(Number(e.target.value))}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              Téléphone (Optionnel)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="06 00 00 00 00"
+                              value={newPartTel}
+                              onChange={(e) => setNewPartTel(e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
+                              Ville
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Marrakech"
+                              value={newPartVille}
+                              onChange={(e) => setNewPartVille(e.target.value)}
+                              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowNewPartenaireInline(false);
+                              setNewPartError(null);
+                            }}
+                            className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCreateInlinePartenaire()}
+                            className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Enregistrer & Sélectionner
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">

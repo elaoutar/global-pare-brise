@@ -1220,6 +1220,7 @@ export default function Home() {
           stockArticles={stock}
           onClose={() => setShowNewDossierModal(false)}
           onSubmit={handleCreateDossier}
+          onAddPartenaire={handleAddPartenaire}
         />
       )}
 
