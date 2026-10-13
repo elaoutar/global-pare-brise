@@ -186,9 +186,6 @@ export const BonLivraisonModal: React.FC<Props> = ({
                 <p className="text-xs text-slate-700 font-medium">{GARAGE_INFO.adresse}</p>
                 <p className="text-xs text-slate-700">Tél : <strong>{GARAGE_INFO.telephone}</strong></p>
                 <p className="text-xs text-slate-700">Email : <strong>{GARAGE_INFO.email}</strong></p>
-                <p className="text-xs text-slate-500 font-mono mt-1">
-                  ICE : {GARAGE_INFO.ice} | IF : {GARAGE_INFO.ifiscal} | PT : {GARAGE_INFO.patente}
-                </p>
               </div>
 
               <div className="text-right">

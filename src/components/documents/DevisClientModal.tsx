@@ -178,10 +178,8 @@ export const DevisClientModal: React.FC<Props> = ({ devis, onClose }) => {
             <div className="mt-10 pt-4 border-t-2 border-slate-800 grid grid-cols-2 gap-6 text-[10px] text-slate-600">
               <div>
                 <p className="font-bold text-slate-800 uppercase mb-1">
-                  {GARAGE_INFO.nom} {GARAGE_INFO.formeJuridique}
+                  {GARAGE_INFO.nom}
                 </p>
-                <p>ICE: <span className="font-mono font-semibold text-slate-800">{GARAGE_INFO.ice}</span> | IF: <span className="font-mono font-semibold text-slate-800">{GARAGE_INFO.ifiscal}</span></p>
-                <p>RC: <span className="font-mono">{GARAGE_INFO.rc}</span> | Patente: <span className="font-mono">{GARAGE_INFO.patente}</span></p>
                 <div className="h-16 mt-2 flex items-end">
                   <span className="text-[10px] text-slate-400 italic">Signature & Cachet Garage</span>
                 </div>
