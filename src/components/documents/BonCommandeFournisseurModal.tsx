@@ -46,30 +46,20 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
           >
             {/* Header: Company & Order Badge */}
             <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-5">
-              <div className="flex items-start gap-4">
-                {GARAGE_INFO.logoUrl && (
-                  <img
-                    src={GARAGE_INFO.logoUrl}
-                    alt={GARAGE_INFO.nom}
-                    className="h-16 w-auto max-w-[160px] object-contain rounded"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = 'none';
-                    }}
-                  />
-                )}
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-black uppercase text-slate-900 tracking-tight">
-                    {GARAGE_INFO.nom}
-                  </h1>
-                  <p className="text-xs text-slate-600 font-semibold">{GARAGE_INFO.formeJuridique} • Centre Spécialisé Vitrage Automobile</p>
-                  <p className="text-[11px] text-slate-500 mt-1">{GARAGE_INFO.adresse}</p>
-                  <p className="text-[11px] text-slate-500">
-                    Tél : {GARAGE_INFO.telephone} | Email : {GARAGE_INFO.email}
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                    ICE: {GARAGE_INFO.ice} | RC: {GARAGE_INFO.rc} | IF: {GARAGE_INFO.ifiscal} | Patente: {GARAGE_INFO.patente}
-                  </p>
-                </div>
+              <div>
+                <img
+                  src={GARAGE_INFO.logoUrl}
+                  alt={GARAGE_INFO.nom}
+                  className="h-14 w-auto max-w-[260px] object-contain mb-2"
+                />
+                <p className="text-xs text-slate-600 font-semibold">{GARAGE_INFO.formeJuridique} • Centre Spécialisé Vitrage Automobile</p>
+                <p className="text-[11px] text-slate-500 mt-1">{GARAGE_INFO.adresse}</p>
+                <p className="text-[11px] text-slate-500">
+                  Tél : {GARAGE_INFO.telephone} | Email : {GARAGE_INFO.email}
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                  ICE: {GARAGE_INFO.ice} | RC: {GARAGE_INFO.rc} | IF: {GARAGE_INFO.ifiscal} | Patente: {GARAGE_INFO.patente}
+                </p>
               </div>
 
               <div className="text-right">

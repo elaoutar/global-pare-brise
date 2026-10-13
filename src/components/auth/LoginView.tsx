@@ -63,23 +63,13 @@ export const LoginView: React.FC<Props> = ({ onLogin }) => {
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 bg-brand-500/10 rounded-full blur-2xl pointer-events-none" />
           
-          <div className="relative w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-brand-500/20 mb-3 border border-white/20 overflow-hidden">
-            <ShieldCheck className="w-8 h-8 text-white" />
-            {GARAGE_INFO.logoUrl && (
-              <img
-                src={GARAGE_INFO.logoUrl}
-                alt={GARAGE_INFO.nom}
-                className="absolute inset-0 w-full h-full object-contain p-1.5 bg-slate-900 rounded-2xl"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                }}
-              />
-            )}
+          <div className="bg-white rounded-2xl p-3.5 max-w-[280px] mx-auto mb-4 shadow-xl flex items-center justify-center border border-white/20">
+            <img
+              src={GARAGE_INFO.logoUrl}
+              alt={GARAGE_INFO.nom}
+              className="h-12 w-auto max-w-full object-contain"
+            />
           </div>
-
-          <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight">
-            {GARAGE_INFO.nom}
-          </h1>
           <p className="text-xs text-indigo-300 font-semibold tracking-wide mt-1">
             Espace Sécurisé • Authentification Obligatoire
           </p>

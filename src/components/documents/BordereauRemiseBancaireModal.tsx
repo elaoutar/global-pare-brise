@@ -386,33 +386,23 @@ export const BordereauRemiseBancaireModal: React.FC<Props> = ({
           
           {/* Header Bordereau */}
           <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 border-slate-900 pb-4 mb-6 gap-4">
-            <div className="flex items-start gap-4">
-              {GARAGE_INFO.logoUrl && (
+            <div>
+              <div className="flex items-center gap-3 mb-1">
                 <img
                   src={GARAGE_INFO.logoUrl}
                   alt={GARAGE_INFO.nom}
-                  className="h-14 w-auto max-w-[140px] object-contain rounded"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = 'none';
-                  }}
+                  className="h-12 w-auto max-w-[220px] object-contain"
                 />
-              )}
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
-                    {GARAGE_INFO.nom}
-                  </h1>
-                  <span className="text-xs px-2 py-0.5 bg-slate-200 text-slate-800 font-bold rounded">
-                    {GARAGE_INFO.formeJuridique}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 mt-1 font-medium">{GARAGE_INFO.adresse}</p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mt-1 font-mono">
-                  <span><strong>ICE:</strong> {GARAGE_INFO.ice}</span>
-                  <span><strong>IF:</strong> {GARAGE_INFO.ifiscal}</span>
-                  <span><strong>RC:</strong> {GARAGE_INFO.rc}</span>
-                  <span><strong>Patente:</strong> {GARAGE_INFO.patente}</span>
-                </div>
+                <span className="text-xs px-2 py-0.5 bg-slate-200 text-slate-800 font-bold rounded">
+                  {GARAGE_INFO.formeJuridique}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 font-medium">{GARAGE_INFO.adresse}</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mt-1 font-mono">
+                <span><strong>ICE:</strong> {GARAGE_INFO.ice}</span>
+                <span><strong>IF:</strong> {GARAGE_INFO.ifiscal}</span>
+                <span><strong>RC:</strong> {GARAGE_INFO.rc}</span>
+                <span><strong>Patente:</strong> {GARAGE_INFO.patente}</span>
               </div>
             </div>
 

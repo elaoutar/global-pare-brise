@@ -113,28 +113,20 @@ export const Navigation: React.FC<Props> = ({
       <div>
         {/* Brand Header */}
         <div className="p-4 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-sky-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20 flex-shrink-0 overflow-hidden">
-              <ShieldCheck className="w-6 h-6" />
-              {GARAGE_INFO.logoUrl && (
-                <img
-                  src={GARAGE_INFO.logoUrl}
-                  alt={GARAGE_INFO.nom}
-                  className="absolute inset-0 w-full h-full object-contain p-1 bg-slate-900 rounded-xl"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = 'none';
-                  }}
-                />
-              )}
-            </div>
-            <div>
-              <h1 className="font-black text-sm text-white tracking-tight leading-none uppercase">
-                {GARAGE_INFO.nom}
-              </h1>
-              <span className="text-[10px] text-sky-400 font-semibold tracking-wider uppercase">
-                Marrakech • Maroc
-              </span>
-            </div>
+          <div className="bg-white rounded-xl p-2 flex items-center justify-center shadow-md">
+            <img
+              src={GARAGE_INFO.logoUrl}
+              alt={GARAGE_INFO.nom}
+              className="h-8 w-auto max-w-full object-contain"
+            />
+          </div>
+          <div className="flex items-center justify-between mt-2.5 px-0.5">
+            <span className="text-[10px] text-sky-400 font-bold tracking-wider uppercase">
+              Marrakech • Maroc
+            </span>
+            <span className="text-[9px] text-slate-400 font-medium bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-700">
+              Centre Agréé
+            </span>
           </div>
 
           {/* User Session Info Card */}

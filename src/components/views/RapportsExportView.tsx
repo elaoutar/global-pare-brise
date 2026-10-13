@@ -460,28 +460,20 @@ export const RapportsExportView: React.FC<Props> = ({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 md:p-10 print-page text-slate-800 text-xs">
         {/* Official Header */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-5">
-          <div className="flex items-start gap-4">
-            {GARAGE_INFO.logoUrl && (
-              <img
-                src={GARAGE_INFO.logoUrl}
-                alt={GARAGE_INFO.nom}
-                className="h-16 w-auto max-w-[160px] object-contain rounded"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                }}
-              />
-            )}
-            <div>
-              <h1 className="text-xl font-black uppercase text-slate-900">{GARAGE_INFO.nom}</h1>
-              <p className="text-[11px] font-semibold text-brand-600 uppercase">
-                Centre Agréé Bris de Glace & Pare-Brise
-              </p>
-              <p className="text-[11px] text-slate-600">{GARAGE_INFO.adresse}</p>
-              <p className="text-[11px] text-slate-600">Tél: {GARAGE_INFO.telephone}</p>
-              <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                ICE: {GARAGE_INFO.ice} | IF: {GARAGE_INFO.ifiscal} | PT: {GARAGE_INFO.patente}
-              </p>
-            </div>
+          <div>
+            <img
+              src={GARAGE_INFO.logoUrl}
+              alt={GARAGE_INFO.nom}
+              className="h-14 w-auto max-w-[260px] object-contain mb-2"
+            />
+            <p className="text-[11px] font-semibold text-brand-600 uppercase">
+              Centre Agréé Bris de Glace & Pare-Brise
+            </p>
+            <p className="text-[11px] text-slate-600">{GARAGE_INFO.adresse}</p>
+            <p className="text-[11px] text-slate-600">Tél: {GARAGE_INFO.telephone}</p>
+            <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+              ICE: {GARAGE_INFO.ice} | IF: {GARAGE_INFO.ifiscal} | PT: {GARAGE_INFO.patente}
+            </p>
           </div>
 
           <div className="text-right">
