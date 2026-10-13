@@ -121,16 +121,28 @@ export const FactureModal: React.FC<Props> = ({
           >
             {/* Top Bar with Logo & Legal Identifiers */}
             <div className="flex justify-between items-start border-b border-slate-200 pb-6 mb-6">
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
-                  {GARAGE_INFO.nom}
-                </h1>
-                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-2">
-                  Remplacement & Réparation de Pare-Brise et Vitrage Automobile
-                </p>
-                <p className="text-xs text-slate-600">{GARAGE_INFO.adresse}</p>
-                <p className="text-xs text-slate-600">Tél : {GARAGE_INFO.telephone}</p>
-                <p className="text-xs text-slate-600">Email : {GARAGE_INFO.email}</p>
+              <div className="flex items-start gap-4">
+                {GARAGE_INFO.logoUrl && (
+                  <img
+                    src={GARAGE_INFO.logoUrl}
+                    alt={GARAGE_INFO.nom}
+                    className="h-16 w-auto max-w-[160px] object-contain rounded"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                )}
+                <div>
+                  <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+                    {GARAGE_INFO.nom}
+                  </h1>
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-2">
+                    Remplacement & Réparation de Pare-Brise et Vitrage Automobile
+                  </p>
+                  <p className="text-xs text-slate-600">{GARAGE_INFO.adresse}</p>
+                  <p className="text-xs text-slate-600">Tél : {GARAGE_INFO.telephone}</p>
+                  <p className="text-xs text-slate-600">Email : {GARAGE_INFO.email}</p>
+                </div>
               </div>
               <div className="text-right">
                 <span className="inline-block px-3 py-1 bg-slate-100 border border-slate-300 rounded font-bold text-xs uppercase tracking-wider mb-2">

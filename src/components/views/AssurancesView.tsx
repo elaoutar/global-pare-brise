@@ -823,11 +823,23 @@ export const AssurancesView: React.FC<Props> = ({
               
               {/* En-tête officiel Garage & Intermédiaire */}
               <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
-                <div>
-                  <h1 className="text-xl font-black uppercase text-slate-950 tracking-tight">{GARAGE_INFO.nom}</h1>
-                  <p className="text-slate-600 font-medium">{GARAGE_INFO.adresse}</p>
-                  <p className="text-slate-600">Tél : {GARAGE_INFO.telephone}</p>
-                  <p className="text-slate-600 font-mono text-[11px]">ICE : {GARAGE_INFO.ice} • RC : {GARAGE_INFO.rc}</p>
+                <div className="flex items-start gap-4">
+                  {GARAGE_INFO.logoUrl && (
+                    <img
+                      src={GARAGE_INFO.logoUrl}
+                      alt={GARAGE_INFO.nom}
+                      className="h-14 w-auto max-w-[140px] object-contain rounded"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <div>
+                    <h1 className="text-xl font-black uppercase text-slate-950 tracking-tight">{GARAGE_INFO.nom}</h1>
+                    <p className="text-slate-600 font-medium">{GARAGE_INFO.adresse}</p>
+                    <p className="text-slate-600">Tél : {GARAGE_INFO.telephone}</p>
+                    <p className="text-slate-600 font-mono text-[11px]">ICE : {GARAGE_INFO.ice} • RC : {GARAGE_INFO.rc}</p>
+                  </div>
                 </div>
 
                 <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl text-right max-w-xs">

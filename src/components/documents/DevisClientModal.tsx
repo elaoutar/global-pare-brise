@@ -43,18 +43,30 @@ export const DevisClientModal: React.FC<Props> = ({ devis, onClose }) => {
           >
             {/* Top Bar with Logo & Legal Identifiers */}
             <div className="flex justify-between items-start border-b border-slate-200 pb-6 mb-6">
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
-                  {GARAGE_INFO.nom}
-                </h1>
-                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2">
-                  Spécialiste Vitrage Automobile • Pare-Brise • Lunettes • Glaces
-                </p>
-                <p className="text-xs text-slate-600">
-                  {devis.agenceVille === 'El Jadida' ? 'Agence El Jadida - Maroc' : GARAGE_INFO.adresse}
-                </p>
-                <p className="text-xs text-slate-600">Tél: {GARAGE_INFO.telephone}</p>
-                <p className="text-xs text-slate-600">Email: {GARAGE_INFO.email}</p>
+              <div className="flex items-start gap-4">
+                {GARAGE_INFO.logoUrl && (
+                  <img
+                    src={GARAGE_INFO.logoUrl}
+                    alt={GARAGE_INFO.nom}
+                    className="h-16 w-auto max-w-[160px] object-contain rounded"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                )}
+                <div>
+                  <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+                    {GARAGE_INFO.nom}
+                  </h1>
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2">
+                    Spécialiste Vitrage Automobile • Pare-Brise • Lunettes • Glaces
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    {devis.agenceVille === 'El Jadida' ? 'Agence El Jadida - Maroc' : GARAGE_INFO.adresse}
+                  </p>
+                  <p className="text-xs text-slate-600">Tél: {GARAGE_INFO.telephone}</p>
+                  <p className="text-xs text-slate-600">Email: {GARAGE_INFO.email}</p>
+                </div>
               </div>
               <div className="text-right">
                 <span className="inline-block px-3 py-1 bg-amber-50 border border-amber-300 text-amber-900 rounded font-black text-xs uppercase tracking-wider mb-2">

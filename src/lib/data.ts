@@ -14,6 +14,7 @@ import {
 
 export const GARAGE_INFO = {
   nom: 'GLOBAL PARE-BRISE',
+  logoUrl: '/logo.png', // Placer le fichier logo dans public/logo.png
   formeJuridique: 'SARL',
   adresse: 'LA FERAIL HAY ALKARAM N 179 MARRAKECH - MAROC',
   telephone: '0700367182 / 0524307501',

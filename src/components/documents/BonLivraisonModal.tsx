@@ -176,16 +176,28 @@ export const BonLivraisonModal: React.FC<Props> = ({
           >
             {/* Top Bar */}
             <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
-                  {GARAGE_INFO.nom}
-                </h1>
-                <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider mb-1">
-                  Centre Spécialisé Vitrage Auto & Bris de Glace
-                </p>
-                <p className="text-xs text-slate-700 font-medium">{GARAGE_INFO.adresse}</p>
-                <p className="text-xs text-slate-700">Tél : <strong>{GARAGE_INFO.telephone}</strong></p>
-                <p className="text-xs text-slate-700">Email : <strong>{GARAGE_INFO.email}</strong></p>
+              <div className="flex items-start gap-4">
+                {GARAGE_INFO.logoUrl && (
+                  <img
+                    src={GARAGE_INFO.logoUrl}
+                    alt={GARAGE_INFO.nom}
+                    className="h-16 w-auto max-w-[160px] object-contain rounded"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                )}
+                <div>
+                  <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
+                    {GARAGE_INFO.nom}
+                  </h1>
+                  <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider mb-1">
+                    Centre Spécialisé Vitrage Auto & Bris de Glace
+                  </p>
+                  <p className="text-xs text-slate-700 font-medium">{GARAGE_INFO.adresse}</p>
+                  <p className="text-xs text-slate-700">Tél : <strong>{GARAGE_INFO.telephone}</strong></p>
+                  <p className="text-xs text-slate-700">Email : <strong>{GARAGE_INFO.email}</strong></p>
+                </div>
               </div>
 
               <div className="text-right">

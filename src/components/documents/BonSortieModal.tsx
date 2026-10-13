@@ -42,9 +42,21 @@ export const BonSortieModal: React.FC<Props> = ({ bonSortie, dossier, onClose })
             className="a4-document print-page p-6 sm:p-10 text-slate-800 text-xs sm:text-sm leading-relaxed shadow-sm border border-slate-200/80 rounded-xl"
           >
           <div className="flex justify-between items-start border-b border-slate-300 pb-4 mb-4">
-            <div>
-              <h1 className="text-xl font-bold uppercase text-slate-900">{GARAGE_INFO.nom}</h1>
-              <p className="text-xs text-slate-500">Service Magasin & Gestion des Stocks</p>
+            <div className="flex items-center gap-3">
+              {GARAGE_INFO.logoUrl && (
+                <img
+                  src={GARAGE_INFO.logoUrl}
+                  alt={GARAGE_INFO.nom}
+                  className="h-12 w-auto max-w-[120px] object-contain rounded"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                />
+              )}
+              <div>
+                <h1 className="text-xl font-bold uppercase text-slate-900">{GARAGE_INFO.nom}</h1>
+                <p className="text-xs text-slate-500">Service Magasin & Gestion des Stocks</p>
+              </div>
             </div>
             <div className="text-right">
               <span className="font-bold text-xs uppercase px-2.5 py-1 bg-amber-100 text-amber-900 rounded">
