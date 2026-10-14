@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Fournisseur, 
   BonCommandeFournisseur, 
@@ -87,6 +87,14 @@ export const FournisseursView: React.FC<Props> = ({
   // New Command Modal
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [orderFournisseurId, setOrderFournisseurId] = useState(fournisseurs[0]?.id || '');
+
+  // Synchronisation automatique de l'ID fournisseur par défaut
+  useEffect(() => {
+    if (!orderFournisseurId && fournisseurs.length > 0) {
+      setOrderFournisseurId(fournisseurs[0].id);
+    }
+  }, [fournisseurs, orderFournisseurId]);
+
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
   const [orderDateLivraison, setOrderDateLivraison] = useState('');
   const [orderAgence, setOrderAgence] = useState<'Marrakech' | 'El Jadida'>('Marrakech');
@@ -219,11 +227,21 @@ export const FournisseursView: React.FC<Props> = ({
       return;
     }
 
+    const currentFournId = orderFournisseurId || (fournisseurs.length > 0 ? fournisseurs[0].id : 'fourn-default');
+    const selectedFourn: Fournisseur = fournisseurs.find((f) => f.id === currentFournId) || (fournisseurs.length > 0 ? fournisseurs[0] : {
+      id: 'fourn-default',
+      nom: 'Fournisseur Vitrage',
+      specialite: 'Vitrages automobiles',
+      telephone: '',
+      email: '',
+      ville: orderAgence,
+    });
+
     const seq = Math.floor(1000 + Math.random() * 9000);
     const newBC: BonCommandeFournisseur = {
       id: `bc-${Date.now()}`,
       numeroBC: `BC-2026-${seq}`,
-      fournisseurId: orderFournisseurId,
+      fournisseurId: currentFournId,
       dateCommande: orderDate,
       dateLivraisonPrevue: orderDateLivraison || undefined,
       agenceVille: orderAgence,
@@ -253,9 +271,13 @@ export const FournisseursView: React.FC<Props> = ({
       dateEcheancePaiement: orderEcheancePaiement || undefined,
       notes: orderNotes || undefined,
     };
+    (newBC as any).fournisseurNom = selectedFourn.nom;
 
     onCreateCommande(newBC);
     setShowNewOrderModal(false);
+
+    // Ouvrir immédiatement le bon de commande pour impression / téléchargement
+    onOpenCommandeModal(newBC, selectedFourn);
   };
 
   // Quick update of status / payment
@@ -542,7 +564,14 @@ export const FournisseursView: React.FC<Props> = ({
                     </tr>
                   ) : (
                     filteredCommandes.map((cmd) => {
-                      const fourn = fournisseurs.find((f) => f.id === cmd.fournisseurId);
+                      const fourn: Fournisseur = fournisseurs.find((f) => f.id === cmd.fournisseurId) || {
+                        id: cmd.fournisseurId || 'fourn-default',
+                        nom: (cmd as any).fournisseurNom || (fournisseurs.length > 0 ? fournisseurs[0].nom : 'Fournisseur Inconnu'),
+                        specialite: 'Vitrage Automobile & Accessoires',
+                        telephone: '',
+                        email: '',
+                        ville: cmd.agenceVille || 'Marrakech',
+                      };
                       const badgeCmd = getStatutCommandeFournisseurBadge(cmd.statutCommande);
                       const badgePaiement = getStatutPaiementFournisseurBadge(cmd.statutPaiement);
                       const reste = Math.max(0, cmd.totalTTC - cmd.montantPaye);
@@ -564,7 +593,7 @@ export const FournisseursView: React.FC<Props> = ({
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <span className="font-bold text-slate-900 block">{fourn?.nom || 'Fournisseur Inconnu'}</span>
+                            <span className="font-bold text-slate-900 block">{fourn.nom}</span>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                                 <MapPin className="w-2.5 h-2.5 text-brand-600" />
@@ -628,8 +657,9 @@ export const FournisseursView: React.FC<Props> = ({
                             <div className="flex items-center justify-center gap-1.5">
                               {/* Open Printable Bon de Commande Modal */}
                               <button
-                                onClick={() => fourn && onOpenCommandeModal(cmd, fourn)}
-                                className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors"
+                                type="button"
+                                onClick={() => onOpenCommandeModal(cmd, fourn)}
+                                className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-colors cursor-pointer"
                                 title="Voir & Imprimer le Bon de Commande"
                               >
                                 <Printer className="w-4 h-4" />

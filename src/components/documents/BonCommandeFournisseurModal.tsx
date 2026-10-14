@@ -1,37 +1,63 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { BonCommandeFournisseur, Fournisseur } from '@/types';
 import { GARAGE_INFO } from '@/lib/data';
 import { formatDate, formatDH, montantEnToutesLettres, getStatutCommandeFournisseurBadge, getStatutPaiementFournisseurBadge } from '@/lib/utils';
 import { DocumentActionBar } from './DocumentActionBar';
-import { FileCheck, Building2, MapPin, Phone, Mail, Truck } from 'lucide-react';
+import { FileCheck, Building2, MapPin, Phone, Mail, Truck, X } from 'lucide-react';
 
 interface Props {
   commande: BonCommandeFournisseur;
-  fournisseur: Fournisseur;
+  fournisseur?: Fournisseur | null;
   onClose: () => void;
 }
 
 export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournisseur, onClose }) => {
   const printRef = useRef<HTMLDivElement>(null);
 
-  const shareMsg = `Bonjour ${fournisseur.nom}, voici le Bon de Commande N° ${commande.numeroBC} émis par ${GARAGE_INFO.nom} pour un montant total de ${formatDH(commande.totalTTC)} TTC. Merci de nous confirmer la date de livraison.`;
+  // Fermeture par touche Echap
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
-  const badgeCommande = getStatutCommandeFournisseurBadge(commande.statutCommande);
-  const badgePaiement = getStatutPaiementFournisseurBadge(commande.statutPaiement);
+  // Fournisseur sécurisé (aucun crash même si undefined ou incomplet)
+  const safeFournisseur: Fournisseur = {
+    id: fournisseur?.id || commande.fournisseurId || 'fourn-default',
+    nom: fournisseur?.nom || (commande as any).fournisseurNom || 'Fournisseur Vitrage',
+    specialite: fournisseur?.specialite || 'Pièces et vitrages automobiles',
+    telephone: fournisseur?.telephone || '',
+    email: fournisseur?.email || '',
+    ville: fournisseur?.ville || commande.agenceVille || 'Marrakech',
+    ice: fournisseur?.ice || '',
+  };
+
+  const cleanFournisseurName = (safeFournisseur.nom || 'Fournisseur').replace(/\s+/g, '_');
+  const shareMsg = `Bonjour ${safeFournisseur.nom}, voici le Bon de Commande N° ${commande.numeroBC} émis par ${GARAGE_INFO.nom} pour un montant total de ${formatDH(commande.totalTTC || 0)} TTC. Merci de nous confirmer la date de livraison.`;
+
+  const badgeCommande = getStatutCommandeFournisseurBadge(commande.statutCommande || 'ENVOYEE');
+  const badgePaiement = getStatutPaiementFournisseurBadge(commande.statutPaiement || 'NON_PAYE');
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in duration-200">
         
         {/* Document Action Bar */}
         <DocumentActionBar
           documentRef={printRef}
-          filename={`BON-COMMANDE-${commande.numeroBC}-${fournisseur.nom.replace(/\s+/g, '_')}`}
-          documentTitle={`Bon de Commande Fournisseur #${commande.numeroBC}`}
-          subtitle={`Fournisseur : ${fournisseur.nom} • Total : ${formatDH(commande.totalTTC)} TTC • Agence : ${commande.agenceVille || 'Marrakech'}`}
-          clientPhone={fournisseur.telephone}
+          filename={`BON-COMMANDE-${commande.numeroBC || 'BC'}-${cleanFournisseurName}`}
+          documentTitle={`Bon de Commande Fournisseur #${commande.numeroBC || ''}`}
+          subtitle={`Fournisseur : ${safeFournisseur.nom} • Total : ${formatDH(commande.totalTTC || 0)} TTC • Agence : ${commande.agenceVille || 'Marrakech'}`}
+          clientPhone={safeFournisseur.telephone}
           shareMessage={shareMsg}
           badgeText="Achat / Appro"
           badgeColor="bg-indigo-600"
@@ -103,14 +129,14 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
                 <p className="font-bold text-[10px] text-indigo-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                   <Truck className="w-3.5 h-3.5 text-indigo-600" /> Fournisseur Destinataire
                 </p>
-                <p className="font-bold text-slate-900 text-sm">{fournisseur.nom}</p>
-                <p className="text-slate-600 font-semibold">{fournisseur.specialite}</p>
-                <p className="text-slate-600 mt-1">Ville : <strong>{fournisseur.ville}</strong></p>
-                <p className="text-slate-600">Tél : <strong>{fournisseur.telephone || '-'}</strong></p>
-                {fournisseur.email && <p className="text-slate-600">Email : {fournisseur.email}</p>}
-                {fournisseur.ice && (
+                <p className="font-bold text-slate-900 text-sm">{safeFournisseur.nom}</p>
+                <p className="text-slate-600 font-semibold">{safeFournisseur.specialite}</p>
+                <p className="text-slate-600 mt-1">Ville : <strong>{safeFournisseur.ville}</strong></p>
+                <p className="text-slate-600">Tél : <strong>{safeFournisseur.telephone || '-'}</strong></p>
+                {safeFournisseur.email && <p className="text-slate-600">Email : {safeFournisseur.email}</p>}
+                {safeFournisseur.ice && (
                   <p className="text-[11px] font-mono text-indigo-900 font-semibold mt-1">
-                    ICE : {fournisseur.ice}
+                    ICE : {safeFournisseur.ice}
                   </p>
                 )}
               </div>
@@ -148,7 +174,7 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
-                  {commande.lignes.map((ligne, idx) => (
+                  {(commande.lignes || []).map((ligne, idx) => (
                     <tr key={ligne.id || idx} className="hover:bg-slate-50/50">
                       <td className="py-2.5 px-3 text-center text-slate-400 font-mono">{idx + 1}</td>
                       <td className="py-2.5 px-3 font-semibold text-slate-800">
@@ -161,10 +187,10 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
                         {ligne.quantite}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-700">
-                        {formatDH(ligne.prixUnitaireAchatHT)}
+                        {formatDH(Number(ligne.prixUnitaireAchatHT) || 0)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                        {formatDH(ligne.totalHT)}
+                        {formatDH(Number(ligne.totalHT) || 0)}
                       </td>
                     </tr>
                   ))}
@@ -178,7 +204,7 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
                 <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
                   <p className="font-bold text-slate-500 uppercase text-[10px]">Arrêté le présent bon de commande à la somme de :</p>
                   <p className="font-bold text-slate-900 italic mt-1 text-[11px]">
-                    « {montantEnToutesLettres(commande.totalTTC)} »
+                    « {montantEnToutesLettres(Number(commande.totalTTC) || 0)} »
                   </p>
                 </div>
 
@@ -190,9 +216,9 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
 
                 {/* Situation financière récap */}
                 <div className="text-[11px] text-slate-600 space-y-0.5 pt-1">
-                  <p>Montant payé / acompte : <strong>{formatDH(commande.montantPaye)}</strong></p>
-                  <p>Reste à payer fournisseur : <strong className={commande.totalTTC - commande.montantPaye > 0 ? 'text-rose-700' : 'text-emerald-700'}>
-                    {formatDH(Math.max(0, commande.totalTTC - commande.montantPaye))}
+                  <p>Montant payé / acompte : <strong>{formatDH(Number(commande.montantPaye) || 0)}</strong></p>
+                  <p>Reste à payer fournisseur : <strong className={(Number(commande.totalTTC) || 0) - (Number(commande.montantPaye) || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'}>
+                    {formatDH(Math.max(0, (Number(commande.totalTTC) || 0) - (Number(commande.montantPaye) || 0)))}
                   </strong></p>
                 </div>
               </div>
@@ -200,15 +226,15 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
               <div className="w-64 space-y-1.5 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200 font-medium">
                 <div className="flex justify-between py-1 text-slate-600">
                   <span>Total Hors Taxes (HT) :</span>
-                  <span className="font-mono font-bold text-slate-900">{formatDH(commande.totalHT)}</span>
+                  <span className="font-mono font-bold text-slate-900">{formatDH(Number(commande.totalHT) || 0)}</span>
                 </div>
                 <div className="flex justify-between py-1 text-slate-600 border-t border-slate-200">
                   <span>TVA Maroc (20%) :</span>
-                  <span className="font-mono font-bold text-slate-900">{formatDH(commande.totalTVA)}</span>
+                  <span className="font-mono font-bold text-slate-900">{formatDH(Number(commande.totalTVA) || 0)}</span>
                 </div>
                 <div className="flex justify-between py-2 border-t-2 border-slate-900 text-sm font-black text-slate-900 bg-white px-2 rounded-lg mt-1">
                   <span>TOTAL TTC :</span>
-                  <span className="font-mono text-indigo-700">{formatDH(commande.totalTTC)}</span>
+                  <span className="font-mono text-indigo-700">{formatDH(Number(commande.totalTTC) || 0)}</span>
                 </div>
               </div>
             </div>
@@ -235,6 +261,19 @@ export const BonCommandeFournisseurModal: React.FC<Props> = ({ commande, fournis
               {GARAGE_INFO.nom} • Document officiel de commande de fournitures conforme à la législation marocaine • {GARAGE_INFO.siteWeb}
             </div>
           </div>
+        </div>
+
+        {/* Modal Bottom Footer (Visible on screen only) */}
+        <div className="no-print p-3 sm:px-6 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs">
+          <span className="text-slate-500 font-medium">
+            Appuyez sur <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] shadow-2xs">Échap</kbd> ou cliquez en dehors pour fermer
+          </span>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs transition active:scale-95"
+          >
+            Fermer le document
+          </button>
         </div>
       </div>
     </div>
