@@ -119,35 +119,37 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
     const payload = {
       id: dossier.id,
       numero_dossier: dossier.numeroDossier,
-      type_dossier: dossier.typeDossier,
-      date_creation: dossier.dateCreation,
-      client: dossier.client,
-      vehicule: dossier.vehicule,
-      assurance: dossier.assurance,
-      agence_assurance: dossier.agenceAssurance,
-      partenaire: dossier.partenaire,
-      numero_sinistre: dossier.numeroSinistre,
-      numero_police: dossier.numeroPolice,
-      date_sinistre: dossier.dateSinistre,
-      type_client_assurance: dossier.typeClientAssurance,
-      reference_dossier_azur_glass: dossier.referenceDossierAzurGlass,
-      date_envoi_azur_glass: dossier.dateEnvoiAzurGlass,
-      montant_total_ttc: dossier.montantTotalTTC,
-      montant_franchise: dossier.montantFranchise,
-      franchise_payee_par_client: dossier.franchisePayeeParClient,
-      franchise_offerte: dossier.franchiseOfferte,
-      tva_exclue_par_assurance: dossier.tvaExclueParAssurance,
-      montant_reversement_azur_glass: dossier.montantReversementAzurGlass,
-      montant_prise_en_charge_assurance: dossier.montantPriseEnChargeAssurance,
-      statut: dossier.isArchive ? 'ARCHIVE' : dossier.statut,
-      poseur: dossier.poseur,
-      observations: dossier.observations,
-      photos: dossier.photos,
-      documents: dossier.documents,
-      bon_sortie_id: dossier.bonSortieId,
-      bon_livraison_id: dossier.bonLivraisonId,
-      facture_assurance_id: dossier.factureAssuranceId,
-      facture_client_id: dossier.factureClientId,
+      type_dossier: dossier.typeDossier || 'ASSURANCE',
+      date_creation: dossier.dateCreation || new Date().toISOString(),
+      client: dossier.client || {},
+      vehicule: dossier.vehicule || {},
+      assurance: dossier.assurance || null,
+      agence_assurance: dossier.agenceAssurance || null,
+      partenaire: dossier.partenaire || null,
+      numero_sinistre: dossier.numeroSinistre || null,
+      numero_police: dossier.numeroPolice || null,
+      date_sinistre: dossier.dateSinistre || null,
+      type_client_assurance: dossier.typeClientAssurance || 'PARTICULIER',
+      reference_dossier_azur_glass: dossier.referenceDossierAzurGlass || null,
+      date_envoi_azur_glass: dossier.dateEnvoiAzurGlass ? dossier.dateEnvoiAzurGlass : null,
+      montant_total_ttc: Number(dossier.montantTotalTTC) || 0,
+      montant_franchise: Number(dossier.montantFranchise) || 0,
+      franchise_payee_par_client: Boolean(dossier.franchisePayeeParClient),
+      franchise_offerte: Boolean(dossier.franchiseOfferte),
+      tva_exclue_par_assurance: Number(dossier.tvaExclueParAssurance) || 0,
+      montant_reversement_azur_glass: Number(dossier.montantReversementAzurGlass) || 0,
+      montant_prise_en_charge_assurance: Number(dossier.montantPriseEnChargeAssurance) || 0,
+      statut: dossier.isArchive ? 'ARCHIVE' : (dossier.statut || 'NOUVEAU'),
+      is_archive: Boolean(dossier.isArchive),
+      date_archivage: (dossier.isArchive && dossier.dateArchivage) ? dossier.dateArchivage : null,
+      poseur: dossier.poseur || null,
+      observations: dossier.observations || null,
+      photos: dossier.photos || {},
+      documents: dossier.documents || [],
+      bon_sortie_id: dossier.bonSortieId || null,
+      bon_livraison_id: dossier.bonLivraisonId || null,
+      facture_assurance_id: dossier.factureAssuranceId || null,
+      facture_client_id: dossier.factureClientId || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -311,13 +313,13 @@ export const saveFactureToSupabase = async (facture: Facture): Promise<boolean> 
       date_emission: facture.dateEmission,
       date_echeance: facture.dateEcheance,
       lignes: facture.lignes,
-      total_ht: facture.totalHT,
-      total_tva: facture.totalTVA,
-      total_ttc: facture.totalTTC,
-      montant_regle: facture.montantRegle,
-      statut_paiement: facture.statutPaiement,
-      date_paiement: facture.datePaiement,
-      reference_paiement: facture.referencePaiement,
+      total_ht: Number(facture.totalHT) || 0,
+      total_tva: Number(facture.totalTVA) || 0,
+      total_ttc: Number(facture.totalTTC) || 0,
+      montant_regle: Number(facture.montantRegle) || 0,
+      statut_paiement: facture.statutPaiement || 'EN_ATTENTE',
+      date_paiement: facture.datePaiement ? facture.datePaiement : null,
+      reference_paiement: facture.referencePaiement || null,
     };
 
     const { error } = await supabase
@@ -428,7 +430,282 @@ export const saveDevisToSupabase = async (devis: DevisClient): Promise<boolean> 
     }
     return true;
   } catch (err) {
-    console.error('Exception save devis Supabase:', err);
+    console.error('Exception upsert devis Supabase:', err);
+    return false;
+  }
+};
+
+export const deleteDevisFromSupabase = async (devisId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('devis')
+      .delete()
+      .eq('id', devisId);
+
+    if (error) {
+      console.error('Erreur delete devis Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Exception delete devis Supabase:', err);
+    return false;
+  }
+};
+
+// ==============================================================================
+// 6. FOURNISSEURS (CRUD SUPABASE)
+// ==============================================================================
+export const fetchFournisseursFromSupabase = async (): Promise<Fournisseur[] | null> => {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('fournisseurs')
+      .select('*')
+      .order('nom', { ascending: true });
+
+    if (error) {
+      console.warn('Erreur ou table fournisseurs absente Supabase:', error.message);
+      return null;
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      nom: row.nom,
+      ice: row.ice || undefined,
+      telephone: row.telephone || '',
+      email: row.email || undefined,
+      ville: row.ville || 'Casablanca',
+      specialite: row.specialite || 'Vitrages automobiles',
+    }));
+  } catch (err) {
+    console.warn('Exception fetch fournisseurs Supabase:', err);
+    return null;
+  }
+};
+
+export const saveFournisseurToSupabase = async (fournisseur: Fournisseur): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const payload = {
+      id: fournisseur.id,
+      nom: fournisseur.nom,
+      ice: fournisseur.ice || null,
+      telephone: fournisseur.telephone || '',
+      email: fournisseur.email || null,
+      ville: fournisseur.ville || 'Casablanca',
+      specialite: fournisseur.specialite || 'Vitrages automobiles',
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('fournisseurs')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Erreur upsert fournisseur Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception save fournisseur Supabase:', err);
+    return false;
+  }
+};
+
+export const deleteFournisseurFromSupabase = async (fournisseurId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('fournisseurs')
+      .delete()
+      .eq('id', fournisseurId);
+
+    if (error) {
+      console.warn('Erreur delete fournisseur Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception delete fournisseur Supabase:', err);
+    return false;
+  }
+};
+
+// ==============================================================================
+// 7. COMMANDES FOURNISSEURS (CRUD SUPABASE)
+// ==============================================================================
+export const fetchCommandesFournisseursFromSupabase = async (): Promise<BonCommandeFournisseur[] | null> => {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('commandes_fournisseurs')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Erreur ou table commandes_fournisseurs absente Supabase:', error.message);
+      return null;
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      numeroBC: row.numero_commande || row.numero_bc,
+      fournisseurId: row.fournisseur_id,
+      dateCommande: row.date_commande,
+      dateLivraisonPrevue: row.date_livraison_prevue || undefined,
+      agenceVille: row.agence_ville || 'Marrakech',
+      lignes: row.lignes || [],
+      totalHT: Number(row.total_ht || row.montant_total_ht || 0),
+      tauxTva: 20,
+      totalTVA: Number(row.total_tva || 0),
+      totalTTC: Number(row.total_ttc || row.montant_total_ttc || 0),
+      statutCommande: row.statut || row.statut_commande || 'ENVOYEE',
+      statutPaiement: row.statut_paiement || 'NON_PAYE',
+      montantPaye: Number(row.montant_paye || 0),
+      modePaiement: row.mode_paiement || undefined,
+      referencePaiement: row.reference_paiement || undefined,
+      dateEcheancePaiement: row.date_echeance_paiement || undefined,
+      numeroBLFournisseur: row.numero_bl_fournisseur || undefined,
+      numeroFactureFournisseur: row.numero_facture_fournisseur || undefined,
+      notes: row.notes || undefined,
+    }));
+  } catch (err) {
+    console.warn('Exception fetch commandes fournisseurs Supabase:', err);
+    return null;
+  }
+};
+
+export const saveCommandeFournisseurToSupabase = async (cmd: BonCommandeFournisseur): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const payload = {
+      id: cmd.id,
+      numero_commande: cmd.numeroBC,
+      fournisseur_id: cmd.fournisseurId,
+      date_commande: cmd.dateCommande,
+      date_livraison_prevue: cmd.dateLivraisonPrevue || null,
+      agence_ville: cmd.agenceVille || 'Marrakech',
+      lignes: cmd.lignes || [],
+      total_ht: Number(cmd.totalHT) || 0,
+      total_tva: Number(cmd.totalTVA) || 0,
+      total_ttc: Number(cmd.totalTTC) || 0,
+      statut: cmd.statutCommande || 'ENVOYEE',
+      statut_paiement: cmd.statutPaiement || 'NON_PAYE',
+      montant_paye: Number(cmd.montantPaye) || 0,
+      mode_paiement: cmd.modePaiement || null,
+      reference_paiement: cmd.referencePaiement || null,
+      date_echeance_paiement: cmd.dateEcheancePaiement || null,
+      numero_bl_fournisseur: cmd.numeroBLFournisseur || null,
+      numero_facture_fournisseur: cmd.numeroFactureFournisseur || null,
+      notes: cmd.notes || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('commandes_fournisseurs')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Erreur upsert commande fournisseur Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception save commande fournisseur Supabase:', err);
+    return false;
+  }
+};
+
+export const deleteCommandeFournisseurFromSupabase = async (cmdId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('commandes_fournisseurs')
+      .delete()
+      .eq('id', cmdId);
+
+    if (error) {
+      console.warn('Erreur delete commande fournisseur Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception delete commande fournisseur Supabase:', err);
+    return false;
+  }
+};
+
+// ==============================================================================
+// 8. PARTENAIRES (CRUD SUPABASE)
+// ==============================================================================
+export const fetchPartenairesFromSupabase = async (): Promise<Partenaire[] | null> => {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('partenaires')
+      .select('*')
+      .order('nom', { ascending: true });
+
+    if (error) {
+      console.warn('Erreur ou table partenaires absente Supabase:', error.message);
+      return null;
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      nom: row.nom,
+      type: row.type || 'COURTIER',
+      telephone: row.telephone || '',
+      ville: row.ville || '',
+      tauxCommissionPourcent: Number(row.taux_commission_pourcent || 0),
+    }));
+  } catch (err) {
+    console.warn('Exception fetch partenaires Supabase:', err);
+    return null;
+  }
+};
+
+export const savePartenaireToSupabase = async (part: Partenaire): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const payload = {
+      id: part.id,
+      nom: part.nom,
+      code: part.nom.substring(0, 10).toUpperCase().replace(/\s+/g, '_'),
+      type: part.type || 'COURTIER',
+      telephone: part.telephone || null,
+      ville: part.ville || null,
+      taux_commission_pourcent: part.tauxCommissionPourcent || 0,
+    };
+
+    const { error } = await supabase
+      .from('partenaires')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Erreur upsert partenaire Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception save partenaire Supabase:', err);
     return false;
   }
 };

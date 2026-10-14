@@ -42,11 +42,20 @@ import {
   fetchStockFromSupabase, 
   fetchFacturesFromSupabase, 
   fetchDevisFromSupabase,
+  fetchFournisseursFromSupabase,
+  fetchCommandesFournisseursFromSupabase,
+  fetchPartenairesFromSupabase,
   saveDossierToSupabase,
   saveStockArticleToSupabase,
   saveFactureToSupabase,
   saveDevisToSupabase,
-  deleteDossierFromSupabase
+  deleteDevisFromSupabase,
+  deleteDossierFromSupabase,
+  saveFournisseurToSupabase,
+  deleteFournisseurFromSupabase,
+  saveCommandeFournisseurToSupabase,
+  deleteCommandeFournisseurFromSupabase,
+  savePartenaireToSupabase
 } from '@/lib/supabaseService';
 import { getActiveSupabaseSession, logoutSupabase } from '@/lib/authService';
 
@@ -77,6 +86,31 @@ import { DeclarationBrisGlaceModal } from '@/components/documents/DeclarationBri
 import { LoginView } from '@/components/auth/LoginView';
 import { Menu, X, ShieldCheck, LogOut } from 'lucide-react';
 
+// Helpers pour persistance locale partagée instantanée entre comptes (Admin & Assistante)
+const loadSharedStorage = <T,>(key: string, fallback: T): T => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as T;
+      if (parsed && typeof parsed === 'object') return parsed as T;
+    }
+  } catch (e) {
+    console.error(`Erreur lecture ${key}:`, e);
+  }
+  return fallback;
+};
+
+const saveSharedStorage = <T,>(key: string, data: T) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error(`Erreur écriture ${key}:`, e);
+  }
+};
+
 export default function Home() {
   // Session & Rôles Utilisateurs
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
@@ -86,18 +120,18 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Core Data State
-  const [dossiers, setDossiers] = useState<DossierSinistre[]>(INITIAL_DOSSIERS);
-  const [stock, setStock] = useState<ArticleStock[]>(INITIAL_STOCK);
-  const [factures, setFactures] = useState<Facture[]>(INITIAL_FACTURES);
-  const [bonsSortie, setBonsSortie] = useState<BonSortie[]>(INITIAL_BONS_SORTIE);
-  const [bonsLivraison, setBonsLivraison] = useState<BonLivraison[]>(INITIAL_BONS_LIVRAISON);
-  const [recettes, setRecettes] = useState<ReglementRecette[]>(INITIAL_RECETTES);
+  // Core Data State - Données partagées persistantes
+  const [dossiers, setDossiers] = useState<DossierSinistre[]>(() => loadSharedStorage('gp_shared_dossiers', INITIAL_DOSSIERS));
+  const [stock, setStock] = useState<ArticleStock[]>(() => loadSharedStorage('gp_shared_stock', INITIAL_STOCK));
+  const [factures, setFactures] = useState<Facture[]>(() => loadSharedStorage('gp_shared_factures', INITIAL_FACTURES));
+  const [bonsSortie, setBonsSortie] = useState<BonSortie[]>(() => loadSharedStorage('gp_shared_bons_sortie', INITIAL_BONS_SORTIE));
+  const [bonsLivraison, setBonsLivraison] = useState<BonLivraison[]>(() => loadSharedStorage('gp_shared_bons_livraison', INITIAL_BONS_LIVRAISON));
+  const [recettes, setRecettes] = useState<ReglementRecette[]>(() => loadSharedStorage('gp_shared_recettes', INITIAL_RECETTES));
   const [assurances, setAssurances] = useState<Assurance[]>(INITIAL_ASSURANCES);
-  const [partenaires, setPartenaires] = useState<Partenaire[]>(INITIAL_PARTENAIRES);
-  const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(INITIAL_FOURNISSEURS);
-  const [commandesFournisseurs, setCommandesFournisseurs] = useState<BonCommandeFournisseur[]>(INITIAL_COMMANDES_FOURNISSEURS);
-  const [devisList, setDevisList] = useState<DevisClient[]>(INITIAL_DEVIS);
+  const [partenaires, setPartenaires] = useState<Partenaire[]>(() => loadSharedStorage('gp_shared_partenaires', INITIAL_PARTENAIRES));
+  const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(() => loadSharedStorage('gp_shared_fournisseurs', INITIAL_FOURNISSEURS));
+  const [commandesFournisseurs, setCommandesFournisseurs] = useState<BonCommandeFournisseur[]>(() => loadSharedStorage('gp_shared_commandes', INITIAL_COMMANDES_FOURNISSEURS));
+  const [devisList, setDevisList] = useState<DevisClient[]>(() => loadSharedStorage('gp_shared_devis', INITIAL_DEVIS));
 
   // Modals state
   const [showNewDossierModal, setShowNewDossierModal] = useState(false);
@@ -123,6 +157,62 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Synchronisation avec Supabase Cloud
+  const loadSupabaseData = async () => {
+    if (!isSupabaseConfigured) return;
+
+    try {
+      const [
+        supaDossiers, 
+        supaStock, 
+        supaFactures, 
+        supaDevis,
+        supaFournisseurs,
+        supaCommandes,
+        supaPartenaires
+      ] = await Promise.all([
+        fetchDossiersFromSupabase(),
+        fetchStockFromSupabase(),
+        fetchFacturesFromSupabase(),
+        fetchDevisFromSupabase(),
+        fetchFournisseursFromSupabase(),
+        fetchCommandesFournisseursFromSupabase(),
+        fetchPartenairesFromSupabase(),
+      ]);
+
+      if (supaDossiers && supaDossiers.length > 0) {
+        setDossiers(supaDossiers);
+        saveSharedStorage('gp_shared_dossiers', supaDossiers);
+      }
+      if (supaStock && supaStock.length > 0) {
+        setStock(supaStock);
+        saveSharedStorage('gp_shared_stock', supaStock);
+      }
+      if (supaFactures && supaFactures.length > 0) {
+        setFactures(supaFactures);
+        saveSharedStorage('gp_shared_factures', supaFactures);
+      }
+      if (supaDevis && supaDevis.length > 0) {
+        setDevisList(supaDevis);
+        saveSharedStorage('gp_shared_devis', supaDevis);
+      }
+      if (supaFournisseurs && supaFournisseurs.length > 0) {
+        setFournisseurs(supaFournisseurs);
+        saveSharedStorage('gp_shared_fournisseurs', supaFournisseurs);
+      }
+      if (supaCommandes && supaCommandes.length > 0) {
+        setCommandesFournisseurs(supaCommandes);
+        saveSharedStorage('gp_shared_commandes', supaCommandes);
+      }
+      if (supaPartenaires && supaPartenaires.length > 0) {
+        setPartenaires(supaPartenaires);
+        saveSharedStorage('gp_shared_partenaires', supaPartenaires);
+      }
+    } catch (err) {
+      console.error('Erreur chargement Supabase:', err);
+    }
+  };
+
   // Chargement strict de la session officielle Supabase Auth
   useEffect(() => {
     const initAuth = async () => {
@@ -132,7 +222,6 @@ export default function Home() {
           setCurrentUser(supaSession);
           localStorage.setItem('gp_user_session', JSON.stringify(supaSession));
         } else {
-          // Si aucune session active Supabase, déconnexion obligatoire
           localStorage.removeItem('gp_user_session');
           setCurrentUser(null);
         }
@@ -156,6 +245,8 @@ export default function Home() {
       console.error('Erreur stockage session:', err);
     }
     showToast(`Connexion réussie : Bienvenue ${session.nom} (${session.role === 'SUPERADMIN' ? 'Super Admin' : 'Assistante'})`);
+    // Re-synchronisation immédiate de toutes les données du Cloud lors du changement de session
+    loadSupabaseData();
   };
 
   const handleLogout = async () => {
@@ -176,36 +267,8 @@ export default function Home() {
     }
   }, [currentUser, activeTab]);
 
-  // Chargement des données réelles depuis Supabase Cloud
+  // Chargement des données réelles depuis Supabase Cloud au montage
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-
-    const loadSupabaseData = async () => {
-      try {
-        const [supaDossiers, supaStock, supaFactures, supaDevis] = await Promise.all([
-          fetchDossiersFromSupabase(),
-          fetchStockFromSupabase(),
-          fetchFacturesFromSupabase(),
-          fetchDevisFromSupabase(),
-        ]);
-
-        if (supaDossiers) {
-          setDossiers(supaDossiers);
-        }
-        if (supaStock) {
-          setStock(supaStock);
-        }
-        if (supaFactures) {
-          setFactures(supaFactures);
-        }
-        if (supaDevis) {
-          setDevisList(supaDevis);
-        }
-      } catch (err) {
-        console.error('Erreur chargement Supabase:', err);
-      }
-    };
-
     loadSupabaseData();
   }, []);
 
@@ -280,33 +343,49 @@ export default function Home() {
       bonLivraisonId: newBL.id,
     };
 
-    setDossiers([dossierWithDocs, ...dossiers]);
-    setBonsSortie([finalBS, ...bonsSortie]);
-    setBonsLivraison([newBL, ...bonsLivraison]);
+    const updatedDossiers = [dossierWithDocs, ...dossiers];
+    setDossiers(updatedDossiers);
+    saveSharedStorage('gp_shared_dossiers', updatedDossiers);
+
+    const updatedBS = [finalBS, ...bonsSortie];
+    setBonsSortie(updatedBS);
+    saveSharedStorage('gp_shared_bons_sortie', updatedBS);
+
+    const updatedBL = [newBL, ...bonsLivraison];
+    setBonsLivraison(updatedBL);
+    saveSharedStorage('gp_shared_bons_livraison', updatedBL);
 
     if (newBonSortie) {
       // Deduct stock for the article and the glue
-      setStock((prev) =>
-        prev.map((art) => {
+      setStock((prev) => {
+        const updatedStock = prev.map((art) => {
           const matchingLine = newBonSortie.lignes.find((l) => l.articleId === art.id);
           if (matchingLine) {
-            return {
+            const updatedArt = {
               ...art,
               quantiteEnStock: Math.max(0, art.quantiteEnStock - matchingLine.quantite),
             };
+            saveStockArticleToSupabase(updatedArt);
+            return updatedArt;
           }
           return art;
-        })
-      );
+        });
+        saveSharedStorage('gp_shared_stock', updatedStock);
+        return updatedStock;
+      });
     }
 
     if (newFacture) {
-      setFactures([newFacture, ...factures]);
+      const updatedFactures = [newFacture, ...factures];
+      setFactures(updatedFactures);
+      saveSharedStorage('gp_shared_factures', updatedFactures);
       saveFactureToSupabase(newFacture);
     }
 
     if (newRecette) {
-      setRecettes([newRecette, ...recettes]);
+      const updatedRecettes = [newRecette, ...recettes];
+      setRecettes(updatedRecettes);
+      saveSharedStorage('gp_shared_recettes', updatedRecettes);
     }
 
     saveDossierToSupabase(dossierWithDocs);
@@ -392,17 +471,31 @@ export default function Home() {
   };
 
   const handleAddStock = (newArticle: ArticleStock) => {
-    setStock([newArticle, ...stock]);
+    setStock((prev) => {
+      const updated = [newArticle, ...prev];
+      saveSharedStorage('gp_shared_stock', updated);
+      return updated;
+    });
+    saveStockArticleToSupabase(newArticle);
     showToast(`Article ${newArticle.reference} ajouté au stock avec succès.`);
   };
 
   const handleUpdateStock = (updatedArticle: ArticleStock) => {
-    setStock((prev) => prev.map((a) => (a.id === updatedArticle.id ? updatedArticle : a)));
+    setStock((prev) => {
+      const updated = prev.map((a) => (a.id === updatedArticle.id ? updatedArticle : a));
+      saveSharedStorage('gp_shared_stock', updated);
+      return updated;
+    });
+    saveStockArticleToSupabase(updatedArticle);
     showToast(`Article ${updatedArticle.reference} mis à jour avec succès.`);
   };
 
   const handleDeleteStock = (articleId: string) => {
-    setStock((prev) => prev.filter((a) => a.id !== articleId));
+    setStock((prev) => {
+      const updated = prev.filter((a) => a.id !== articleId);
+      saveSharedStorage('gp_shared_stock', updated);
+      return updated;
+    });
     showToast('Article supprimé du stock.');
   };
 
@@ -424,47 +517,83 @@ export default function Home() {
 
   // CRUD Partenaires
   const handleAddPartenaire = (newPart: Partenaire) => {
-    setPartenaires((prev) => [newPart, ...prev]);
+    setPartenaires((prev) => {
+      const updated = [newPart, ...prev];
+      saveSharedStorage('gp_shared_partenaires', updated);
+      return updated;
+    });
+    savePartenaireToSupabase(newPart);
     showToast(`Partenaire "${newPart.nom}" ajouté avec succès.`);
   };
 
   const handleUpdatePartenaire = (updatedPart: Partenaire) => {
-    setPartenaires((prev) => prev.map((p) => (p.id === updatedPart.id ? updatedPart : p)));
+    setPartenaires((prev) => {
+      const updated = prev.map((p) => (p.id === updatedPart.id ? updatedPart : p));
+      saveSharedStorage('gp_shared_partenaires', updated);
+      return updated;
+    });
+    savePartenaireToSupabase(updatedPart);
     showToast(`Partenaire "${updatedPart.nom}" mis à jour.`);
   };
 
   const handleDeletePartenaire = (partenaireId: string) => {
-    setPartenaires((prev) => prev.filter((p) => p.id !== partenaireId));
+    setPartenaires((prev) => {
+      const updated = prev.filter((p) => p.id !== partenaireId);
+      saveSharedStorage('gp_shared_partenaires', updated);
+      return updated;
+    });
     showToast('Partenaire supprimé.');
   };
 
   // CRUD Fournisseurs
   const handleAddFournisseur = (newFourn: Fournisseur) => {
-    setFournisseurs((prev) => [newFourn, ...prev]);
-    showToast(`Fournisseur "${newFourn.nom}" ajouté avec succès.`);
+    setFournisseurs((prev) => {
+      const updated = [newFourn, ...prev];
+      saveSharedStorage('gp_shared_fournisseurs', updated);
+      return updated;
+    });
+    saveFournisseurToSupabase(newFourn);
+    showToast(`Fournisseur "${newFourn.nom}" enregistré avec succès.`);
   };
 
   const handleUpdateFournisseur = (updatedFourn: Fournisseur) => {
-    setFournisseurs((prev) => prev.map((f) => (f.id === updatedFourn.id ? updatedFourn : f)));
+    setFournisseurs((prev) => {
+      const updated = prev.map((f) => (f.id === updatedFourn.id ? updatedFourn : f));
+      saveSharedStorage('gp_shared_fournisseurs', updated);
+      return updated;
+    });
+    saveFournisseurToSupabase(updatedFourn);
     showToast(`Fournisseur "${updatedFourn.nom}" mis à jour.`);
   };
 
   const handleDeleteFournisseur = (fournisseurId: string) => {
-    setFournisseurs((prev) => prev.filter((f) => f.id !== fournisseurId));
-    showToast('Fournisseur supprimé.');
+    setFournisseurs((prev) => {
+      const updated = prev.filter((f) => f.id !== fournisseurId);
+      saveSharedStorage('gp_shared_fournisseurs', updated);
+      return updated;
+    });
+    deleteFournisseurFromSupabase(fournisseurId);
+    showToast('Fournisseur supprimé avec succès.');
   };
 
   // Commandes Fournisseurs Handlers
   const handleCreateCommandeFournisseur = (newCmd: BonCommandeFournisseur) => {
-    setCommandesFournisseurs((prev) => [newCmd, ...prev]);
-    const fourn = fournisseurs.find((f) => f.id === newCmd.fournisseurId);
-    showToast(`Bon de Commande ${newCmd.numeroBC} créé avec succès (${formatDH(newCmd.totalTTC)} TTC).`);
+    setCommandesFournisseurs((prev) => {
+      const updated = [newCmd, ...prev];
+      saveSharedStorage('gp_shared_commandes', updated);
+      return updated;
+    });
+    saveCommandeFournisseurToSupabase(newCmd);
+    showToast(`Bon de Commande ${newCmd.numeroBC} enregistré avec succès (${formatDH(newCmd.totalTTC)} TTC).`);
   };
 
   const handleUpdateCommandeFournisseur = (updatedCmd: BonCommandeFournisseur) => {
-    setCommandesFournisseurs((prev) =>
-      prev.map((c) => (c.id === updatedCmd.id ? updatedCmd : c))
-    );
+    setCommandesFournisseurs((prev) => {
+      const updated = prev.map((c) => (c.id === updatedCmd.id ? updatedCmd : c));
+      saveSharedStorage('gp_shared_commandes', updated);
+      return updated;
+    });
+    saveCommandeFournisseurToSupabase(updatedCmd);
     showToast(`Commande ${updatedCmd.numeroBC} mise à jour avec succès.`);
   };
 
@@ -476,27 +605,43 @@ export default function Home() {
   // DEVIS CLIENTS HANDLERS
   // ----------------------------------------------------
   const handleSaveDevis = (devis: DevisClient) => {
-    const exists = devisList.some((d) => d.id === devis.id);
-    if (exists) {
-      setDevisList((prev) => prev.map((d) => (d.id === devis.id ? devis : d)));
-      showToast(`Devis ${devis.numeroDevis} mis à jour avec succès.`);
-    } else {
-      setDevisList((prev) => [devis, ...prev]);
-      showToast(`Devis ${devis.numeroDevis} créé avec succès (${formatDH(devis.totalTTC)} TTC).`);
-    }
+    setDevisList((prev) => {
+      const exists = prev.some((d) => d.id === devis.id);
+      const updated = exists
+        ? prev.map((d) => (d.id === devis.id ? devis : d))
+        : [devis, ...prev];
+      saveSharedStorage('gp_shared_devis', updated);
+      return updated;
+    });
+    saveDevisToSupabase(devis);
+    showToast(`Devis ${devis.numeroDevis} enregistré avec succès (${formatDH(devis.totalTTC)} TTC).`);
     setShowNewDevisModal(false);
     setEditingDevis(null);
   };
 
   const handleUpdateStatutDevis = (devisId: string, newStatut: StatutDevis) => {
-    setDevisList((prev) =>
-      prev.map((d) => (d.id === devisId ? { ...d, statut: newStatut } : d))
-    );
+    setDevisList((prev) => {
+      const updated = prev.map((d) => {
+        if (d.id === devisId) {
+          const u = { ...d, statut: newStatut };
+          saveDevisToSupabase(u);
+          return u;
+        }
+        return d;
+      });
+      saveSharedStorage('gp_shared_devis', updated);
+      return updated;
+    });
     showToast(`Statut du devis mis à jour : ${newStatut}`);
   };
 
   const handleDeleteDevis = (devisId: string) => {
-    setDevisList((prev) => prev.filter((d) => d.id !== devisId));
+    setDevisList((prev) => {
+      const updated = prev.filter((d) => d.id !== devisId);
+      saveSharedStorage('gp_shared_devis', updated);
+      return updated;
+    });
+    deleteDevisFromSupabase(devisId);
     showToast('Devis supprimé avec succès.');
   };
 
@@ -690,16 +835,18 @@ export default function Home() {
   };
 
   const handleUpdateStatutDossier = (dossierId: string, newStatut: StatutDossier) => {
-    setDossiers((prev) =>
-      prev.map((d) => {
+    setDossiers((prev) => {
+      const updated = prev.map((d) => {
         if (d.id === dossierId) {
-          const updated = { ...d, statut: newStatut };
-          saveDossierToSupabase(updated);
-          return updated;
+          const u = { ...d, statut: newStatut };
+          saveDossierToSupabase(u);
+          return u;
         }
         return d;
-      })
-    );
+      });
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
     showToast('Statut du dossier mis à jour.');
   };
 
@@ -707,10 +854,10 @@ export default function Home() {
   // GESTION ARCHIVES / CORBEILLE & SÉCURITÉ 30 JOURS
   // ----------------------------------------------------
   const handleArchiveDossier = (dossierId: string, motif?: string) => {
-    setDossiers((prev) =>
-      prev.map((d) => {
+    setDossiers((prev) => {
+      const updated = prev.map((d) => {
         if (d.id === dossierId) {
-          const updated: DossierSinistre = {
+          const u: DossierSinistre = {
             ...d,
             isArchive: true,
             dateArchivage: new Date().toISOString(),
@@ -718,36 +865,44 @@ export default function Home() {
             statut: 'ARCHIVE',
             motifArchivage: motif || 'Dossier archivé',
           };
-          saveDossierToSupabase(updated);
-          return updated;
+          saveDossierToSupabase(u);
+          return u;
         }
         return d;
-      })
-    );
+      });
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
     showToast('Dossier placé en archive sécurisée (conservé 30 jours avant suppression automatique).');
   };
 
   const handleRestoreDossier = (dossierId: string) => {
-    setDossiers((prev) =>
-      prev.map((d) => {
+    setDossiers((prev) => {
+      const updated = prev.map((d) => {
         if (d.id === dossierId) {
-          const updated: DossierSinistre = {
+          const u: DossierSinistre = {
             ...d,
             isArchive: false,
             dateArchivage: undefined,
             statut: d.statutPrecedent || 'NOUVEAU',
           };
-          saveDossierToSupabase(updated);
-          return updated;
+          saveDossierToSupabase(u);
+          return u;
         }
         return d;
-      })
-    );
+      });
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
     showToast('Dossier restauré avec succès dans les dossiers actifs.');
   };
 
   const handleDeleteDossierPermanent = async (dossierId: string) => {
-    setDossiers((prev) => prev.filter((d) => d.id !== dossierId));
+    setDossiers((prev) => {
+      const updated = prev.filter((d) => d.id !== dossierId);
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
     await deleteDossierFromSupabase(dossierId);
     showToast('Dossier supprimé définitivement de la base de données.');
   };
