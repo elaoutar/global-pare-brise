@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArticleStock, BonSortie, TypeArticle, DossierSinistre } from '@/types';
+import { ArticleStock, BonSortie, BonLivraison, TypeArticle, DossierSinistre } from '@/types';
 import { formatDH, formatDate } from '@/lib/utils';
 import { 
   Package, 
@@ -18,29 +18,38 @@ import {
   X,
   Check,
   AlertCircle,
-  MapPin
+  MapPin,
+  Truck
 } from 'lucide-react';
 
 interface Props {
   stock: ArticleStock[];
   bonsSortie: BonSortie[];
+  bonsLivraison?: BonLivraison[];
   dossiers: DossierSinistre[];
   onAddStock: (article: ArticleStock) => void;
   onUpdateStock: (article: ArticleStock) => void;
   onDeleteStock: (articleId: string) => void;
   onOpenBonSortie: (bonSortie: BonSortie, dossier: DossierSinistre) => void;
+  onOpenBonLivraison?: (bonLivraison: BonLivraison, dossier?: DossierSinistre) => void;
+  onOpenNewBonLivraison?: () => void;
+  onDeleteBonLivraison?: (blId: string) => void;
 }
 
 export const StockView: React.FC<Props> = ({
   stock,
   bonsSortie,
+  bonsLivraison = [],
   dossiers,
   onAddStock,
   onUpdateStock,
   onDeleteStock,
   onOpenBonSortie,
+  onOpenBonLivraison,
+  onOpenNewBonLivraison,
+  onDeleteBonLivraison,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'STOCK' | 'BONS_SORTIE'>('STOCK');
+  const [activeSubTab, setActiveSubTab] = useState<'STOCK' | 'BONS_SORTIE' | 'BONS_LIVRAISON'>('STOCK');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
 
@@ -152,12 +161,12 @@ export const StockView: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* Sub tabs: Stock vs Bons de sortie */}
+      {/* Sub tabs: Stock vs Bons de sortie vs Bons de livraison */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex bg-slate-200/70 p-1 rounded-xl text-xs font-semibold">
+        <div className="flex flex-wrap bg-slate-200/70 p-1 rounded-xl text-xs font-semibold gap-1">
           <button
             onClick={() => setActiveSubTab('STOCK')}
-            className={`flex items-center gap-2 py-2 px-4 rounded-lg transition-all ${
+            className={`flex items-center gap-2 py-2 px-3 sm:px-4 rounded-lg transition-all ${
               activeSubTab === 'STOCK' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -166,12 +175,21 @@ export const StockView: React.FC<Props> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('BONS_SORTIE')}
-            className={`flex items-center gap-2 py-2 px-4 rounded-lg transition-all ${
+            className={`flex items-center gap-2 py-2 px-3 sm:px-4 rounded-lg transition-all ${
               activeSubTab === 'BONS_SORTIE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <PackageMinus className="w-4 h-4 text-amber-600" />
             Bons de Sortie Atelier ({bonsSortie.length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('BONS_LIVRAISON')}
+            className={`flex items-center gap-2 py-2 px-3 sm:px-4 rounded-lg transition-all ${
+              activeSubTab === 'BONS_LIVRAISON' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Truck className="w-4 h-4 text-indigo-600" />
+            Bons de Livraison ({bonsLivraison.length})
           </button>
         </div>
 
@@ -182,6 +200,16 @@ export const StockView: React.FC<Props> = ({
           >
             <Plus className="w-4 h-4" />
             Nouvel Article / Vitrage
+          </button>
+        )}
+
+        {activeSubTab === 'BONS_LIVRAISON' && onOpenNewBonLivraison && (
+          <button
+            onClick={onOpenNewBonLivraison}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            Nouveau Bon de Livraison (Multi-vitrages)
           </button>
         )}
       </div>
@@ -370,7 +398,7 @@ export const StockView: React.FC<Props> = ({
                       <span className="text-xs text-slate-500">• Délivré le {formatDate(bs.dateSortie)}</span>
                     </div>
                     <p className="text-xs text-slate-700 font-medium">
-                      Affecté au dossier : <strong>{matchedDossier.numeroDossier}</strong> ({matchedDossier.vehicule.marque} {matchedDossier.vehicule.modele} - {matchedDossier.vehicule.immatriculation})
+                      Affecté au dossier : <strong>{matchedDossier?.numeroDossier || 'Non lié'}</strong> ({matchedDossier?.vehicule?.marque} {matchedDossier?.vehicule?.modele} - {matchedDossier?.vehicule?.immatriculation})
                     </p>
                     <p className="text-[11px] text-slate-500">Poseur : {bs.poseur}</p>
                   </div>
@@ -392,6 +420,126 @@ export const StockView: React.FC<Props> = ({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* VIEW 3 : BONS DE LIVRAISON */}
+      {activeSubTab === 'BONS_LIVRAISON' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800">
+                Historique des Bons de Livraison Clients & Partenaires
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Bons de livraison avec ou sans véhicule spécifique (livraisons multi-vitrages / sorties clients).
+              </p>
+            </div>
+            {onOpenNewBonLivraison && (
+              <button
+                onClick={onOpenNewBonLivraison}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" /> Créer un Bon de Livraison
+              </button>
+            )}
+          </div>
+
+          {bonsLivraison.length === 0 ? (
+            <div className="p-12 text-center text-slate-400">
+              <Truck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+              <p className="text-sm font-medium text-slate-600">Aucun bon de livraison enregistré pour le moment.</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Cliquez sur "Créer un Bon de Livraison" pour en générer un pour un client (multi-vitrages ou unitaire).
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {bonsLivraison.map((bl) => {
+                const matchedDossier = dossiers.find((d) => d.id === bl.dossierId);
+                const clientName = bl.clientNom || matchedDossier?.client?.nom || 'Client non spécifié';
+                const totalTTC = bl.totalTTC || bl.lignes.reduce((sum, l) => sum + ((l.prixUnitaireTTC || 0) * l.quantite), 0);
+                const totalPieces = bl.lignes.reduce((sum, l) => sum + l.quantite, 0);
+
+                return (
+                  <div key={bl.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/80 transition-colors">
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono font-bold text-sm text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200">
+                          {bl.numeroBL}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          • Délivré le {formatDate(bl.dateLivraison)}
+                        </span>
+                        {bl.isMultiVehicules ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">
+                            Multi-Véhicules / En Gros
+                          </span>
+                        ) : matchedDossier?.vehicule?.immatriculation || bl.immatriculation ? (
+                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                            Matr : {bl.immatriculation || matchedDossier?.vehicule?.immatriculation}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                        <span className="text-slate-800 font-bold">
+                          Client : <span className="text-indigo-950">{clientName}</span>
+                          {bl.clientTelephone && <span className="text-slate-500 font-normal"> ({bl.clientTelephone})</span>}
+                        </span>
+                        {bl.clientVille && (
+                          <span className="text-slate-500 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-slate-400" /> {bl.clientVille}
+                          </span>
+                        )}
+                        <span className="text-slate-500">
+                          Livreur / Responsable : <strong className="text-slate-700">{bl.livreurPoseur || 'Global Pare-Brise'}</strong>
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 flex flex-wrap gap-1 items-center">
+                        <span className="font-semibold text-slate-700">{totalPieces} pièce(s) :</span>
+                        {bl.lignes.map((l, idx) => (
+                          <span key={idx} className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                            {l.quantite}x {l.designation}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 self-end sm:self-center">
+                      <div className="text-right">
+                        <div className="font-extrabold text-sm text-slate-900">{formatDH(totalTTC)}</div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Total TTC</div>
+                      </div>
+
+                      <button
+                        onClick={() => onOpenBonLivraison?.(bl, matchedDossier)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 rounded-lg text-xs font-semibold transition-colors border border-indigo-200 shadow-sm"
+                        title="Voir / Imprimer le Bon de Livraison"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Voir / Imprimer
+                      </button>
+
+                      {onDeleteBonLivraison && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Êtes-vous sûr de vouloir supprimer le bon de livraison ${bl.numeroBL} ?`)) {
+                              onDeleteBonLivraison(bl.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors border border-transparent hover:border-rose-100"
+                          title="Supprimer ce bon de livraison"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

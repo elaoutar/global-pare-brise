@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { BonLivraison, DossierSinistre, Facture } from '@/types';
 import { GARAGE_INFO } from '@/lib/data';
 import { formatDate, formatDH } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
-import { FileText, Save, Check } from 'lucide-react';
+import { FileText, Save, Check, Truck, Layers } from 'lucide-react';
 import { DocumentActionBar } from './DocumentActionBar';
 
 interface Props {
   bonLivraison: BonLivraison;
-  dossier: DossierSinistre;
+  dossier?: DossierSinistre;
   facture?: Facture;
   onClose: () => void;
   onUpdateObservations?: (newObservations: string) => void;
@@ -25,11 +25,41 @@ export const BonLivraisonModal: React.FC<Props> = ({
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
 
+  // Fermeture par touche Echap
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Mode multi-véhicules / sans matricule unique
+  const [hideVehicleInfo, setHideVehicleInfo] = useState<boolean>(() => {
+    return Boolean(
+      bonLivraison.isMultiVehicules ||
+      (!dossier?.vehicule?.immatriculation && !bonLivraison.immatriculation)
+    );
+  });
+
+  // Identité du client / réceptionnaire
+  const clientNom = bonLivraison.receptionnaireNom || bonLivraison.clientNom || dossier?.client.nom || 'Client';
+  const clientTel = bonLivraison.clientTelephone || dossier?.client.telephone || '';
+  const clientCin = bonLivraison.receptionnaireCin || bonLivraison.clientCin || dossier?.client.cin || '';
+  const clientVille = bonLivraison.clientVille || dossier?.client.ville || 'Marrakech';
+
+  // Infos véhicule (si présent)
+  const vehiculeMarque = dossier?.vehicule?.marque || bonLivraison.vehiculeInfo || '';
+  const vehiculeModele = dossier?.vehicule?.modele || '';
+  const vehiculeAnnee = dossier?.vehicule?.annee;
+  const vehiculeImmatriculation = dossier?.vehicule?.immatriculation || bonLivraison.immatriculation || '';
+
   // État observation éditable
-  const [observations, setObservations] = useState(
-    bonLivraison.observations ||
-      `Véhicule ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation}) remis en parfait état de conformité.`
-  );
+  const defaultObs = (hideVehicleInfo || !vehiculeImmatriculation)
+    ? 'Fournitures et vitrages livrés en parfait état de conformité.'
+    : `Véhicule ${vehiculeMarque} ${vehiculeModele} (${vehiculeImmatriculation}) remis en parfait état de conformité.`;
+
+  const [observations, setObservations] = useState(bonLivraison.observations || defaultObs);
   const [hasSavedObs, setHasSavedObs] = useState(false);
 
   const handleSaveObs = () => {
@@ -38,28 +68,14 @@ export const BonLivraisonModal: React.FC<Props> = ({
     setTimeout(() => setHasSavedObs(false), 2500);
   };
 
-  // Récupérer toutes les prestations réalisées avec leurs prix en TTC
+  // Récupérer toutes les prestations et vitrages livrés avec leurs prix en TTC
   const prestationsLignes = useMemo(() => {
-    // 1. Si la facture liée existe avec ses prestations complètes
-    if (facture && facture.lignes && facture.lignes.length > 0) {
-      return facture.lignes.map((l) => ({
-        designation: l.designation,
-        codeEurocode: l.codeEurocode || '-',
-        quantite: l.quantite || 1,
-        prixUnitaireTTC: +(l.prixUnitaireHT * 1.20).toFixed(2),
-        totalTTC: +(l.totalHT * 1.20).toFixed(2),
-      }));
-    }
-
-    // 2. Si le bon de livraison a déjà des lignes avec prix
-    const hasPrices = bonLivraison.lignes.some(
-      (l) => (l.totalTTC && l.totalTTC > 0) || (l.prixUnitaireTTC && l.prixUnitaireTTC > 0)
-    );
-    if (hasPrices) {
+    // 1. Si le bon de livraison a déjà ses lignes enregistrées
+    if (bonLivraison.lignes && bonLivraison.lignes.length > 0) {
       return bonLivraison.lignes.map((l) => {
         const qte = l.quantite || 1;
-        const puTTC = l.prixUnitaireTTC || (l.totalTTC ? +(l.totalTTC / qte).toFixed(2) : 0);
-        const totTTC = l.totalTTC || +(puTTC * qte).toFixed(2);
+        const puTTC = Number(l.prixUnitaireTTC) || (l.totalTTC ? +(Number(l.totalTTC) / qte).toFixed(2) : (l.prixUnitaireHT ? +(Number(l.prixUnitaireHT) * 1.20).toFixed(2) : 0));
+        const totTTC = Number(l.totalTTC) || +(puTTC * qte).toFixed(2);
         return {
           designation: l.designation,
           codeEurocode: l.codeEurocode || '-',
@@ -70,56 +86,90 @@ export const BonLivraisonModal: React.FC<Props> = ({
       });
     }
 
-    // 3. Reconstitution des prestations depuis le dossier
-    const totalDossierTTC = dossier.montantTotalTTC || 1100;
-    const colleTTC = 180;
-    const moTTC = 120;
-    const vitrageTTC = Math.max(0, +(totalDossierTTC - colleTTC - moTTC).toFixed(2));
+    // 2. Si la facture liée existe avec ses prestations complètes
+    if (facture && facture.lignes && facture.lignes.length > 0) {
+      return facture.lignes.map((l) => ({
+        designation: l.designation,
+        codeEurocode: l.codeEurocode || '-',
+        quantite: l.quantite || 1,
+        prixUnitaireTTC: +(l.prixUnitaireHT * 1.20).toFixed(2),
+        totalTTC: +(l.totalHT * 1.20).toFixed(2),
+      }));
+    }
 
-    return [
-      {
-        designation: `Vitrage ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`,
-        codeEurocode: bonLivraison.lignes[0]?.codeEurocode || `PB-${dossier.vehicule.marque.slice(0, 3).toUpperCase()}`,
-        quantite: 1,
-        prixUnitaireTTC: vitrageTTC,
-        totalTTC: vitrageTTC,
-      },
-      {
-        designation: 'Kit colle polyuréthane & primaire d\'adhérence haute résistance',
-        codeEurocode: 'COLLE-PU',
-        quantite: 1,
-        prixUnitaireTTC: colleTTC,
-        totalTTC: colleTTC,
-      },
-      {
-        designation: 'Main d\'œuvre spécialisée pose & dépose vitrage',
-        codeEurocode: 'MO-POSE',
-        quantite: 1,
-        prixUnitaireTTC: moTTC,
-        totalTTC: moTTC,
-      },
-    ];
+    // 3. Reconstitution des prestations depuis le dossier
+    if (dossier) {
+      const totalDossierTTC = dossier.montantTotalTTC || 1100;
+      const colleTTC = 180;
+      const moTTC = 120;
+      const vitrageTTC = Math.max(0, +(totalDossierTTC - colleTTC - moTTC).toFixed(2));
+
+      return [
+        {
+          designation: `Vitrage ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`,
+          codeEurocode: bonLivraison.lignes[0]?.codeEurocode || `PB-${dossier.vehicule.marque.slice(0, 3).toUpperCase()}`,
+          quantite: 1,
+          prixUnitaireTTC: vitrageTTC,
+          totalTTC: vitrageTTC,
+        },
+        {
+          designation: 'Kit colle polyuréthane & primaire d\'adhérence haute résistance',
+          codeEurocode: 'COLLE-PU',
+          quantite: 1,
+          prixUnitaireTTC: colleTTC,
+          totalTTC: colleTTC,
+        },
+        {
+          designation: 'Main d\'œuvre spécialisée pose & dépose vitrage',
+          codeEurocode: 'MO-POSE',
+          quantite: 1,
+          prixUnitaireTTC: moTTC,
+          totalTTC: moTTC,
+        },
+      ];
+    }
+
+    return [];
   }, [bonLivraison, facture, dossier]);
 
-  // Total dans le BL en TTC : inclut SEULEMENT les prestations faites
-  const totalPrestationsTTC = useMemo(() => {
-    return +(prestationsLignes.reduce((sum, l) => sum + (l.totalTTC || 0), 0)).toFixed(2);
+  // Total pièces
+  const totalQuantiteArticles = useMemo(() => {
+    return prestationsLignes.reduce((sum, l) => sum + (l.quantite || 1), 0);
   }, [prestationsLignes]);
 
-  // Décompte Assurance / AZUR GLASS
-  const isAssurance = dossier.typeDossier === 'ASSURANCE';
-  const franchiseMontant = dossier.montantFranchise || 0;
-  const franchiseOfferte = dossier.franchiseOfferte;
+  // Total dans le BL en TTC
+  const totalPrestationsTTC = useMemo(() => {
+    if (bonLivraison.totalTTC && bonLivraison.totalTTC > 0) return Number(bonLivraison.totalTTC);
+    return +(prestationsLignes.reduce((sum, l) => sum + (l.totalTTC || 0), 0)).toFixed(2);
+  }, [prestationsLignes, bonLivraison]);
+
+  // Décompte Assurance / AZUR GLASS (si dossier assurance)
+  const isAssurance = dossier?.typeDossier === 'ASSURANCE';
+  const franchiseMontant = dossier?.montantFranchise || 0;
+  const franchiseOfferte = Boolean(dossier?.franchiseOfferte);
   const effectiveFranchise = franchiseOfferte ? 0 : franchiseMontant;
-  const effectiveTvaExclue = Number(dossier.tvaExclueParAssurance) || 0;
+  const effectiveTvaExclue = Number(dossier?.tvaExclueParAssurance) || 0;
   const netPriseEnCharge = isAssurance
     ? Math.max(0, +(totalPrestationsTTC - effectiveFranchise - effectiveTvaExclue).toFixed(2))
     : totalPrestationsTTC;
 
-  const shareMsg = `Bonjour ${dossier.client.nom}, voici votre Bon de Livraison N° ${bonLivraison.numeroBL} d'un montant de ${formatDH(totalPrestationsTTC)} attestant de la pose et réception conforme du vitrage sur votre véhicule ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation}) chez GLOBAL PARE-BRISE.`;
+  const isMulti = hideVehicleInfo || !vehiculeImmatriculation;
+
+  const docSubtitle = isMulti
+    ? `Client : ${clientNom} • Livraison Multi-Vitrages (${totalQuantiteArticles} article${totalQuantiteArticles > 1 ? 's' : ''}) • Total : ${formatDH(totalPrestationsTTC)} TTC`
+    : `Client : ${clientNom} • Véhicule : ${vehiculeMarque} ${vehiculeModele} (${vehiculeImmatriculation})`;
+
+  const shareMsg = isMulti
+    ? `Bonjour ${clientNom}, voici votre Bon de Livraison N° ${bonLivraison.numeroBL} d'un montant de ${formatDH(totalPrestationsTTC)} TTC attestant de la livraison conforme de ${totalQuantiteArticles} vitrage(s) chez GLOBAL PARE-BRISE.`
+    : `Bonjour ${clientNom}, voici votre Bon de Livraison N° ${bonLivraison.numeroBL} d'un montant de ${formatDH(totalPrestationsTTC)} attestant de la pose et réception conforme du vitrage sur votre véhicule ${vehiculeMarque} ${vehiculeModele} (${vehiculeImmatriculation}) chez GLOBAL PARE-BRISE.`;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in duration-200">
         
         {/* Action Bar */}
@@ -127,45 +177,59 @@ export const BonLivraisonModal: React.FC<Props> = ({
           documentRef={printRef}
           filename={`BON-LIVRAISON-${bonLivraison.numeroBL}`}
           documentTitle={`Bon de Livraison #${bonLivraison.numeroBL}`}
-          subtitle={`Client : ${dossier.client.nom} • Véhicule : ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation})`}
-          clientPhone={dossier.client.telephone}
+          subtitle={docSubtitle}
+          clientPhone={clientTel}
           shareMessage={shareMsg}
-          badgeText="Livraison avec Prix"
+          badgeText={isMulti ? "Multi-Vitrages" : "Livraison avec Prix"}
           badgeColor="bg-indigo-600"
           onClose={onClose}
         />
 
-        {/* Barre d'édition d'observations (visible à l'écran uniquement) */}
-        <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 no-print">
+        {/* Barre d'édition d'observations & options (visible à l'écran uniquement) */}
+        <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 no-print">
           <div className="flex-1 flex items-center gap-2">
             <FileText className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-            <span className="text-xs font-bold text-slate-800 whitespace-nowrap">Observation BL :</span>
+            <span className="text-xs font-bold text-slate-800 whitespace-nowrap">Observation :</span>
             <input
               type="text"
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
               onBlur={handleSaveObs}
-              placeholder="Ajouter une observation ou mention particulière sur le bon de livraison..."
+              placeholder="Ajouter une observation ou mention particulière..."
               className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
+            <button
+              type="button"
+              onClick={handleSaveObs}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow-xs whitespace-nowrap"
+            >
+              {hasSavedObs ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Enregistré !</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Enregistrer</span>
+                </>
+              )}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleSaveObs}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow-xs whitespace-nowrap"
-          >
-            {hasSavedObs ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                <span>Enregistré !</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-3.5 h-3.5" />
-                <span>Enregistrer</span>
-              </>
-            )}
-          </button>
+
+          {/* Toggle Multi-véhicules */}
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-300 cursor-pointer hover:bg-slate-50 transition whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={hideVehicleInfo}
+              onChange={(e) => setHideVehicleInfo(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            />
+            <span className="flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-indigo-600" />
+              Livraison Multi-Vitrages (Sans matricule)
+            </span>
+          </label>
         </div>
 
         {/* Printable Delivery Note Area (Strict A4) */}
@@ -197,51 +261,82 @@ export const BonLivraisonModal: React.FC<Props> = ({
                 <p className="text-xs text-slate-600">
                   Date : <span className="font-bold text-slate-900">{formatDate(bonLivraison.dateLivraison)}</span>
                 </p>
+                {dossier?.numeroDossier ? (
+                  <p className="text-xs text-slate-600">
+                    Dossier Réf : <span className="font-mono font-semibold">{dossier.numeroDossier}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-indigo-700 font-semibold">
+                    Type : <span>Livraison Directe / Client</span>
+                  </p>
+                )}
                 <p className="text-xs text-slate-600">
-                  Dossier Réf : <span className="font-mono font-semibold">{dossier.numeroDossier}</span>
-                </p>
-                <p className="text-xs text-slate-600">
-                  Régime : <strong>{isAssurance ? (dossier.assurance?.nom || 'Assurance via AZUR GLASS') : 'Client Direct (Comptant)'}</strong>
+                  Régime : <strong>{isAssurance ? (dossier?.assurance?.nom || 'Assurance via AZUR GLASS') : 'Client Direct (Comptant)'}</strong>
                 </p>
               </div>
             </div>
 
-            {/* Client & Vehicle Blocks */}
+            {/* Client & Vehicle / Delivery Blocks */}
             <div className="grid grid-cols-2 gap-6 my-6">
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Client / Réceptionnaire
+              {/* Client Box */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 text-xs">
+                <p className="font-bold text-[10px] text-slate-400 uppercase tracking-wider mb-2">
+                  Client / Destinataire
                 </p>
-                <p className="text-base font-bold text-slate-900">{bonLivraison.receptionnaireNom}</p>
-                <p className="text-xs text-slate-600 mt-1">
-                  CIN / Identifiant : <span className="font-mono font-semibold">{bonLivraison.receptionnaireCin || dossier.client.cin || 'N/A'}</span>
+                <p className="text-sm font-bold text-slate-900">{clientNom}</p>
+                <p className="text-slate-600 mt-1">
+                  CIN / ICE : <span className="font-mono font-semibold text-slate-800">{clientCin || 'N/A'}</span>
                 </p>
-                <p className="text-xs text-slate-600">Téléphone : {dossier.client.telephone}</p>
-                <p className="text-xs text-slate-600">Ville : {dossier.client.ville}</p>
+                <p className="text-slate-600 mt-0.5">Téléphone : <strong>{clientTel || '-'}</strong></p>
+                <p className="text-slate-600 mt-0.5">Ville : <strong>{clientVille}</strong></p>
+                {bonLivraison.clientAdresse && (
+                  <p className="text-slate-600 mt-0.5 text-[11px]">Adresse : {bonLivraison.clientAdresse}</p>
+                )}
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Véhicule & Travaux Réalisés
-                </p>
-                <p className="font-bold text-slate-900 text-sm">
-                  {dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})
-                </p>
-                <div className="mt-2 inline-flex items-center gap-2 bg-white px-2.5 py-1 rounded-md border border-slate-300 text-xs">
-                  <span className="font-medium text-slate-500">Matricule :</span>
-                  <span className="font-mono font-black text-slate-900" dir="ltr">
-                    {formatMatricule(dossier.vehicule.immatriculation, 'LATIN')}
-                  </span>
-                </div>
-                {isAssurance && (
-                  <p className="text-xs text-slate-600 mt-2 font-mono">
-                    N° Sinistre : <strong>{dossier.numeroSinistre || '-'}</strong>
+              {/* Right Box : IF multi-véhicules -> Affiche Détails de Livraison sans aucun véhicule ni matricule */}
+              {hideVehicleInfo || !vehiculeImmatriculation ? (
+                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 text-xs">
+                  <p className="font-bold text-[10px] text-indigo-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-indigo-600" /> Détails de la Livraison
                   </p>
-                )}
-                <p className="text-xs text-slate-600">
-                  Technicien Poseur : <strong>{bonLivraison.livreurPoseur}</strong>
-                </p>
-              </div>
+                  <p className="font-bold text-slate-900 text-sm">
+                    Livraison Multi-Vitrages & Pare-brise
+                  </p>
+                  <p className="text-slate-600 mt-1.5">
+                    Articles livrés : <strong className="font-bold text-indigo-950 font-mono text-sm">{totalQuantiteArticles}</strong> pièce(s)
+                  </p>
+                  <p className="text-slate-600 mt-0.5">
+                    Date livraison : <strong>{formatDate(bonLivraison.dateLivraison)}</strong>
+                  </p>
+                  <p className="text-slate-600 mt-0.5">
+                    Livreur / Technicien : <strong>{bonLivraison.livreurPoseur || 'Équipe Atelier'}</strong>
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 text-xs">
+                  <p className="font-bold text-[10px] text-slate-400 uppercase tracking-wider mb-2">
+                    Véhicule & Travaux Réalisés
+                  </p>
+                  <p className="font-bold text-slate-900 text-sm">
+                    {vehiculeMarque} {vehiculeModele} {vehiculeAnnee ? `(${vehiculeAnnee})` : ''}
+                  </p>
+                  <div className="mt-2 inline-flex items-center gap-2 bg-white px-2.5 py-1 rounded-md border border-slate-300 text-xs">
+                    <span className="font-medium text-slate-500">Matricule :</span>
+                    <span className="font-mono font-black text-slate-900" dir="ltr">
+                      {formatMatricule(vehiculeImmatriculation, 'LATIN')}
+                    </span>
+                  </div>
+                  {isAssurance && (
+                    <p className="text-slate-600 mt-2 font-mono text-[11px]">
+                      N° Sinistre : <strong>{dossier?.numeroSinistre || '-'}</strong>
+                    </p>
+                  )}
+                  <p className="text-slate-600 mt-1">
+                    Technicien Poseur : <strong>{bonLivraison.livreurPoseur}</strong>
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Table of items & prestations with prices */}
@@ -360,6 +455,19 @@ export const BonLivraisonModal: React.FC<Props> = ({
             </div>
 
           </div>
+        </div>
+
+        {/* Modal Bottom Footer (Visible on screen only) */}
+        <div className="no-print p-3 sm:px-6 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs">
+          <span className="text-slate-500 font-medium">
+            Appuyez sur <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] shadow-2xs">Échap</kbd> ou cliquez en dehors pour fermer
+          </span>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs transition active:scale-95"
+          >
+            Fermer le document
+          </button>
         </div>
       </div>
     </div>

@@ -216,6 +216,7 @@ export interface DocumentAttache {
 }
 
 export interface BonLivraisonLigne {
+  articleId?: string;
   designation: string;
   codeEurocode?: string;
   quantite: number;
@@ -228,7 +229,15 @@ export interface BonLivraisonLigne {
 export interface BonLivraison {
   id: string;
   numeroBL: string; // Ex: BL-2026-0042
-  dossierId: string;
+  dossierId?: string; // Optionnel si BL direct / multi-vitrages sans dossier unique
+  clientNom?: string; // Nom du client ou société
+  clientTelephone?: string;
+  clientCin?: string;
+  clientVille?: string;
+  clientAdresse?: string;
+  isMultiVehicules?: boolean; // Vrai si livraison multi-vitrages / sans véhicule ou matricule unique
+  vehiculeInfo?: string; // Ex: "Multi-Vitrages / Flotte" ou "Dacia Logan"
+  immatriculation?: string; // Optionnel
   dateLivraison: string;
   livreurPoseur: string;
   receptionnaireNom: string;
@@ -239,6 +248,7 @@ export interface BonLivraison {
   montantFranchise?: number;
   tvaExclue?: number;
   observations?: string;
+  created_at?: string;
 }
 
 export type ModePaiement = 'CHEQUE' | 'ESPECES' | 'VIREMENT' | 'EFFET';

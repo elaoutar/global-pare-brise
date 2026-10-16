@@ -45,9 +45,12 @@ import {
   fetchFournisseursFromSupabase,
   fetchCommandesFournisseursFromSupabase,
   fetchPartenairesFromSupabase,
+  fetchBonsLivraisonFromSupabase,
   saveDossierToSupabase,
   saveStockArticleToSupabase,
   saveFactureToSupabase,
+  saveBonLivraisonToSupabase,
+  deleteBonLivraisonFromSupabase,
   saveDevisToSupabase,
   deleteDevisFromSupabase,
   deleteDossierFromSupabase,
@@ -77,6 +80,7 @@ import { QuittanceModal } from '@/components/documents/QuittanceModal';
 import { FactureModal } from '@/components/documents/FactureModal';
 import { BonSortieModal } from '@/components/documents/BonSortieModal';
 import { BonLivraisonModal } from '@/components/documents/BonLivraisonModal';
+import { NewBonLivraisonModal } from '@/components/documents/NewBonLivraisonModal';
 import { EncaisserPaiementModal } from '@/components/modals/EncaisserPaiementModal';
 import { BonCommandeFournisseurModal } from '@/components/documents/BonCommandeFournisseurModal';
 import { DevisClientModal } from '@/components/documents/DevisClientModal';
@@ -139,7 +143,8 @@ export default function Home() {
   const [activeDeclarationBrisGlaceDossier, setActiveDeclarationBrisGlaceDossier] = useState<DossierSinistre | null>(null);
   const [activeFactureModal, setActiveFactureModal] = useState<{ facture: Facture; dossier: DossierSinistre } | null>(null);
   const [activeBonSortieModal, setActiveBonSortieModal] = useState<{ bonSortie: BonSortie; dossier: DossierSinistre } | null>(null);
-  const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier: DossierSinistre; facture?: Facture } | null>(null);
+  const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier?: DossierSinistre; facture?: Facture } | null>(null);
+  const [showNewBonLivraisonModal, setShowNewBonLivraisonModal] = useState(false);
   const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier: DossierSinistre; facture?: Facture } | null>(null);
   const [activeCommandeFournisseurModal, setActiveCommandeFournisseurModal] = useState<{ commande: BonCommandeFournisseur; fournisseur: Fournisseur } | null>(null);
   const [activeTransmettreAzurGlassDossier, setActiveTransmettreAzurGlassDossier] = useState<DossierSinistre | null>(null);
@@ -169,7 +174,8 @@ export default function Home() {
         supaDevis,
         supaFournisseurs,
         supaCommandes,
-        supaPartenaires
+        supaPartenaires,
+        supaBonsLivraison
       ] = await Promise.all([
         fetchDossiersFromSupabase(),
         fetchStockFromSupabase(),
@@ -178,6 +184,7 @@ export default function Home() {
         fetchFournisseursFromSupabase(),
         fetchCommandesFournisseursFromSupabase(),
         fetchPartenairesFromSupabase(),
+        fetchBonsLivraisonFromSupabase(),
       ]);
 
       if (supaDossiers && supaDossiers.length > 0) {
@@ -207,6 +214,10 @@ export default function Home() {
       if (supaPartenaires && supaPartenaires.length > 0) {
         setPartenaires(supaPartenaires);
         saveSharedStorage('gp_shared_partenaires', supaPartenaires);
+      }
+      if (supaBonsLivraison && supaBonsLivraison.length > 0) {
+        setBonsLivraison(supaBonsLivraison);
+        saveSharedStorage('gp_shared_bons_livraison', supaBonsLivraison);
       }
     } catch (err) {
       console.error('Erreur chargement Supabase:', err);
@@ -354,6 +365,7 @@ export default function Home() {
     const updatedBL = [newBL, ...bonsLivraison];
     setBonsLivraison(updatedBL);
     saveSharedStorage('gp_shared_bons_livraison', updatedBL);
+    saveBonLivraisonToSupabase(newBL);
 
     if (newBonSortie) {
       // Deduct stock for the article and the glue
@@ -760,6 +772,8 @@ export default function Home() {
     setBonsSortie([finalBS, ...bonsSortie]);
     setBonsLivraison([newBL, ...bonsLivraison]);
     setFactures([newFacture, ...factures]);
+    saveSharedStorage('gp_shared_bons_livraison', [newBL, ...bonsLivraison]);
+    saveBonLivraisonToSupabase(newBL);
 
     // Mark devis as converted
     setDevisList((prev) =>
@@ -1177,19 +1191,74 @@ export default function Home() {
         tvaExclue: dossier.tvaExclueParAssurance,
         observations: `Véhicule ${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.immatriculation}) remis au client en parfait état de conformité.`,
       };
-      setBonsLivraison((prev) => [matchedBL!, ...prev]);
+      setBonsLivraison((prev) => {
+        const updated = [matchedBL!, ...prev];
+        saveSharedStorage('gp_shared_bons_livraison', updated);
+        return updated;
+      });
+      saveBonLivraisonToSupabase(matchedBL!);
     }
     setActiveBonLivraisonModal({ bonLivraison: matchedBL, dossier, facture: matchedFacture });
+  };
+
+  const handleCreateBonLivraison = (newBL: BonLivraison) => {
+    // 1. Add to bonsLivraison & shared storage
+    setBonsLivraison((prev) => {
+      const updated = [newBL, ...prev];
+      saveSharedStorage('gp_shared_bons_livraison', updated);
+      return updated;
+    });
+    // 2. Persist to Supabase
+    saveBonLivraisonToSupabase(newBL);
+
+    // 3. Deduct stock articles if any article was selected from inventory
+    const articlesWithIds = newBL.lignes.filter((l) => l.articleId);
+    if (articlesWithIds.length > 0) {
+      setStock((prev) => {
+        const updatedStock = prev.map((art) => {
+          const match = articlesWithIds.find((l) => l.articleId === art.id);
+          if (match) {
+            const updated = {
+              ...art,
+              quantiteEnStock: Math.max(0, art.quantiteEnStock - match.quantite),
+            };
+            saveStockArticleToSupabase(updated);
+            return updated;
+          }
+          return art;
+        });
+        saveSharedStorage('gp_shared_stock', updatedStock);
+        return updatedStock;
+      });
+    }
+
+    setShowNewBonLivraisonModal(false);
+    showToast(`Bon de Livraison ${newBL.numeroBL} créé avec succès !`);
+    setActiveBonLivraisonModal({ bonLivraison: newBL });
+  };
+
+  const handleDeleteBonLivraison = (blId: string) => {
+    setBonsLivraison((prev) => {
+      const updated = prev.filter((b) => b.id !== blId);
+      saveSharedStorage('gp_shared_bons_livraison', updated);
+      return updated;
+    });
+    deleteBonLivraisonFromSupabase(blId);
+    showToast('Bon de livraison supprimé avec succès.');
   };
 
   const handleUpdateBonLivraisonObservations = (newObservations: string) => {
     if (!activeBonLivraisonModal) return;
     const blId = activeBonLivraisonModal.bonLivraison.id;
-    setBonsLivraison((prev) =>
-      prev.map((b) => (b.id === blId ? { ...b, observations: newObservations } : b))
-    );
+    const updatedBL = { ...activeBonLivraisonModal.bonLivraison, observations: newObservations };
+    setBonsLivraison((prev) => {
+      const updated = prev.map((b) => (b.id === blId ? updatedBL : b));
+      saveSharedStorage('gp_shared_bons_livraison', updated);
+      return updated;
+    });
+    saveBonLivraisonToSupabase(updatedBL);
     setActiveBonLivraisonModal((prev) =>
-      prev ? { ...prev, bonLivraison: { ...prev.bonLivraison, observations: newObservations } } : null
+      prev ? { ...prev, bonLivraison: updatedBL } : null
     );
   };
 
@@ -1363,11 +1432,15 @@ export default function Home() {
           <StockView
             stock={stock}
             bonsSortie={bonsSortie}
+            bonsLivraison={bonsLivraison}
             dossiers={dossiers}
             onAddStock={handleAddStock}
             onUpdateStock={handleUpdateStock}
             onDeleteStock={handleDeleteStock}
             onOpenBonSortie={(bs, dossier) => setActiveBonSortieModal({ bonSortie: bs, dossier })}
+            onOpenBonLivraison={(bl, dossier) => setActiveBonLivraisonModal({ bonLivraison: bl, dossier })}
+            onOpenNewBonLivraison={() => setShowNewBonLivraisonModal(true)}
+            onDeleteBonLivraison={handleDeleteBonLivraison}
           />
         )}
 
@@ -1501,6 +1574,15 @@ export default function Home() {
           bonSortie={activeBonSortieModal.bonSortie}
           dossier={activeBonSortieModal.dossier}
           onClose={() => setActiveBonSortieModal(null)}
+        />
+      )}
+
+      {showNewBonLivraisonModal && (
+        <NewBonLivraisonModal
+          stockArticles={stock}
+          partenaires={partenaires}
+          onSubmit={handleCreateBonLivraison}
+          onClose={() => setShowNewBonLivraisonModal(false)}
         />
       )}
 

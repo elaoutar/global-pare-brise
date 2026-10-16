@@ -709,3 +709,117 @@ export const savePartenaireToSupabase = async (part: Partenaire): Promise<boolea
     return false;
   }
 };
+
+// ==============================================================================
+// 9. BONS DE LIVRAISON (CRUD SUPABASE - MULTI-VÉHICULES & DOSSIERS)
+// ==============================================================================
+export const fetchBonsLivraisonFromSupabase = async (): Promise<BonLivraison[] | null> => {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('bons_livraison')
+      .select('*')
+      .order('date_livraison', { ascending: false });
+
+    if (error) {
+      console.warn('Erreur ou table bons_livraison absente Supabase:', error.message);
+      return null;
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      numeroBL: row.numero_bl,
+      dossierId: row.dossier_id || undefined,
+      clientNom: row.client_nom || undefined,
+      clientTelephone: row.client_telephone || undefined,
+      clientCin: row.client_cin || undefined,
+      clientVille: row.client_ville || undefined,
+      clientAdresse: row.client_adresse || undefined,
+      isMultiVehicules: Boolean(row.is_multi_vehicules),
+      vehiculeInfo: row.vehicule_info || undefined,
+      immatriculation: row.immatriculation || undefined,
+      dateLivraison: row.date_livraison,
+      livreurPoseur: row.livreur_poseur || 'Poseur Atelier',
+      receptionnaireNom: row.receptionnaire_nom || row.client_nom || 'Client',
+      receptionnaireCin: row.receptionnaire_cin || row.client_cin || undefined,
+      lignes: row.lignes || [],
+      totalHT: Number(row.total_ht || 0),
+      totalTTC: Number(row.total_ttc || 0),
+      montantFranchise: Number(row.montant_franchise || 0),
+      tvaExclue: Number(row.tva_exclue || 0),
+      observations: row.observations || undefined,
+      created_at: row.created_at,
+    }));
+  } catch (err) {
+    console.warn('Exception fetch bons livraison Supabase:', err);
+    return null;
+  }
+};
+
+export const saveBonLivraisonToSupabase = async (bl: BonLivraison): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const payload = {
+      id: bl.id,
+      numero_bl: bl.numeroBL,
+      dossier_id: bl.dossierId || null,
+      client_nom: bl.clientNom || bl.receptionnaireNom || null,
+      client_telephone: bl.clientTelephone || null,
+      client_cin: bl.clientCin || bl.receptionnaireCin || null,
+      client_ville: bl.clientVille || null,
+      client_adresse: bl.clientAdresse || null,
+      is_multi_vehicules: Boolean(bl.isMultiVehicules),
+      vehicule_info: bl.vehiculeInfo || null,
+      immatriculation: bl.immatriculation || null,
+      date_livraison: bl.dateLivraison || new Date().toISOString(),
+      livreur_poseur: bl.livreurPoseur || 'Poseur Atelier',
+      receptionnaire_nom: bl.receptionnaireNom || bl.clientNom || 'Client',
+      receptionnaire_cin: bl.receptionnaireCin || bl.clientCin || null,
+      lignes: bl.lignes || [],
+      total_ht: Number(bl.totalHT || 0),
+      total_ttc: Number(bl.totalTTC || 0),
+      montant_franchise: Number(bl.montantFranchise || 0),
+      tva_exclue: Number(bl.tvaExclue || 0),
+      observations: bl.observations || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('bons_livraison')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Erreur upsert bon livraison Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception save bon livraison Supabase:', err);
+    return false;
+  }
+};
+
+export const deleteBonLivraisonFromSupabase = async (blId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('bons_livraison')
+      .delete()
+      .eq('id', blId);
+
+    if (error) {
+      console.warn('Erreur delete bon livraison Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception delete bon livraison Supabase:', err);
+    return false;
+  }
+};
+
