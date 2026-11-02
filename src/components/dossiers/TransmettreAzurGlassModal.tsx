@@ -96,7 +96,7 @@ ${tvaPro > 0 ? `• TVA Pro / Location exclue par l'assurance : -${tvaPro.toFixe
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. PIÈCES JOINTES AU PACK DOSSIER
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[X] 1. Facture Officielle N° ${facture?.numeroFacture || `FA-2026-${numDossier.slice(-4)}`} libellée à AZUR GLASS SARL (ICE ${AZUR_GLASS_INFO.ice})
+[X] 1. Facture Officielle N° ${facture?.numeroFacture || 'N2028045'} libellée à AZUR GLASS SARL (ICE ${AZUR_GLASS_INFO.ice})
 [X] 2. Quittance Subrogative d'Assurance remplie et signée
 ${dossier.typeClientAssurance === 'PROFESSIONNEL' || dossier.typeClientAssurance === 'AGENCE_LOCATION' ? `[X] 3. Déclaration de bris de glaces signée & cachetée par la société (${dossier.client.nom})\n` : ''}[X] 4. Bon de Sortie Atelier N° ${bonSortie?.numeroBS || `BS-2026-${numDossier.slice(-4)}`} (Vitrage & fournitures de pose)
 [X] 5. Bon de Livraison & Décharge client N° ${bonLivraison?.numeroBL || `BL-2026-${numDossier.slice(-4)}`}
@@ -297,7 +297,7 @@ Email: ${GARAGE_INFO.email}`;
               <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-slate-800">
                 <FileText className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                 <span className="truncate">
-                  <strong>Facture N° {facture?.numeroFacture || `FA-2026-${numDossier.slice(-4)}`}</strong> (adressée à AZUR GLASS)
+                  <strong>Facture N° {facture?.numeroFacture || 'N2028045'}</strong> (adressée à AZUR GLASS)
                 </span>
               </div>
 

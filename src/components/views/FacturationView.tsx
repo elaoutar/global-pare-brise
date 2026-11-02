@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Facture, DossierSinistre } from '@/types';
 import { formatDH, formatDate, getStatutPaiementBadge } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
-import { FileText, Printer, Search, CheckCircle2, Clock, AlertCircle, Coins, Calendar } from 'lucide-react';
+import { FileText, Printer, Search, CheckCircle2, Clock, AlertCircle, Coins, Calendar, Pencil, Check, X } from 'lucide-react';
 
 interface Props {
   factures: Facture[];
@@ -12,6 +12,7 @@ interface Props {
   onOpenFactureModal: (facture: Facture, dossier: DossierSinistre) => void;
   onMarquerPayee: (factureId: string) => void;
   onOpenEncaisserModal?: (facture: Facture, dossier: DossierSinistre) => void;
+  onUpdateNumeroFacture?: (factureId: string, newNumero: string) => void;
 }
 
 export const FacturationView: React.FC<Props> = ({
@@ -20,10 +21,22 @@ export const FacturationView: React.FC<Props> = ({
   onOpenFactureModal,
   onMarquerPayee,
   onOpenEncaisserModal,
+  onUpdateNumeroFacture,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPaiement, setFilterPaiement] = useState<string>('ALL');
   const [filterMois, setFilterMois] = useState<string>('ALL');
+
+  // État édition rapide numéro de facture
+  const [editingFactureId, setEditingFactureId] = useState<string | null>(null);
+  const [editNumeroValue, setEditNumeroValue] = useState('');
+
+  const handleSaveNumero = (factureId: string) => {
+    const cleanNum = editNumeroValue.trim().toUpperCase();
+    if (!cleanNum) return;
+    onUpdateNumeroFacture?.(factureId, cleanNum);
+    setEditingFactureId(null);
+  };
 
   const baseFactures = filterMois === 'ALL'
     ? factures
@@ -143,8 +156,55 @@ export const FacturationView: React.FC<Props> = ({
 
                 return (
                   <tr key={fac.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                      {fac.numeroFacture}
+                    <td className="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
+                      {editingFactureId === fac.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editNumeroValue}
+                            onChange={(e) => setEditNumeroValue(e.target.value.toUpperCase())}
+                            className="px-2 py-0.5 text-xs border-2 border-emerald-500 rounded bg-emerald-50/50 font-mono font-bold w-28 focus:outline-none"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveNumero(fac.id);
+                              if (e.key === 'Escape') setEditingFactureId(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveNumero(fac.id)}
+                            className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded transition shadow-xs"
+                            title="Valider"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingFactureId(null)}
+                            className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition"
+                            title="Annuler"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 group">
+                          <span className="text-slate-900">{fac.numeroFacture}</span>
+                          {onUpdateNumeroFacture && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingFactureId(fac.id);
+                                setEditNumeroValue(fac.numeroFacture);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded transition"
+                              title="Modifier le N° de facture"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-slate-600">
                       {formatDate(fac.dateEmission)}

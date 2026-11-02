@@ -41,11 +41,13 @@ import { formatDH } from '@/lib/utils';
 import { LISTE_MARQUES_MAROC, getModelesPourMarque } from '@/lib/vehiculesMaroc';
 import { uploadFileToSupabase } from '@/lib/supabaseService';
 import { optimizeImageFile } from '@/lib/imageOptimizer';
+import { getNextNumeroFacture } from '@/lib/invoiceUtils';
 
 interface Props {
   assurances: Assurance[];
   partenaires: Partenaire[];
   stockArticles: ArticleStock[];
+  factures?: Facture[];
   onClose: () => void;
   onSubmit: (newDossier: DossierSinistre, newBonSortie?: BonSortie, newFacture?: Facture, newRecette?: ReglementRecette) => void;
   onAddPartenaire?: (newPartenaire: Partenaire) => void;
@@ -63,6 +65,7 @@ export const NewDossierModal: React.FC<Props> = ({
   assurances,
   partenaires,
   stockArticles,
+  factures = [],
   onClose,
   onSubmit,
   onAddPartenaire,
@@ -73,6 +76,17 @@ export const NewDossierModal: React.FC<Props> = ({
 
   // Type Dossier : Assurance vs Particulier Comptant
   const [typeDossier, setTypeDossier] = useState<TypeDossier>('ASSURANCE');
+
+  // Numéro de Facture (automatique & modifiable)
+  const [customNumeroFacture, setCustomNumeroFacture] = useState('');
+  const [isFactureNumManuallyEdited, setIsFactureNumManuallyEdited] = useState(false);
+
+  useEffect(() => {
+    if (!isFactureNumManuallyEdited) {
+      const autoNum = getNextNumeroFacture(typeDossier === 'ASSURANCE' ? 'AZUR_GLASS' : 'CLIENT', factures);
+      setCustomNumeroFacture(autoNum);
+    }
+  }, [typeDossier, factures, isFactureNumManuallyEdited]);
 
   // Form State
   const [clientNom, setClientNom] = useState('');
@@ -451,9 +465,10 @@ export const NewDossierModal: React.FC<Props> = ({
 
     // Auto-create Facture (Destinataire: AZUR_GLASS si assurance, sinon CLIENT)
     const facId = `fac-${Date.now()}`;
+    const finalNumeroFacture = customNumeroFacture.trim() || getNextNumeroFacture(isAssurance ? 'AZUR_GLASS' : 'CLIENT', factures);
     const factureGeneree: Facture = {
       id: facId,
-      numeroFacture: `FA-2026-${seq}`,
+      numeroFacture: finalNumeroFacture,
       dossierId: dossierId,
       destinataire: isAssurance ? 'AZUR_GLASS' : 'CLIENT',
       dateEmission: dateNow,
@@ -1770,6 +1785,50 @@ export const NewDossierModal: React.FC<Props> = ({
                       {formatDH(dynamicTotalTTC)}
                     </span>
                   </div>
+                </div>
+
+                {/* Numéro de Facture Modifiable */}
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      N° de Facture {typeDossier === 'ASSURANCE' ? '(Série AZUR GLASS)' : '(Série Client Particulier)'} :
+                    </label>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-semibold border border-emerald-200">
+                      Modifiable
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customNumeroFacture}
+                      onChange={(e) => {
+                        setCustomNumeroFacture(e.target.value.toUpperCase());
+                        setIsFactureNumManuallyEdited(true);
+                      }}
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                      placeholder={typeDossier === 'ASSURANCE' ? 'Ex: N2028045' : 'Ex: N2026148'}
+                    />
+                    {isFactureNumManuallyEdited && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsFactureNumManuallyEdited(false);
+                          const auto = getNextNumeroFacture(typeDossier === 'ASSURANCE' ? 'AZUR_GLASS' : 'CLIENT', factures);
+                          setCustomNumeroFacture(auto);
+                        }}
+                        className="px-2.5 py-2 text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition whitespace-nowrap"
+                        title="Réinitialiser au numéro automatique suivant"
+                      >
+                        Auto
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    {typeDossier === 'ASSURANCE' 
+                      ? 'Incrément automatique débutant par N2028045 (AZUR GLASS).'
+                      : 'Incrément automatique débutant par N2026148 (Client Particulier).'}
+                  </p>
                 </div>
               </div>
 

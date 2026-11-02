@@ -36,6 +36,7 @@ import {
   GARAGE_INFO 
 } from '@/lib/data';
 import { formatDH } from '@/lib/utils';
+import { getNextNumeroFacture } from '@/lib/invoiceUtils';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
 import { 
   fetchDossiersFromSupabase, 
@@ -736,11 +737,13 @@ export default function Home() {
     };
 
     // Auto-create Facture
+    const isAssuranceDevis = devis.typeDemande === 'ASSURANCE';
+    const newFactureNumero = getNextNumeroFacture(isAssuranceDevis ? 'AZUR_GLASS' : 'CLIENT', factures);
     const newFacture: Facture = {
       id: `fac-${Date.now()}`,
-      numeroFacture: `FA-2026-${seq}`,
+      numeroFacture: newFactureNumero,
       dossierId: newDossier.id,
-      destinataire: devis.typeDemande === 'ASSURANCE' ? 'ASSURANCE' : 'CLIENT',
+      destinataire: isAssuranceDevis ? 'ASSURANCE' : 'CLIENT',
       dateEmission: newDossier.dateCreation,
       dateEcheance: devis.typeDemande === 'ASSURANCE'
         ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -1056,13 +1059,13 @@ export default function Home() {
   const handleOpenFactureFromDossier = (dossier: DossierSinistre) => {
     let matchedFacture = factures.find((f) => f.dossierId === dossier.id);
     if (!matchedFacture) {
-      const seq = Math.floor(1000 + Math.random() * 9000);
       const isAssurance = dossier.typeDossier === 'ASSURANCE';
+      const newFactureNumero = getNextNumeroFacture(isAssurance ? 'AZUR_GLASS' : 'CLIENT', factures);
       const totalHT = +(dossier.montantTotalTTC / 1.2).toFixed(2);
       const totalTVA = +(dossier.montantTotalTTC - totalHT).toFixed(2);
       matchedFacture = {
         id: `fac-${Date.now()}`,
-        numeroFacture: `FA-2026-${seq}`,
+        numeroFacture: newFactureNumero,
         dossierId: dossier.id,
         destinataire: isAssurance ? 'ASSURANCE' : 'CLIENT',
         dateEmission: dossier.dateCreation,
@@ -1273,6 +1276,38 @@ export default function Home() {
     );
   };
 
+  const handleUpdateNumeroFacture = (factureId: string, newNumero: string) => {
+    const cleanNum = newNumero.trim().toUpperCase();
+    if (!cleanNum) return;
+
+    let updatedFac: Facture | undefined;
+    setFactures((prev) => {
+      const updated = prev.map((f) => {
+        if (f.id === factureId) {
+          updatedFac = { ...f, numeroFacture: cleanNum };
+          return updatedFac;
+        }
+        return f;
+      });
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
+
+    if (updatedFac) {
+      saveFactureToSupabase(updatedFac);
+    }
+
+    setActiveFactureModal((prev) => {
+      if (!prev || prev.facture.id !== factureId) return prev;
+      return {
+        ...prev,
+        facture: { ...prev.facture, numeroFacture: cleanNum },
+      };
+    });
+
+    showToast(`Numéro de facture modifié : ${cleanNum}`);
+  };
+
   const stockCritiqueCount = stock.filter((a) => a.quantiteEnStock <= a.stockMinimumAlerte).length;
 
   // Écran d'attente lors du chargement de la session
@@ -1451,6 +1486,7 @@ export default function Home() {
             onOpenFactureModal={(fac, d) => setActiveFactureModal({ facture: fac, dossier: d })}
             onMarquerPayee={handleMarquerFacturePayee}
             onOpenEncaisserModal={(fac, d) => setActiveEncaisserModal({ facture: fac, dossier: d })}
+            onUpdateNumeroFacture={handleUpdateNumeroFacture}
           />
         )}
 
@@ -1520,6 +1556,7 @@ export default function Home() {
           assurances={assurances}
           partenaires={partenaires}
           stockArticles={stock}
+          factures={factures}
           onClose={() => setShowNewDossierModal(false)}
           onSubmit={handleCreateDossier}
           onAddPartenaire={handleAddPartenaire}
@@ -1566,6 +1603,7 @@ export default function Home() {
           dossier={activeFactureModal.dossier}
           onClose={() => setActiveFactureModal(null)}
           onUpdateObservations={handleUpdateFactureObservations}
+          onUpdateNumeroFacture={(newNum) => handleUpdateNumeroFacture(activeFactureModal.facture.id, newNum)}
         />
       )}
 

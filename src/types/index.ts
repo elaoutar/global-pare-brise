@@ -108,7 +108,7 @@ export interface LigneFacture {
 
 export interface Facture {
   id: string;
-  numeroFacture: string; // Ex: FA-2026-0158
+  numeroFacture: string; // Ex: N2026148 (Particulier) ou N2028045 (AZUR GLASS)
   dossierId: string;
   destinataire: 'ASSURANCE' | 'CLIENT' | 'AZUR_GLASS';
   dateEmission: string;
