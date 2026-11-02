@@ -163,7 +163,7 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Synchronisation avec Supabase Cloud
+  // Synchronisation avec Supabase Cloud (avec réconciliation et poussée automatique des données locales orphelines)
   const loadSupabaseData = async () => {
     if (!isSupabaseConfigured) return;
 
@@ -188,34 +188,95 @@ export default function Home() {
         fetchBonsLivraisonFromSupabase(),
       ]);
 
-      if (supaDossiers && supaDossiers.length > 0) {
-        setDossiers(supaDossiers);
-        saveSharedStorage('gp_shared_dossiers', supaDossiers);
+      // 1. DOSSIERS : Réconciliation intelligente Cloud <-> Local
+      const localDossiers = loadSharedStorage<DossierSinistre[]>('gp_shared_dossiers', []);
+      let finalDossiers = supaDossiers || [];
+      if (localDossiers && localDossiers.length > 0) {
+        // Détecter les dossiers présents en local sur ce PC mais non encore enregistrés sur le Cloud
+        const pendingDossiers = localDossiers.filter((ld) => !finalDossiers.some((sd) => sd.id === ld.id));
+        if (pendingDossiers.length > 0) {
+          console.log(`Synchronisation de ${pendingDossiers.length} dossier(s) local(aux) vers Supabase Cloud...`);
+          for (const d of pendingDossiers) {
+            await saveDossierToSupabase(d);
+          }
+          finalDossiers = [...pendingDossiers, ...finalDossiers];
+        }
       }
-      if (supaStock && supaStock.length > 0) {
-        setStock(supaStock);
-        saveSharedStorage('gp_shared_stock', supaStock);
+      if (finalDossiers.length > 0) {
+        setDossiers(finalDossiers);
+        saveSharedStorage('gp_shared_dossiers', finalDossiers);
       }
+
+      // 2. STOCK : Réconciliation Cloud <-> Local
+      const localStock = loadSharedStorage<ArticleStock[]>('gp_shared_stock', []);
+      let finalStock = supaStock || [];
+      if (localStock && localStock.length > 0) {
+        const pendingStock = localStock.filter((ls) => !finalStock.some((ss) => ss.id === ls.id));
+        if (pendingStock.length > 0) {
+          for (const s of pendingStock) {
+            await saveStockArticleToSupabase(s);
+          }
+          finalStock = [...pendingStock, ...finalStock];
+        }
+      }
+      if (finalStock.length > 0) {
+        setStock(finalStock);
+        saveSharedStorage('gp_shared_stock', finalStock);
+      }
+
+      // 3. FACTURES
       if (supaFactures && supaFactures.length > 0) {
         setFactures(supaFactures);
         saveSharedStorage('gp_shared_factures', supaFactures);
       }
+
+      // 4. DEVIS
       if (supaDevis && supaDevis.length > 0) {
         setDevisList(supaDevis);
         saveSharedStorage('gp_shared_devis', supaDevis);
       }
+
+      // 5. FOURNISSEURS
       if (supaFournisseurs && supaFournisseurs.length > 0) {
         setFournisseurs(supaFournisseurs);
         saveSharedStorage('gp_shared_fournisseurs', supaFournisseurs);
       }
-      if (supaCommandes && supaCommandes.length > 0) {
-        setCommandesFournisseurs(supaCommandes);
-        saveSharedStorage('gp_shared_commandes', supaCommandes);
+
+      // 6. COMMANDES FOURNISSEURS
+      const localCmds = loadSharedStorage<BonCommandeFournisseur[]>('gp_shared_commandes', []);
+      let finalCmds = supaCommandes || [];
+      if (localCmds && localCmds.length > 0) {
+        const pendingCmds = localCmds.filter((lc) => !finalCmds.some((sc) => sc.id === lc.id));
+        if (pendingCmds.length > 0) {
+          for (const c of pendingCmds) {
+            await saveCommandeFournisseurToSupabase(c);
+          }
+          finalCmds = [...pendingCmds, ...finalCmds];
+        }
       }
-      if (supaPartenaires && supaPartenaires.length > 0) {
-        setPartenaires(supaPartenaires);
-        saveSharedStorage('gp_shared_partenaires', supaPartenaires);
+      if (finalCmds.length > 0) {
+        setCommandesFournisseurs(finalCmds);
+        saveSharedStorage('gp_shared_commandes', finalCmds);
       }
+
+      // 7. PARTENAIRES
+      const localParts = loadSharedStorage<Partenaire[]>('gp_shared_partenaires', INITIAL_PARTENAIRES);
+      let finalParts = supaPartenaires || [];
+      if (localParts && localParts.length > 0) {
+        const pendingParts = localParts.filter((lp) => !finalParts.some((sp) => sp.id === lp.id));
+        if (pendingParts.length > 0) {
+          for (const p of pendingParts) {
+            await savePartenaireToSupabase(p);
+          }
+          finalParts = [...pendingParts, ...finalParts];
+        }
+      }
+      if (finalParts.length > 0) {
+        setPartenaires(finalParts);
+        saveSharedStorage('gp_shared_partenaires', finalParts);
+      }
+
+      // 8. BONS DE LIVRAISON
       if (supaBonsLivraison && supaBonsLivraison.length > 0) {
         setBonsLivraison(supaBonsLivraison);
         saveSharedStorage('gp_shared_bons_livraison', supaBonsLivraison);
@@ -279,9 +340,27 @@ export default function Home() {
     }
   }, [currentUser, activeTab]);
 
-  // Chargement des données réelles depuis Supabase Cloud au montage
+  // Chargement des données réelles depuis Supabase Cloud au montage & lors du focus/retour sur l'onglet
   useEffect(() => {
     loadSupabaseData();
+
+    const handleFocus = () => {
+      loadSupabaseData();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadSupabaseData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Handlers

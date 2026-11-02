@@ -304,6 +304,7 @@ export interface BonCommandeFournisseur {
   id: string;
   numeroBC: string; // Ex: BC-2026-0031
   fournisseurId: string;
+  fournisseurNom?: string;
   dateCommande: string;
   dateLivraisonPrevue?: string;
   dateReceptionReelle?: string;

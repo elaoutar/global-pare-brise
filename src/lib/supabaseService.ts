@@ -158,8 +158,16 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      console.error('Erreur upsert dossier Supabase:', error);
-      return false;
+      console.warn('Erreur upsert dossier Supabase, tentative de repli sans colonnes optionnelles:', error.message);
+      // Fallback sans colonnes optionnelles d'archivage
+      const { is_archive, date_archivage, ...safePayload } = payload;
+      const { error: retryError } = await supabase
+        .from('dossiers')
+        .upsert(safePayload, { onConflict: 'id' });
+      if (retryError) {
+        console.error('Erreur persistante upsert dossier:', retryError);
+        return false;
+      }
     }
     return true;
   } catch (err) {
@@ -250,8 +258,15 @@ export const saveStockArticleToSupabase = async (article: ArticleStock): Promise
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      console.error('Erreur upsert article Supabase:', error);
-      return false;
+      console.warn('Erreur upsert article Supabase, tentative de repli sans rayon:', error.message);
+      const { rayon, ...safePayload } = payload;
+      const { error: retryError } = await supabase
+        .from('stock')
+        .upsert(safePayload, { onConflict: 'id' });
+      if (retryError) {
+        console.error('Erreur persistante upsert article:', retryError);
+        return false;
+      }
     }
     return true;
   } catch (err) {
@@ -594,7 +609,8 @@ export const saveCommandeFournisseurToSupabase = async (cmd: BonCommandeFourniss
       id: cmd.id,
       numero_commande: cmd.numeroBC,
       fournisseur_id: cmd.fournisseurId,
-      date_commande: cmd.dateCommande,
+      fournisseur_nom: cmd.fournisseurNom || 'Fournisseur',
+      date_commande: cmd.dateCommande || new Date().toISOString().split('T')[0],
       date_livraison_prevue: cmd.dateLivraisonPrevue || null,
       agence_ville: cmd.agenceVille || 'Marrakech',
       lignes: cmd.lignes || [],
@@ -618,8 +634,16 @@ export const saveCommandeFournisseurToSupabase = async (cmd: BonCommandeFourniss
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      console.warn('Erreur upsert commande fournisseur Supabase:', error.message);
-      return false;
+      console.warn('Erreur upsert commande fournisseur Supabase, repli minimal:', error.message);
+      // Tentative de repli sans colonnes optionnelles
+      const { agence_ville, mode_paiement, date_echeance_paiement, ...safePayload } = payload;
+      const { error: retryError } = await supabase
+        .from('commandes_fournisseurs')
+        .upsert(safePayload, { onConflict: 'id' });
+      if (retryError) {
+        console.error('Erreur persistante upsert commande fournisseur:', retryError.message);
+        return false;
+      }
     }
     return true;
   } catch (err) {
@@ -688,7 +712,6 @@ export const savePartenaireToSupabase = async (part: Partenaire): Promise<boolea
     const payload = {
       id: part.id,
       nom: part.nom,
-      code: part.nom.substring(0, 10).toUpperCase().replace(/\s+/g, '_'),
       type: part.type || 'COURTIER',
       telephone: part.telephone || null,
       ville: part.ville || null,
