@@ -10,7 +10,7 @@ import { DocumentActionBar } from './DocumentActionBar';
 
 interface Props {
   facture: Facture;
-  dossier: DossierSinistre;
+  dossier?: DossierSinistre | null;
   onClose: () => void;
   onUpdateObservations?: (newObservations: string) => void;
   onUpdateNumeroFacture?: (newNumero: string) => void;
@@ -42,11 +42,11 @@ export const FactureModal: React.FC<Props> = ({
   const isAssuranceOrAzur =
     facture.destinataire === 'AZUR_GLASS' ||
     facture.destinataire === 'ASSURANCE' ||
-    dossier.typeDossier === 'ASSURANCE';
+    dossier?.typeDossier === 'ASSURANCE';
 
   // Calcul du cash (franchise non offerte + TVA exclue éventuelle) et du reste en virement
-  const effectiveFranchise = dossier.franchiseOfferte ? 0 : (dossier.montantFranchise || 0);
-  const effectiveTvaExclue = Number(dossier.tvaExclueParAssurance) || 0;
+  const effectiveFranchise = dossier ? (dossier.franchiseOfferte ? 0 : (dossier.montantFranchise || 0)) : 0;
+  const effectiveTvaExclue = dossier ? (Number(dossier.tvaExclueParAssurance) || 0) : 0;
   const montantCash =
     facture.montantRegleEspeces !== undefined
       ? facture.montantRegleEspeces
@@ -73,11 +73,13 @@ export const FactureModal: React.FC<Props> = ({
     setTimeout(() => setHasSavedObs(false), 2500);
   };
 
+  const clientNomDisplay = dossier?.client?.nom || facture.clientNom || 'Client';
+  const immatDisplay = dossier?.vehicule?.immatriculation || facture.immatriculation || '';
   const destinataireNom = isAssuranceOrAzur
-    ? `${AZUR_GLASS_INFO.nom} (Intermédiaire Assurances)`
-    : dossier.client.nom;
+    ? (dossier?.assurance?.nom || 'AZUR GLASS / Assurance')
+    : clientNomDisplay;
 
-  const shareMsg = `Bonjour ${dossier.client.nom}, voici votre Facture N° ${numeroFacture} d'un montant de ${formatDH(facture.totalTTC)} pour l'intervention sur votre véhicule ${dossier.vehicule.immatriculation} chez GLOBAL PARE-BRISE.`;
+  const shareMsg = `Bonjour ${clientNomDisplay}, voici votre Facture N° ${numeroFacture} d'un montant de ${formatDH(facture.totalTTC)} ${immatDisplay ? `pour l'intervention sur le véhicule ${immatDisplay}` : ''} chez GLOBAL PARE-BRISE.`;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
@@ -88,8 +90,8 @@ export const FactureModal: React.FC<Props> = ({
           documentRef={printRef}
           filename={`FACTURE-${numeroFacture}`}
           documentTitle={`Facture Officielle #${numeroFacture}`}
-          subtitle={`Destinataire : ${destinataireNom} • Véhicule : ${dossier.vehicule.immatriculation}`}
-          clientPhone={dossier.client.telephone}
+          subtitle={`Destinataire : ${destinataireNom}${immatDisplay ? ` • Véhicule : ${immatDisplay}` : ''}`}
+          clientPhone={dossier?.client?.telephone || facture.clientTelephone}
           shareMessage={shareMsg}
           badgeText={isAssuranceOrAzur ? 'Facture AZUR GLASS' : 'Facture Client'}
           badgeColor="bg-emerald-600"
@@ -227,7 +229,7 @@ export const FactureModal: React.FC<Props> = ({
                   Date échéance : <span className="font-medium text-slate-900">{formatDate(facture.dateEcheance)}</span>
                 </p>
                 <p className="text-xs text-slate-600 mt-1">
-                  Dossier Réf : <span className="font-mono font-semibold">{dossier.numeroDossier}</span>
+                  Dossier Réf : <span className="font-mono font-semibold">{dossier ? dossier.numeroDossier : (facture.dossierId || 'Vente Directe / Sans dossier')}</span>
                 </p>
               </div>
             </div>
@@ -252,19 +254,20 @@ export const FactureModal: React.FC<Props> = ({
                     </p>
                     <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-700 space-y-0.5">
                       <p>
-                        <strong>Cie Assurance :</strong> {dossier.assurance?.nom || 'Assurance'}{' '}
-                        {dossier.agenceAssurance ? `(${dossier.agenceAssurance})` : ''}
+                        <strong>Cie Assurance :</strong> {dossier?.assurance?.nom || 'Assurance'}{' '}
+                        {dossier?.agenceAssurance ? `(${dossier.agenceAssurance})` : ''}
                       </p>
-                      <p className="font-mono"><strong>N° Sinistre :</strong> {dossier.numeroSinistre || '-'}</p>
-                      <p className="font-mono"><strong>N° Police :</strong> {dossier.numeroPolice || '-'}</p>
+                      <p className="font-mono"><strong>N° Sinistre :</strong> {dossier?.numeroSinistre || '-'}</p>
+                      <p className="font-mono"><strong>N° Police :</strong> {dossier?.numeroPolice || '-'}</p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <p className="text-base font-bold text-slate-900">{dossier.client.nom}</p>
-                    <p className="text-xs text-slate-600">Tél : {dossier.client.telephone}</p>
-                    <p className="text-xs text-slate-600">CIN : {dossier.client.cin || 'Particulier'}</p>
-                    <p className="text-xs text-slate-600">Ville : {dossier.client.ville}</p>
+                    <p className="text-base font-bold text-slate-900">{clientNomDisplay}</p>
+                    <p className="text-xs text-slate-600">Tél : {dossier?.client?.telephone || facture.clientTelephone || '-'}</p>
+                    <p className="text-xs text-slate-600">CIN : {dossier?.client?.cin || facture.clientCin || 'Client Direct'}</p>
+                    {facture.clientIce && <p className="text-xs text-slate-700 font-mono"><strong>ICE :</strong> {facture.clientIce}</p>}
+                    <p className="text-xs text-slate-600">Adresse / Ville : {dossier?.client?.ville || facture.clientAdresse || 'Marrakech'}</p>
                   </>
                 )}
               </div>
@@ -273,19 +276,42 @@ export const FactureModal: React.FC<Props> = ({
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                   Véhicule & Travaux Réalisés :
                 </p>
-                <p className="font-semibold text-slate-900">
-                  {dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})
-                </p>
-                <div className="mt-2 inline-flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200 text-xs">
-                  <span className="font-medium text-slate-500">Immatriculation :</span>
-                  <span className="font-mono font-bold text-slate-900" dir="ltr">
-                    {formatMatricule(dossier.vehicule.immatriculation, 'LATIN')}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 mt-2">
-                  N° Châssis : <span className="font-mono">{dossier.vehicule.chassisVin || 'Conforme'}</span>
-                </p>
-                <p className="text-xs text-slate-600">Souscripteur : {dossier.client.nom}</p>
+                {dossier ? (
+                  <>
+                    <p className="font-semibold text-slate-900">
+                      {dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})
+                    </p>
+                    <div className="mt-2 inline-flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200 text-xs">
+                      <span className="font-medium text-slate-500">Immatriculation :</span>
+                      <span className="font-mono font-bold text-slate-900" dir="ltr">
+                        {formatMatricule(dossier.vehicule.immatriculation, 'LATIN')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-2">
+                      N° Châssis : <span className="font-mono">{dossier.vehicule.chassisVin || 'Conforme'}</span>
+                    </p>
+                    <p className="text-xs text-slate-600">Souscripteur : {dossier.client.nom}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-slate-900">
+                      {facture.vehiculeInfo || 'Vente Comptoir / Vitrages & Fournitures'}
+                    </p>
+                    {facture.immatriculation ? (
+                      <div className="mt-2 inline-flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200 text-xs">
+                        <span className="font-medium text-slate-500">Immatriculation :</span>
+                        <span className="font-mono font-bold text-slate-900" dir="ltr">
+                          {formatMatricule(facture.immatriculation, 'LATIN')}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 mt-2 italic">
+                        Vente directe au comptoir de pièces et vitrages (sans véhicule ni matricule rattaché).
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-600 mt-2">Client : {clientNomDisplay}</p>
+                  </>
+                )}
               </div>
             </div>
 
@@ -317,13 +343,13 @@ export const FactureModal: React.FC<Props> = ({
                   {/* Lignes Franchise & TVA (si dossier Assurance / AZUR GLASS) */}
                   {isAssuranceOrAzur && (
                     <>
-                      {(dossier.montantFranchise || 0) > 0 && (
+                      {(dossier?.montantFranchise || 0) > 0 && (
                         <tr className="bg-slate-50/70 border-t border-slate-200">
                           <td colSpan={5} className="py-2.5 px-4 font-semibold text-slate-800">
                             Franchise
                           </td>
                           <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                            {formatDH(dossier.montantFranchise)}
+                            {formatDH(dossier?.montantFranchise || 0)}
                           </td>
                         </tr>
                       )}

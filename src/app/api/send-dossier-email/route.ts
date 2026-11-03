@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
       html, 
       dossierNumero,
       photos,
-      documents
+      documents,
+      bonSortie,
+      bonLivraison,
+      facture
     } = body;
 
     if (!destinataire || !objet || !message) {
@@ -93,6 +96,58 @@ export async function POST(req: NextRequest) {
             path: doc.url,
           });
         }
+      });
+    }
+
+    // Joindre directement le Bon de Sortie Atelier (pas besoin de scan/signature papier)
+    if (bonSortie) {
+      const bsContent = `
+========================================================================
+                  GLOBAL PARE-BRISE - BON DE SORTIE ATELIER
+========================================================================
+N° Bon de Sortie : ${bonSortie.numeroBS || 'BS-AUTO'}
+Date de Sortie   : ${bonSortie.dateSortie || new Date().toISOString().split('T')[0]}
+Dossier Réf      : ${dossierNumero || '-'}
+Poseur / Atelier : ${bonSortie.poseur || 'Poseur Atelier'}
+------------------------------------------------------------------------
+ARTICLES ET FOURNITURES SORTIS DU STOCK :
+${(bonSortie.lignes || []).map((l: any, i: number) => `  ${i + 1}. [Réf: ${l.reference || '-'}] ${l.designation} - Quantité: ${l.quantite}`).join('\n')}
+------------------------------------------------------------------------
+Observations     : ${bonSortie.notes || 'Sortie conforme pour intervention vitrage.'}
+Statut           : CONFORME & JOINT AUTOMATIQUEMENT (Non soumis à signature physique)
+========================================================================
+      `.trim();
+
+      attachments.push({
+        filename: `Bon_de_Sortie_${bonSortie.numeroBS || dossierNumero || 'BS'}.txt`,
+        content: Buffer.from(bsContent, 'utf-8'),
+      });
+    }
+
+    // Joindre directement le Bon de Livraison & Décharge client
+    if (bonLivraison) {
+      const blContent = `
+========================================================================
+               GLOBAL PARE-BRISE - BON DE LIVRAISON CLIENT
+========================================================================
+N° Bon Livraison : ${bonLivraison.numeroBL || 'BL-AUTO'}
+Date Livraison   : ${bonLivraison.dateLivraison || new Date().toISOString().split('T')[0]}
+Dossier Réf      : ${dossierNumero || '-'}
+Client / Décharge: ${bonLivraison.receptionnaireNom || 'Client'} (CIN: ${bonLivraison.receptionnaireCin || '-'})
+Livreur / Poseur : ${bonLivraison.livreurPoseur || 'Poseur Atelier'}
+------------------------------------------------------------------------
+PRESTATIONS ET VITRAGES LIVRÉS :
+${(bonLivraison.lignes || []).map((l: any, i: number) => `  ${i + 1}. ${l.designation} - Quantité: ${l.quantite} ${l.totalTTC ? `(${l.totalTTC} DH TTC)` : ''}`).join('\n')}
+------------------------------------------------------------------------
+Total TTC        : ${bonLivraison.totalTTC || 0} DH
+Observations     : ${bonLivraison.observations || 'Véhicule et vitrage remis conformes.'}
+Statut           : CONFORME & JOINT AUTOMATIQUEMENT (Non soumis à signature physique)
+========================================================================
+      `.trim();
+
+      attachments.push({
+        filename: `Bon_de_Livraison_${bonLivraison.numeroBL || dossierNumero || 'BL'}.txt`,
+        content: Buffer.from(blContent, 'utf-8'),
       });
     }
 

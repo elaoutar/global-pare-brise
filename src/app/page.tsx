@@ -59,7 +59,8 @@ import {
   deleteFournisseurFromSupabase,
   saveCommandeFournisseurToSupabase,
   deleteCommandeFournisseurFromSupabase,
-  savePartenaireToSupabase
+  savePartenaireToSupabase,
+  deleteFactureFromSupabase
 } from '@/lib/supabaseService';
 import { getActiveSupabaseSession, logoutSupabase } from '@/lib/authService';
 
@@ -77,8 +78,10 @@ import { DevisView } from '@/components/views/DevisView';
 import { UtilisateursView } from '@/components/views/UtilisateursView';
 
 import { NewDossierModal } from '@/components/dossiers/NewDossierModal';
+import { EditDossierModal } from '@/components/dossiers/EditDossierModal';
 import { QuittanceModal } from '@/components/documents/QuittanceModal';
 import { FactureModal } from '@/components/documents/FactureModal';
+import { NewDirectFactureModal } from '@/components/documents/NewDirectFactureModal';
 import { BonSortieModal } from '@/components/documents/BonSortieModal';
 import { BonLivraisonModal } from '@/components/documents/BonLivraisonModal';
 import { NewBonLivraisonModal } from '@/components/documents/NewBonLivraisonModal';
@@ -140,13 +143,15 @@ export default function Home() {
 
   // Modals state
   const [showNewDossierModal, setShowNewDossierModal] = useState(false);
+  const [editingDossier, setEditingDossier] = useState<DossierSinistre | null>(null);
   const [activeQuittanceDossier, setActiveQuittanceDossier] = useState<DossierSinistre | null>(null);
   const [activeDeclarationBrisGlaceDossier, setActiveDeclarationBrisGlaceDossier] = useState<DossierSinistre | null>(null);
-  const [activeFactureModal, setActiveFactureModal] = useState<{ facture: Facture; dossier: DossierSinistre } | null>(null);
+  const [activeFactureModal, setActiveFactureModal] = useState<{ facture: Facture; dossier?: DossierSinistre | null } | null>(null);
+  const [showNewDirectFactureModal, setShowNewDirectFactureModal] = useState(false);
   const [activeBonSortieModal, setActiveBonSortieModal] = useState<{ bonSortie: BonSortie; dossier: DossierSinistre } | null>(null);
   const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier?: DossierSinistre; facture?: Facture } | null>(null);
   const [showNewBonLivraisonModal, setShowNewBonLivraisonModal] = useState(false);
-  const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier: DossierSinistre; facture?: Facture } | null>(null);
+  const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier?: DossierSinistre | null; facture?: Facture } | null>(null);
   const [activeCommandeFournisseurModal, setActiveCommandeFournisseurModal] = useState<{ commande: BonCommandeFournisseur; fournisseur: Fournisseur } | null>(null);
   const [activeTransmettreAzurGlassDossier, setActiveTransmettreAzurGlassDossier] = useState<DossierSinistre | null>(null);
 
@@ -188,96 +193,60 @@ export default function Home() {
         fetchBonsLivraisonFromSupabase(),
       ]);
 
-      // 1. DOSSIERS : Réconciliation intelligente Cloud <-> Local
-      const localDossiers = loadSharedStorage<DossierSinistre[]>('gp_shared_dossiers', []);
-      let finalDossiers = supaDossiers || [];
-      if (localDossiers && localDossiers.length > 0) {
-        // Détecter les dossiers présents en local sur ce PC mais non encore enregistrés sur le Cloud
-        const pendingDossiers = localDossiers.filter((ld) => !finalDossiers.some((sd) => sd.id === ld.id));
-        if (pendingDossiers.length > 0) {
-          console.log(`Synchronisation de ${pendingDossiers.length} dossier(s) local(aux) vers Supabase Cloud...`);
-          for (const d of pendingDossiers) {
-            await saveDossierToSupabase(d);
-          }
-          finalDossiers = [...pendingDossiers, ...finalDossiers];
-        }
-      }
-      if (finalDossiers.length > 0) {
-        setDossiers(finalDossiers);
-        saveSharedStorage('gp_shared_dossiers', finalDossiers);
+      // 1. DOSSIERS : Supabase Cloud est la source de vérité
+      if (supaDossiers !== null) {
+        setDossiers(supaDossiers);
+        saveSharedStorage('gp_shared_dossiers', supaDossiers);
       }
 
-      // 2. STOCK : Réconciliation Cloud <-> Local
-      const localStock = loadSharedStorage<ArticleStock[]>('gp_shared_stock', []);
-      let finalStock = supaStock || [];
-      if (localStock && localStock.length > 0) {
-        const pendingStock = localStock.filter((ls) => !finalStock.some((ss) => ss.id === ls.id));
-        if (pendingStock.length > 0) {
-          for (const s of pendingStock) {
-            await saveStockArticleToSupabase(s);
-          }
-          finalStock = [...pendingStock, ...finalStock];
-        }
-      }
-      if (finalStock.length > 0) {
-        setStock(finalStock);
-        saveSharedStorage('gp_shared_stock', finalStock);
+      // 2. STOCK
+      if (supaStock !== null) {
+        setStock(supaStock);
+        saveSharedStorage('gp_shared_stock', supaStock);
       }
 
       // 3. FACTURES
-      if (supaFactures && supaFactures.length > 0) {
+      if (supaFactures !== null) {
         setFactures(supaFactures);
         saveSharedStorage('gp_shared_factures', supaFactures);
       }
 
       // 4. DEVIS
-      if (supaDevis && supaDevis.length > 0) {
+      if (supaDevis !== null) {
         setDevisList(supaDevis);
         saveSharedStorage('gp_shared_devis', supaDevis);
       }
 
       // 5. FOURNISSEURS
-      if (supaFournisseurs && supaFournisseurs.length > 0) {
+      if (supaFournisseurs !== null) {
         setFournisseurs(supaFournisseurs);
         saveSharedStorage('gp_shared_fournisseurs', supaFournisseurs);
       }
 
-      // 6. COMMANDES FOURNISSEURS
-      const localCmds = loadSharedStorage<BonCommandeFournisseur[]>('gp_shared_commandes', []);
-      let finalCmds = supaCommandes || [];
-      if (localCmds && localCmds.length > 0) {
-        const pendingCmds = localCmds.filter((lc) => !finalCmds.some((sc) => sc.id === lc.id));
-        if (pendingCmds.length > 0) {
-          for (const c of pendingCmds) {
-            await saveCommandeFournisseurToSupabase(c);
-          }
-          finalCmds = [...pendingCmds, ...finalCmds];
+      // 6. COMMANDES FOURNISSEURS (Suppression stricte des commandes antérieures au mois 11 / Novembre 2026)
+      if (supaCommandes !== null) {
+        const filteredCmds = supaCommandes.filter((c) => {
+          if (!c.dateCommande) return true;
+          return c.dateCommande >= '2026-11-01';
+        });
+        setCommandesFournisseurs(filteredCmds);
+        saveSharedStorage('gp_shared_commandes', filteredCmds);
+
+        // Purge en base des commandes antérieures au mois 11 si détectées
+        const oldCmds = supaCommandes.filter((c) => c.dateCommande && c.dateCommande < '2026-11-01');
+        for (const old of oldCmds) {
+          deleteCommandeFournisseurFromSupabase(old.id);
         }
-      }
-      if (finalCmds.length > 0) {
-        setCommandesFournisseurs(finalCmds);
-        saveSharedStorage('gp_shared_commandes', finalCmds);
       }
 
       // 7. PARTENAIRES
-      const localParts = loadSharedStorage<Partenaire[]>('gp_shared_partenaires', INITIAL_PARTENAIRES);
-      let finalParts = supaPartenaires || [];
-      if (localParts && localParts.length > 0) {
-        const pendingParts = localParts.filter((lp) => !finalParts.some((sp) => sp.id === lp.id));
-        if (pendingParts.length > 0) {
-          for (const p of pendingParts) {
-            await savePartenaireToSupabase(p);
-          }
-          finalParts = [...pendingParts, ...finalParts];
-        }
-      }
-      if (finalParts.length > 0) {
-        setPartenaires(finalParts);
-        saveSharedStorage('gp_shared_partenaires', finalParts);
+      if (supaPartenaires !== null) {
+        setPartenaires(supaPartenaires);
+        saveSharedStorage('gp_shared_partenaires', supaPartenaires);
       }
 
       // 8. BONS DE LIVRAISON
-      if (supaBonsLivraison && supaBonsLivraison.length > 0) {
+      if (supaBonsLivraison !== null) {
         setBonsLivraison(supaBonsLivraison);
         saveSharedStorage('gp_shared_bons_livraison', supaBonsLivraison);
       }
@@ -333,9 +302,9 @@ export default function Home() {
     showToast('Déconnexion effectuée.');
   };
 
-  // Sécurité navigation : L'Assistante ne peut pas accéder aux recettes, rapports financiers ou gestion utilisateurs
+  // Sécurité navigation : L'Assistante ne peut pas accéder aux recettes d'encaissement ou gestion utilisateurs
   useEffect(() => {
-    if (currentUser?.role === 'ASSISTANTE' && (activeTab === 'recettes' || activeTab === 'rapports' || activeTab === 'utilisateurs')) {
+    if (currentUser?.role === 'ASSISTANTE' && (activeTab === 'recettes' || activeTab === 'utilisateurs')) {
       setActiveTab('dashboard');
     }
   }, [currentUser, activeTab]);
@@ -506,9 +475,11 @@ export default function Home() {
     const newRec: ReglementRecette = {
       id: `rec-${Date.now()}`,
       numeroRecu: `REC-2026-${seq}`,
-      dossierId: dossier.id,
+      dossierId: dossier?.id,
       factureId: facture?.id,
-      payeurNom: facture?.destinataire === 'ASSURANCE' ? (dossier.assurance?.nom || 'Assurance') : dossier.client.nom,
+      payeurNom: facture?.destinataire === 'ASSURANCE'
+        ? (dossier?.assurance?.nom || 'Assurance')
+        : (dossier?.client.nom || facture?.clientNom || 'Client'),
       sourceType: facture?.destinataire === 'ASSURANCE' ? 'ASSURANCE' : 'CLIENT',
       modePaiement: data.modePaiement,
       montant: data.montant,
@@ -518,7 +489,7 @@ export default function Home() {
       dateEcheance: data.dateEcheance,
       statut: (data.modePaiement === 'ESPECES' || data.modePaiement === 'VIREMENT') ? 'ENCAISSE' : 'EN_ATTENTE_ECHEANCE',
       dateEncaissementEffectif: (data.modePaiement === 'ESPECES' || data.modePaiement === 'VIREMENT') ? data.datePaiement : undefined,
-      notes: data.notes || `Règlement pour dossier ${dossier.numeroDossier}`,
+      notes: data.notes || (dossier ? `Règlement pour dossier ${dossier.numeroDossier}` : `Règlement facture ${facture?.numeroFacture || ''}`),
     };
 
     setRecettes((prev) => [newRec, ...prev]);
@@ -526,7 +497,7 @@ export default function Home() {
     // Update matching invoice
     setFactures((prev) =>
       prev.map((f) => {
-        if ((facture && f.id === facture.id) || f.dossierId === dossier.id) {
+        if ((facture && f.id === facture.id) || (dossier && f.dossierId === dossier.id)) {
           const nouveauMontantRegle = (f.montantRegle || 0) + data.montant;
           return {
             ...f,
@@ -540,18 +511,20 @@ export default function Home() {
       })
     );
 
-    // Update dossier status to VALIDE_REGLE
-    setDossiers((prev) =>
-      prev.map((d) =>
-        d.id === dossier.id
-          ? {
-              ...d,
-              statut: 'VALIDE_REGLE',
-              franchisePayeeParClient: true,
-            }
-          : d
-      )
-    );
+    // Update dossier status to VALIDE_REGLE if dossier exists
+    if (dossier) {
+      setDossiers((prev) =>
+        prev.map((d) =>
+          d.id === dossier.id
+            ? {
+                ...d,
+                statut: 'VALIDE_REGLE',
+                franchisePayeeParClient: true,
+              }
+            : d
+        )
+      );
+    }
 
     setActiveEncaisserModal(null);
     showToast(`Règlement de ${data.montant} DH (${data.modePaiement}) enregistré et encaissé avec succès !`);
@@ -993,14 +966,110 @@ export default function Home() {
     showToast('Dossier restauré avec succès dans les dossiers actifs.');
   };
 
+  const handleSaveEditedDossier = async (updatedDossier: DossierSinistre) => {
+    setDossiers((prev) => {
+      const updated = prev.map((d) => (d.id === updatedDossier.id ? updatedDossier : d));
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
+    await saveDossierToSupabase(updatedDossier);
+
+    // Mettre à jour la facture liée si existante
+    setFactures((prev) => {
+      const updatedFactures = prev.map((f) => {
+        if (
+          f.dossierId === updatedDossier.id ||
+          (updatedDossier.factureAssuranceId && f.id === updatedDossier.factureAssuranceId) ||
+          (updatedDossier.factureClientId && f.id === updatedDossier.factureClientId)
+        ) {
+          const totalHT = +(updatedDossier.montantTotalTTC / 1.20).toFixed(2);
+          const totalTVA = +(updatedDossier.montantTotalTTC - totalHT).toFixed(2);
+          const uFac: Facture = {
+            ...f,
+            totalHT,
+            totalTVA,
+            totalTTC: updatedDossier.montantTotalTTC,
+            clientNom: updatedDossier.client.nom,
+            clientTelephone: updatedDossier.client.telephone,
+            clientCin: updatedDossier.client.cin,
+            vehiculeInfo: `${updatedDossier.vehicule.marque} ${updatedDossier.vehicule.modele}`,
+            immatriculation: updatedDossier.vehicule.immatriculation,
+          };
+          saveFactureToSupabase(uFac);
+          return uFac;
+        }
+        return f;
+      });
+      saveSharedStorage('gp_shared_factures', updatedFactures);
+      return updatedFactures;
+    });
+
+    setEditingDossier(null);
+    showToast(`Dossier ${updatedDossier.numeroDossier} modifié avec succès.`);
+  };
+
   const handleDeleteDossierPermanent = async (dossierId: string) => {
+    // 1. Suppression du dossier
     setDossiers((prev) => {
       const updated = prev.filter((d) => d.id !== dossierId);
       saveSharedStorage('gp_shared_dossiers', updated);
       return updated;
     });
+
+    // 2. Suppression en cascade des factures associées
+    const linkedFactures = factures.filter((f) => f.dossierId === dossierId);
+    setFactures((prev) => {
+      const updated = prev.filter((f) => f.dossierId !== dossierId);
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
+
+    // 3. Suppression en cascade des bons de livraison associés
+    const linkedBLs = bonsLivraison.filter((b) => b.dossierId === dossierId);
+    setBonsLivraison((prev) => {
+      const updated = prev.filter((b) => b.dossierId !== dossierId);
+      saveSharedStorage('gp_shared_bons_livraison', updated);
+      return updated;
+    });
+
     await deleteDossierFromSupabase(dossierId);
-    showToast('Dossier supprimé définitivement de la base de données.');
+    for (const fac of linkedFactures) {
+      await deleteFactureFromSupabase(fac.id);
+    }
+    for (const bl of linkedBLs) {
+      await deleteBonLivraisonFromSupabase(bl.id);
+    }
+
+    showToast('Dossier et documents associés supprimés définitivement.');
+  };
+
+  const handleDeleteFacture = async (factureId: string) => {
+    setFactures((prev) => {
+      const updated = prev.filter((f) => f.id !== factureId);
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
+    await deleteFactureFromSupabase(factureId);
+    showToast('Facture supprimée définitivement.');
+  };
+
+  const handleDeleteCommande = async (commandeId: string) => {
+    setCommandesFournisseurs((prev) => {
+      const updated = prev.filter((c) => c.id !== commandeId);
+      saveSharedStorage('gp_shared_commandes', updated);
+      return updated;
+    });
+    await deleteCommandeFournisseurFromSupabase(commandeId);
+    showToast('Bon de commande supprimé définitivement.');
+  };
+
+  const handleCreateDirectFacture = async (newFac: Facture) => {
+    const updated = [newFac, ...factures];
+    setFactures(updated);
+    saveSharedStorage('gp_shared_factures', updated);
+    await saveFactureToSupabase(newFac);
+    setShowNewDirectFactureModal(false);
+    showToast(`Facture directe ${newFac.numeroFacture} créée avec succès.`);
   };
 
   const handlePurgeExpiredDossiers = async () => {
@@ -1136,7 +1205,12 @@ export default function Home() {
 
   // Helper to open Facture modal from dossier
   const handleOpenFactureFromDossier = (dossier: DossierSinistre) => {
-    let matchedFacture = factures.find((f) => f.dossierId === dossier.id);
+    let matchedFacture = factures.find(
+      (f) =>
+        f.dossierId === dossier.id ||
+        (dossier.factureAssuranceId && f.id === dossier.factureAssuranceId) ||
+        (dossier.factureClientId && f.id === dossier.factureClientId)
+    );
     if (!matchedFacture) {
       const isAssurance = dossier.typeDossier === 'ASSURANCE';
       const newFactureNumero = getNextNumeroFacture(isAssurance ? 'AZUR_GLASS' : 'CLIENT', factures);
@@ -1146,7 +1220,7 @@ export default function Home() {
         id: `fac-${Date.now()}`,
         numeroFacture: newFactureNumero,
         dossierId: dossier.id,
-        destinataire: isAssurance ? 'ASSURANCE' : 'CLIENT',
+        destinataire: isAssurance ? 'AZUR_GLASS' : 'CLIENT',
         dateEmission: dossier.dateCreation,
         dateEcheance: isAssurance 
           ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -1179,8 +1253,16 @@ export default function Home() {
         totalTTC: dossier.montantTotalTTC,
         montantRegle: 0,
         statutPaiement: 'EN_ATTENTE',
+        clientNom: dossier.client.nom,
+        clientTelephone: dossier.client.telephone,
+        clientCin: dossier.client.cin,
+        vehiculeInfo: `${dossier.vehicule.marque} ${dossier.vehicule.modele}`,
+        immatriculation: dossier.vehicule.immatriculation,
       };
-      setFactures((prev) => [matchedFacture!, ...prev]);
+      const updatedFactures = [matchedFacture, ...factures];
+      setFactures(updatedFactures);
+      saveSharedStorage('gp_shared_factures', updatedFactures);
+      saveFactureToSupabase(matchedFacture);
     }
     setActiveFactureModal({ facture: matchedFacture, dossier });
   };
@@ -1539,6 +1621,7 @@ export default function Home() {
             onRestoreDossier={handleRestoreDossier}
             onDeleteDossierPermanent={handleDeleteDossierPermanent}
             onPurgeExpiredDossiers={handlePurgeExpiredDossiers}
+            onEditDossier={(d) => setEditingDossier(d)}
           />
         )}
 
@@ -1566,6 +1649,8 @@ export default function Home() {
             onMarquerPayee={handleMarquerFacturePayee}
             onOpenEncaisserModal={(fac, d) => setActiveEncaisserModal({ facture: fac, dossier: d })}
             onUpdateNumeroFacture={handleUpdateNumeroFacture}
+            onDeleteFacture={handleDeleteFacture}
+            onNewDirectFacture={() => setShowNewDirectFactureModal(true)}
           />
         )}
 
@@ -1578,7 +1663,7 @@ export default function Home() {
           />
         )}
 
-        {activeTab === 'rapports' && currentUser?.role === 'SUPERADMIN' && (
+        {activeTab === 'rapports' && (
           <RapportsExportView
             dossiers={dossiers}
             assurances={assurances}
@@ -1625,6 +1710,7 @@ export default function Home() {
             onCreateCommande={handleCreateCommandeFournisseur}
             onUpdateCommande={handleUpdateCommandeFournisseur}
             onOpenCommandeModal={handleOpenCommandeFournisseurModal}
+            onDeleteCommande={handleDeleteCommande}
           />
         )}
       </main>
@@ -1639,6 +1725,25 @@ export default function Home() {
           onClose={() => setShowNewDossierModal(false)}
           onSubmit={handleCreateDossier}
           onAddPartenaire={handleAddPartenaire}
+        />
+      )}
+
+      {editingDossier && (
+        <EditDossierModal
+          dossier={editingDossier}
+          assurances={assurances}
+          partenaires={partenaires}
+          onClose={() => setEditingDossier(null)}
+          onSave={handleSaveEditedDossier}
+        />
+      )}
+
+      {showNewDirectFactureModal && (
+        <NewDirectFactureModal
+          stockArticles={stock}
+          factures={factures}
+          onClose={() => setShowNewDirectFactureModal(false)}
+          onSave={handleCreateDirectFacture}
         />
       )}
 

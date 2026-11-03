@@ -4,15 +4,17 @@ import React, { useState } from 'react';
 import { Facture, DossierSinistre } from '@/types';
 import { formatDH, formatDate, getStatutPaiementBadge } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
-import { FileText, Printer, Search, CheckCircle2, Clock, AlertCircle, Coins, Calendar, Pencil, Check, X } from 'lucide-react';
+import { FileText, Printer, Search, CheckCircle2, Clock, AlertCircle, Coins, Calendar, Pencil, Check, X, Plus, Trash2 } from 'lucide-react';
 
 interface Props {
   factures: Facture[];
   dossiers: DossierSinistre[];
-  onOpenFactureModal: (facture: Facture, dossier: DossierSinistre) => void;
+  onOpenFactureModal: (facture: Facture, dossier?: DossierSinistre) => void;
   onMarquerPayee: (factureId: string) => void;
-  onOpenEncaisserModal?: (facture: Facture, dossier: DossierSinistre) => void;
+  onOpenEncaisserModal?: (facture: Facture, dossier?: DossierSinistre) => void;
   onUpdateNumeroFacture?: (factureId: string, newNumero: string) => void;
+  onDeleteFacture?: (factureId: string) => void;
+  onNewDirectFacture?: () => void;
 }
 
 export const FacturationView: React.FC<Props> = ({
@@ -22,6 +24,8 @@ export const FacturationView: React.FC<Props> = ({
   onMarquerPayee,
   onOpenEncaisserModal,
   onUpdateNumeroFacture,
+  onDeleteFacture,
+  onNewDirectFacture,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPaiement, setFilterPaiement] = useState<string>('ALL');
@@ -44,10 +48,11 @@ export const FacturationView: React.FC<Props> = ({
 
   const filteredFactures = baseFactures.filter((f) => {
     const matchedDossier = dossiers.find((d) => d.id === f.dossierId);
-    const imm = matchedDossier?.vehicule.immatriculation || '';
+    const imm = matchedDossier?.vehicule.immatriculation || f.immatriculation || '';
+    const clientName = matchedDossier?.client.nom || f.clientNom || '';
     const searchString = `
       ${f.numeroFacture} 
-      ${matchedDossier?.client.nom || ''} 
+      ${clientName} 
       ${matchedDossier?.assurance?.nom || ''} 
       ${imm}
       ${formatMatricule(imm, 'LATIN')}
@@ -75,7 +80,7 @@ export const FacturationView: React.FC<Props> = ({
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-xs font-semibold text-emerald-600 uppercase">Total Encaissé</span>
           <p className="text-2xl font-black text-emerald-700 font-mono mt-1">{formatDH(totalEncaisse)}</p>
-          <p className="text-[11px] text-emerald-600 mt-0.5">Virements reçus des assurances</p>
+          <p className="text-[11px] text-emerald-600 mt-0.5">Règlements reçus (Assurance & Comptant)</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-xs font-semibold text-brand-600 uppercase">Reste à Recouvrer</span>
@@ -87,8 +92,8 @@ export const FacturationView: React.FC<Props> = ({
       {/* Invoices List */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         {/* Header bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between gap-3 bg-slate-50/50">
-          <div className="relative flex-1 sm:w-80">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3 bg-slate-50/50">
+          <div className="relative flex-1 w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input
               type="text"
@@ -98,7 +103,8 @@ export const FacturationView: React.FC<Props> = ({
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
             {/* Filtre par Mois */}
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
               <Calendar className="w-3.5 h-3.5 text-brand-600 flex-shrink-0" />
@@ -131,6 +137,17 @@ export const FacturationView: React.FC<Props> = ({
               <option value="EN_ATTENTE">En attente de paiement</option>
               <option value="PARTIEL">Partiel</option>
             </select>
+
+            {onNewDirectFacture && (
+              <button
+                type="button"
+                onClick={onNewDirectFacture}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-sm transition-all"
+                title="Créer une facture directe (vente comptoir, pièces du stock, sans dossier sinistre)"
+              >
+                <Plus className="w-4 h-4" /> Nouvelle Facture Directe
+              </button>
+            )}
           </div>
         </div>
 
@@ -142,7 +159,7 @@ export const FacturationView: React.FC<Props> = ({
                 <th className="py-3 px-4">N° Facture</th>
                 <th className="py-3 px-4">Date Émission</th>
                 <th className="py-3 px-4">Destinataire (Assurance / Client)</th>
-                <th className="py-3 px-4">Véhicule Concerne</th>
+                <th className="py-3 px-4">Véhicule / Prestation</th>
                 <th className="py-3 px-4 text-right">Total HT</th>
                 <th className="py-3 px-4 text-right">Total TTC</th>
                 <th className="py-3 px-4 text-center">Statut Paiement</th>
@@ -150,120 +167,161 @@ export const FacturationView: React.FC<Props> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredFactures.map((fac) => {
-                const matchedDossier = dossiers.find((d) => d.id === fac.dossierId) || dossiers[0];
-                const badge = getStatutPaiementBadge(fac.statutPaiement);
+              {filteredFactures.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-10 text-center text-slate-400 text-xs">
+                    Aucune facture trouvée.
+                  </td>
+                </tr>
+              ) : (
+                filteredFactures.map((fac) => {
+                  const matchedDossier = dossiers.find((d) => d.id === fac.dossierId);
+                  const clientNomAffiche = matchedDossier?.client.nom || fac.clientNom || 'Client Comptoir';
+                  const isAssuranceOrAzur = fac.destinataire === 'ASSURANCE' || fac.destinataire === 'AZUR_GLASS';
+                  const badge = getStatutPaiementBadge(fac.statutPaiement);
 
-                return (
-                  <tr key={fac.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
-                      {editingFactureId === fac.id ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            value={editNumeroValue}
-                            onChange={(e) => setEditNumeroValue(e.target.value.toUpperCase())}
-                            className="px-2 py-0.5 text-xs border-2 border-emerald-500 rounded bg-emerald-50/50 font-mono font-bold w-28 focus:outline-none"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveNumero(fac.id);
-                              if (e.key === 'Escape') setEditingFactureId(null);
-                            }}
-                          />
+                  return (
+                    <tr key={fac.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
+                        {editingFactureId === fac.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={editNumeroValue}
+                              onChange={(e) => setEditNumeroValue(e.target.value.toUpperCase())}
+                              className="px-2 py-0.5 text-xs border-2 border-emerald-500 rounded bg-emerald-50/50 font-mono font-bold w-28 focus:outline-none"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveNumero(fac.id);
+                                if (e.key === 'Escape') setEditingFactureId(null);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveNumero(fac.id)}
+                              className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded transition shadow-xs"
+                              title="Valider"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingFactureId(null)}
+                              className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition"
+                              title="Annuler"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group">
+                            <span className="text-slate-900">{fac.numeroFacture}</span>
+                            {onUpdateNumeroFacture && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingFactureId(fac.id);
+                                  setEditNumeroValue(fac.numeroFacture);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded transition"
+                                title="Modifier le N° de facture"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {formatDate(fac.dateEmission)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <strong className="text-slate-900">
+                          {isAssuranceOrAzur ? (matchedDossier?.assurance?.nom || 'AZUR GLASS') : clientNomAffiche}
+                        </strong>
+                        <span className="block text-[11px] text-slate-500">
+                          {isAssuranceOrAzur ? `Assuré : ${clientNomAffiche}` : (fac.clientIce ? `ICE: ${fac.clientIce}` : 'Vente directe')}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {matchedDossier ? (
+                          <>
+                            <span className="font-semibold text-slate-800">
+                              {matchedDossier.vehicule.marque} {matchedDossier.vehicule.modele}
+                            </span>
+                            <span className="block font-mono text-[11px] text-slate-500" dir="ltr">
+                              {formatMatricule(matchedDossier.vehicule.immatriculation, 'LATIN')}
+                            </span>
+                          </>
+                        ) : fac.vehiculeInfo ? (
+                          <>
+                            <span className="font-semibold text-slate-800">{fac.vehiculeInfo}</span>
+                            {fac.immatriculation && (
+                              <span className="block font-mono text-[11px] text-slate-500" dir="ltr">
+                                {formatMatricule(fac.immatriculation, 'LATIN')}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            Vente Comptoir / Stock
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-600">
+                        {formatDH(fac.totalHT)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 text-sm">
+                        {formatDH(fac.totalTTC)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.bg}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {fac.statutPaiement !== 'REGLE' && (
+                            <button
+                              onClick={() => {
+                                if (onOpenEncaisserModal) {
+                                  onOpenEncaisserModal(fac, matchedDossier);
+                                } else {
+                                  onMarquerPayee(fac.id);
+                                }
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-semibold transition-colors shadow-sm"
+                              title="Encaisser le paiement (Espèces, Chèque, Virement, Effet)"
+                            >
+                              <Coins className="w-3.5 h-3.5" /> Encaisser
+                            </button>
+                          )}
                           <button
-                            type="button"
-                            onClick={() => handleSaveNumero(fac.id)}
-                            className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded transition shadow-xs"
-                            title="Valider"
+                            onClick={() => onOpenFactureModal(fac, matchedDossier)}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold transition-colors"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Printer className="w-3.5 h-3.5" /> Voir / Imprimer
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingFactureId(null)}
-                            className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition"
-                            title="Annuler"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 group">
-                          <span className="text-slate-900">{fac.numeroFacture}</span>
-                          {onUpdateNumeroFacture && (
+                          {onDeleteFacture && (
                             <button
                               type="button"
                               onClick={() => {
-                                setEditingFactureId(fac.id);
-                                setEditNumeroValue(fac.numeroFacture);
+                                if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement la facture ${fac.numeroFacture} ?`)) {
+                                  onDeleteFacture(fac.id);
+                                }
                               }}
-                              className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded transition"
-                              title="Modifier le N° de facture"
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                              title="Supprimer la facture"
                             >
-                              <Pencil className="w-3 h-3" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {formatDate(fac.dateEmission)}
-                    </td>
-                    <td className="py-3 px-4">
-                      <strong className="text-slate-900">
-                        {fac.destinataire === 'ASSURANCE' ? (matchedDossier?.assurance?.nom || 'Assurance') : matchedDossier?.client.nom}
-                      </strong>
-                      <span className="block text-[11px] text-slate-500">
-                        Client : {matchedDossier?.client.nom}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="font-semibold text-slate-800">
-                        {matchedDossier?.vehicule.marque} {matchedDossier?.vehicule.modele}
-                      </span>
-                      <span className="block font-mono text-[11px] text-slate-500" dir="ltr">
-                        {matchedDossier ? formatMatricule(matchedDossier.vehicule.immatriculation, 'LATIN') : ''}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-slate-600">
-                      {formatDH(fac.totalHT)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 text-sm">
-                      {formatDH(fac.totalTTC)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.bg}`}>
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {fac.statutPaiement !== 'REGLE' && (
-                          <button
-                            onClick={() => {
-                              if (onOpenEncaisserModal && matchedDossier) {
-                                onOpenEncaisserModal(fac, matchedDossier);
-                              } else {
-                                onMarquerPayee(fac.id);
-                              }
-                            }}
-                            className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-semibold transition-colors shadow-sm"
-                            title="Encaisser le paiement (Espèces, Chèque, Virement, Effet)"
-                          >
-                            <Coins className="w-3.5 h-3.5" /> Encaisser
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onOpenFactureModal(fac, matchedDossier)}
-                          className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold transition-colors"
-                        >
-                          <Printer className="w-3.5 h-3.5" /> Voir / Imprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

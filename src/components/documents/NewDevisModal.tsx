@@ -40,6 +40,9 @@ export const NewDevisModal: React.FC<Props> = ({
   const [agenceVille, setAgenceVille] = useState(initialDevis?.agenceVille || 'Marrakech');
 
   // Vehicule Info
+  const [isVenteComptoir, setIsVenteComptoir] = useState(
+    initialDevis?.vehiculeImmatriculation === '-' || initialDevis?.vehiculeMarque?.includes('Comptoir') || false
+  );
   const [vehiculeMarque, setVehiculeMarque] = useState(initialDevis?.vehiculeMarque || 'Renault');
   const [vehiculeModele, setVehiculeModele] = useState(initialDevis?.vehiculeModele || 'Clio');
   const [vehiculeAnnee, setVehiculeAnnee] = useState(initialDevis?.vehiculeAnnee || new Date().getFullYear());
@@ -195,10 +198,10 @@ export const NewDevisModal: React.FC<Props> = ({
       clientCin: clientCin || undefined,
       clientEmail: clientEmail || undefined,
       clientVille: agenceVille,
-      vehiculeMarque,
-      vehiculeModele,
-      vehiculeAnnee: Number(vehiculeAnnee),
-      vehiculeImmatriculation,
+      vehiculeMarque: isVenteComptoir ? (vehiculeMarque.trim() || 'Comptoir / Pièces') : vehiculeMarque,
+      vehiculeModele: isVenteComptoir ? (vehiculeModele.trim() || 'Vente Directe') : vehiculeModele,
+      vehiculeAnnee: Number(vehiculeAnnee) || new Date().getFullYear(),
+      vehiculeImmatriculation: isVenteComptoir ? (vehiculeImmatriculation.trim() || '-') : vehiculeImmatriculation,
       vehiculeChassisVin: vehiculeChassisVin || undefined,
       typeDemande,
       compagnieAssurance: typeDemande === 'ASSURANCE' ? compagnieAssurance : undefined,
@@ -402,71 +405,102 @@ export const NewDevisModal: React.FC<Props> = ({
 
             {/* Véhicule Info */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
-              <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b pb-2">
-                <Car className="w-4 h-4 text-brand-600" /> Véhicule Concerné
-              </h4>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Marque *</label>
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <Car className="w-4 h-4 text-brand-600" /> Véhicule Concerné
+                </h4>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
                   <input
-                    type="text"
-                    required
-                    placeholder="Ex: Renault"
-                    value={vehiculeMarque}
-                    onChange={(e) => setVehiculeMarque(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border rounded-lg bg-white font-medium"
+                    type="checkbox"
+                    checked={isVenteComptoir}
+                    onChange={(e) => {
+                      setIsVenteComptoir(e.target.checked);
+                      if (e.target.checked) {
+                        setVehiculeMarque('Comptoir / Pièces');
+                        setVehiculeModele('Vente Directe');
+                        setVehiculeImmatriculation('-');
+                      } else {
+                        setVehiculeMarque('Renault');
+                        setVehiculeModele('Clio');
+                        setVehiculeImmatriculation('');
+                      }
+                    }}
+                    className="rounded text-amber-600 focus:ring-amber-500"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Modèle *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ex: Clio 5"
-                    value={vehiculeModele}
-                    onChange={(e) => setVehiculeModele(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border rounded-lg bg-white font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Année *</label>
-                  <input
-                    type="number"
-                    min={1990}
-                    max={2030}
-                    required
-                    value={vehiculeAnnee}
-                    onChange={(e) => setVehiculeAnnee(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border rounded-lg bg-white font-medium"
-                  />
-                </div>
-
-                <div className="col-span-3">
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Matricule du véhicule (Format Maroc) :
-                  </label>
-                  <MatriculeMarocInput
-                    value={vehiculeImmatriculation}
-                    onChange={setVehiculeImmatriculation}
-                  />
-                </div>
-
-                <div className="col-span-3">
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                    N° Châssis (VIN Optionnel)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: VF1... (17 caractères)"
-                    value={vehiculeChassisVin}
-                    onChange={(e) => setVehiculeChassisVin(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border rounded-lg bg-white uppercase font-mono"
-                  />
-                </div>
+                  <span className="font-bold">🛒 Vente Comptoir / Sans Matricule</span>
+                </label>
               </div>
+
+              {isVenteComptoir ? (
+                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
+                  <p className="font-bold">Mode Vente Comptoir activé :</p>
+                  <p className="text-[11px] text-amber-800">
+                    Ce devis sera établi pour un achat direct au comptoir (vente de vitrages, colles ou fournitures) sans exiger de véhicule ni d'immatriculation.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Marque *</label>
+                    <input
+                      type="text"
+                      required={!isVenteComptoir}
+                      placeholder="Ex: Renault"
+                      value={vehiculeMarque}
+                      onChange={(e) => setVehiculeMarque(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border rounded-lg bg-white font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Modèle *</label>
+                    <input
+                      type="text"
+                      required={!isVenteComptoir}
+                      placeholder="Ex: Clio 5"
+                      value={vehiculeModele}
+                      onChange={(e) => setVehiculeModele(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border rounded-lg bg-white font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Année *</label>
+                    <input
+                      type="number"
+                      min={1990}
+                      max={2030}
+                      required={!isVenteComptoir}
+                      value={vehiculeAnnee}
+                      onChange={(e) => setVehiculeAnnee(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border rounded-lg bg-white font-medium"
+                    />
+                  </div>
+
+                  <div className="col-span-3">
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Matricule du véhicule (Format Maroc) :
+                    </label>
+                    <MatriculeMarocInput
+                      value={vehiculeImmatriculation}
+                      onChange={setVehiculeImmatriculation}
+                    />
+                  </div>
+
+                  <div className="col-span-3">
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                      N° Châssis (VIN Optionnel)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: VF1... (17 caractères)"
+                      value={vehiculeChassisVin}
+                      onChange={(e) => setVehiculeChassisVin(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border rounded-lg bg-white uppercase font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

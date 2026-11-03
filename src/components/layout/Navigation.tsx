@@ -105,7 +105,7 @@ export const Navigation: React.FC<Props> = ({
   ];
 
   const filteredNavItems = userSession?.role === 'ASSISTANTE'
-    ? navItems.filter((item) => item.id !== 'recettes' && item.id !== 'rapports' && !item.superAdminOnly)
+    ? navItems.filter((item) => item.id !== 'recettes' && !item.superAdminOnly)
     : navItems;
 
   return (

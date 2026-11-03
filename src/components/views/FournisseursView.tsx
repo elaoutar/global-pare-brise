@@ -52,6 +52,7 @@ interface Props {
   onCreateCommande: (commande: BonCommandeFournisseur) => void;
   onUpdateCommande: (commande: BonCommandeFournisseur) => void;
   onOpenCommandeModal: (commande: BonCommandeFournisseur, fournisseur: Fournisseur) => void;
+  onDeleteCommande?: (commandeId: string) => void;
 }
 
 export const FournisseursView: React.FC<Props> = ({ 
@@ -63,7 +64,8 @@ export const FournisseursView: React.FC<Props> = ({
   onDeleteFournisseur,
   onCreateCommande,
   onUpdateCommande,
-  onOpenCommandeModal
+  onOpenCommandeModal,
+  onDeleteCommande,
 }) => {
   // Navigation tabs within Fournisseurs view
   const [activeTab, setActiveTab] = useState<'ANNUAIRE' | 'COMMANDES'>('COMMANDES');
@@ -674,6 +676,21 @@ export const FournisseursView: React.FC<Props> = ({
                                 <CreditCard className="w-3 h-3 text-slate-500" />
                                 État
                               </button>
+
+                              {onDeleteCommande && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement le bon de commande ${cmd.numeroBC} ?`)) {
+                                      onDeleteCommande(cmd.id);
+                                    }
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Supprimer ce bon de commande"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

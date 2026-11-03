@@ -109,7 +109,7 @@ export interface LigneFacture {
 export interface Facture {
   id: string;
   numeroFacture: string; // Ex: N2026148 (Particulier) ou N2028045 (AZUR GLASS)
-  dossierId: string;
+  dossierId?: string;
   destinataire: 'ASSURANCE' | 'CLIENT' | 'AZUR_GLASS';
   dateEmission: string;
   dateEcheance: string;
@@ -124,6 +124,15 @@ export interface Facture {
   observations?: string;
   montantRegleEspeces?: number; // Montant réglé en espèces (franchise / TVA)
   montantSoldeVirement?: number; // Reste à régler par virement bancaire (reversement AZUR GLASS)
+
+  // Champs vente directe / comptoir sans dossier
+  clientNom?: string;
+  clientTelephone?: string;
+  clientCin?: string;
+  clientIce?: string;
+  clientAdresse?: string;
+  vehiculeInfo?: string;
+  immatriculation?: string;
 }
 
 export type TypeDossier = 'ASSURANCE' | 'PARTICULIER_COMPTANT';

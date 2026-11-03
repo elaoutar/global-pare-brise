@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 interface Props {
-  dossier: DossierSinistre;
+  dossier?: DossierSinistre | null;
   facture?: Facture;
   onClose: () => void;
   onConfirmPaiement: (data: {
@@ -49,7 +49,7 @@ export const EncaisserPaiementModal: React.FC<Props> = ({
 }) => {
   const montantDu = facture 
     ? Math.max(0, facture.totalTTC - (facture.montantRegle || 0))
-    : dossier.montantTotalTTC;
+    : (dossier?.montantTotalTTC || 0);
 
   const [modePaiement, setModePaiement] = useState<ModePaiement>('ESPECES');
   const [montant, setMontant] = useState<number>(montantDu || 1800);
@@ -85,7 +85,11 @@ export const EncaisserPaiementModal: React.FC<Props> = ({
               Encaisser le Règlement Client / Facture
             </h3>
             <p className="text-xs text-slate-300 mt-0.5">
-              Dossier : <span className="font-mono font-bold text-white">{dossier.numeroDossier}</span> • {dossier.client.nom}
+              {dossier ? (
+                <>Dossier : <span className="font-mono font-bold text-white">{dossier.numeroDossier}</span> • {dossier.client.nom}</>
+              ) : (
+                <>Facture : <span className="font-mono font-bold text-white">{facture?.numeroFacture}</span> • {facture?.clientNom || 'Vente Comptoir'}</>
+              )}
             </p>
           </div>
           <button
@@ -101,9 +105,22 @@ export const EncaisserPaiementModal: React.FC<Props> = ({
           {/* Target vehicle reminder */}
           <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-200">
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Véhicule & Intervention</p>
-              <p className="font-bold text-slate-900">{dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})</p>
-              <p className="text-[11px] font-mono font-bold text-amber-800">{dossier.vehicule.immatriculation}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">
+                {dossier ? 'Véhicule & Intervention' : 'Client & Détails'}
+              </p>
+              {dossier ? (
+                <>
+                  <p className="font-bold text-slate-900">{dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})</p>
+                  <p className="text-[11px] font-mono font-bold text-amber-800">{dossier.vehicule.immatriculation}</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-bold text-slate-900">{facture?.clientNom || 'Client Direct'}</p>
+                  <p className="text-[11px] font-mono font-bold text-amber-800">
+                    {facture?.immatriculation || facture?.vehiculeInfo || 'Vente Comptoir / Directe'}
+                  </p>
+                </>
+              )}
             </div>
             <div className="text-right">
               <p className="text-[10px] font-bold text-slate-400 uppercase">Montant Total Facturé</p>

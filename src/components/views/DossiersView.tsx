@@ -34,7 +34,8 @@ import {
   RotateCcw,
   AlertTriangle,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Pencil
 } from 'lucide-react';
 import { DocumentAttache } from '@/types';
 import { exportEtatMensuelExcel } from '@/lib/exportUtils';
@@ -59,6 +60,7 @@ interface Props {
   onRestoreDossier?: (dossierId: string) => void;
   onDeleteDossierPermanent?: (dossierId: string) => void;
   onPurgeExpiredDossiers?: () => void;
+  onEditDossier?: (dossier: DossierSinistre) => void;
 }
 
 export const DossiersView: React.FC<Props> = ({
@@ -78,6 +80,7 @@ export const DossiersView: React.FC<Props> = ({
   onRestoreDossier,
   onDeleteDossierPermanent,
   onPurgeExpiredDossiers,
+  onEditDossier,
 }) => {
   const [tabVue, setTabVue] = useState<'ACTIFS' | 'ARCHIVES'>('ACTIFS');
   const [dossierToArchive, setDossierToArchive] = useState<DossierSinistre | null>(null);
@@ -514,6 +517,20 @@ export const DossiersView: React.FC<Props> = ({
                       <span>•</span>
                       <span>Poseur : {selectedDossier.poseur || 'Non affecté'}</span>
                     </div>
+
+                    {onEditDossier && !selectedDossier.isArchive && (
+                      <div className="mt-2.5">
+                        <button
+                          type="button"
+                          onClick={() => onEditDossier(selectedDossier)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-lg text-xs font-bold transition-all border border-slate-200 hover:border-emerald-300 shadow-2xs"
+                          title="Modifier les coordonnées du client, véhicule, assurance, montants ou statut"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Modifier le Dossier</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     {selectedDossier.typeDossier === 'PARTICULIER_COMPTANT' ? (

@@ -134,6 +134,9 @@ Email: ${GARAGE_INFO.email}`;
           dossierNumero: dossier.numeroDossier,
           photos: dossier.photos,
           documents: dossier.documents,
+          bonSortie,
+          bonLivraison,
+          facture,
         }),
       });
 
@@ -317,17 +320,17 @@ Email: ${GARAGE_INFO.email}`;
                 </div>
               )}
 
-              <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-slate-800">
-                <PackageMinus className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <div className="flex items-center gap-2 p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 text-slate-800">
+                <PackageMinus className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                 <span className="truncate">
-                  <strong>Bon de Sortie Stock</strong> ({numDossier})
+                  <strong>Bon de Sortie Atelier</strong> (Joint auto • Sans signature requise)
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-slate-800">
-                <Truck className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+              <div className="flex items-center gap-2 p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 text-slate-800">
+                <Truck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                 <span className="truncate">
-                  <strong>Bon de Livraison & Décharge</strong> client
+                  <strong>Bon de Livraison Décharge</strong> (Joint auto • Sans signature requise)
                 </span>
               </div>
 

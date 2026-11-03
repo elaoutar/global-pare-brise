@@ -275,6 +275,26 @@ export const saveStockArticleToSupabase = async (article: ArticleStock): Promise
   }
 };
 
+export const deleteStockArticleFromSupabase = async (articleId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('stock')
+      .delete()
+      .eq('id', articleId);
+
+    if (error) {
+      console.error('Erreur delete article stock Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Exception delete article stock Supabase:', err);
+    return false;
+  }
+};
+
 // ==============================================================================
 // 4. FACTURES (CRUD SUPABASE)
 // ==============================================================================
@@ -348,6 +368,26 @@ export const saveFactureToSupabase = async (facture: Facture): Promise<boolean> 
     return true;
   } catch (err) {
     console.error('Exception save facture Supabase:', err);
+    return false;
+  }
+};
+
+export const deleteFactureFromSupabase = async (factureId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('factures')
+      .delete()
+      .eq('id', factureId);
+
+    if (error) {
+      console.error('Erreur delete facture Supabase:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Exception delete facture Supabase:', err);
     return false;
   }
 };
@@ -729,6 +769,26 @@ export const savePartenaireToSupabase = async (part: Partenaire): Promise<boolea
     return true;
   } catch (err) {
     console.warn('Exception save partenaire Supabase:', err);
+    return false;
+  }
+};
+
+export const deletePartenaireFromSupabase = async (partenaireId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('partenaires')
+      .delete()
+      .eq('id', partenaireId);
+
+    if (error) {
+      console.warn('Erreur delete partenaire Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception delete partenaire Supabase:', err);
     return false;
   }
 };
