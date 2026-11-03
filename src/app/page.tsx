@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   DossierSinistre, 
   ArticleStock, 
@@ -101,7 +101,7 @@ const loadSharedStorage = <T,>(key: string, fallback: T): T => {
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed as T;
+      if (Array.isArray(parsed)) return parsed as T;
       if (parsed && typeof parsed === 'object') return parsed as T;
     }
   } catch (e) {
@@ -170,9 +170,13 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Référence pour limiter les requêtes intempestives sur focus / boîte de dialogue
+  const lastFetchRef = useRef<number>(0);
+
   // Synchronisation avec Supabase Cloud (avec réconciliation et poussée automatique des données locales orphelines)
   const loadSupabaseData = async () => {
     if (!isSupabaseConfigured) return;
+    lastFetchRef.current = Date.now();
 
     try {
       const [
@@ -225,19 +229,10 @@ export default function Home() {
         saveSharedStorage('gp_shared_fournisseurs', supaFournisseurs);
       }
 
-      // 6. COMMANDES FOURNISSEURS (Mois 11 / Novembre 2026 et suivants)
+      // 6. COMMANDES FOURNISSEURS : Supabase Cloud est la source de vérité
       if (supaCommandes !== null) {
-        if (supaCommandes.length > 0) {
-          setCommandesFournisseurs(supaCommandes);
-          saveSharedStorage('gp_shared_commandes', supaCommandes);
-        } else {
-          // Si aucune commande dans le cloud, initialiser avec les commandes du mois 11
-          setCommandesFournisseurs(INITIAL_COMMANDES_FOURNISSEURS);
-          saveSharedStorage('gp_shared_commandes', INITIAL_COMMANDES_FOURNISSEURS);
-          for (const cmd of INITIAL_COMMANDES_FOURNISSEURS) {
-            saveCommandeFournisseurToSupabase(cmd);
-          }
-        }
+        setCommandesFournisseurs(supaCommandes);
+        saveSharedStorage('gp_shared_commandes', supaCommandes);
       }
 
       // 7. PARTENAIRES
@@ -315,11 +310,14 @@ export default function Home() {
     loadSupabaseData();
 
     const handleFocus = () => {
-      loadSupabaseData();
+      // Éviter les rechargements concurrents lors de la fermeture des boîtes de confirmation
+      if (Date.now() - lastFetchRef.current > 3000) {
+        loadSupabaseData();
+      }
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && Date.now() - lastFetchRef.current > 3000) {
         loadSupabaseData();
       }
     };
@@ -1055,12 +1053,23 @@ export default function Home() {
   };
 
   const handleDeleteCommande = async (commandeId: string) => {
+    // 1. Suppression optimiste locale immédiate
     setCommandesFournisseurs((prev) => {
       const updated = prev.filter((c) => c.id !== commandeId);
       saveSharedStorage('gp_shared_commandes', updated);
       return updated;
     });
+
+    // 2. Suppression définitive dans Supabase Cloud
     await deleteCommandeFournisseurFromSupabase(commandeId);
+
+    // 3. Re-filtrage de sécurité pour garantir la cohérence
+    setCommandesFournisseurs((prev) => {
+      const updated = prev.filter((c) => c.id !== commandeId);
+      saveSharedStorage('gp_shared_commandes', updated);
+      return updated;
+    });
+
     showToast('Bon de commande supprimé définitivement.');
   };
 

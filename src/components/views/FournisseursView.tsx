@@ -680,9 +680,9 @@ export const FournisseursView: React.FC<Props> = ({
                               {onDeleteCommande && (
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={async () => {
                                     if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement le bon de commande ${cmd.numeroBC} ?`)) {
-                                      onDeleteCommande(cmd.id);
+                                      await onDeleteCommande(cmd.id);
                                     }
                                   }}
                                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
