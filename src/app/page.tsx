@@ -138,7 +138,9 @@ export default function Home() {
   const [assurances, setAssurances] = useState<Assurance[]>(INITIAL_ASSURANCES);
   const [partenaires, setPartenaires] = useState<Partenaire[]>(() => loadSharedStorage('gp_shared_partenaires', INITIAL_PARTENAIRES));
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(() => loadSharedStorage('gp_shared_fournisseurs', INITIAL_FOURNISSEURS));
-  const [commandesFournisseurs, setCommandesFournisseurs] = useState<BonCommandeFournisseur[]>(() => loadSharedStorage('gp_shared_commandes', INITIAL_COMMANDES_FOURNISSEURS));
+  const [commandesFournisseurs, setCommandesFournisseurs] = useState<BonCommandeFournisseur[]>(() => 
+    loadSharedStorage<BonCommandeFournisseur[]>('gp_shared_commandes', INITIAL_COMMANDES_FOURNISSEURS)
+  );
   const [devisList, setDevisList] = useState<DevisClient[]>(() => loadSharedStorage('gp_shared_devis', INITIAL_DEVIS));
 
   // Modals state
@@ -223,19 +225,18 @@ export default function Home() {
         saveSharedStorage('gp_shared_fournisseurs', supaFournisseurs);
       }
 
-      // 6. COMMANDES FOURNISSEURS (Suppression stricte des commandes antérieures au mois 11 / Novembre 2026)
+      // 6. COMMANDES FOURNISSEURS (Mois 11 / Novembre 2026 et suivants)
       if (supaCommandes !== null) {
-        const filteredCmds = supaCommandes.filter((c) => {
-          if (!c.dateCommande) return true;
-          return c.dateCommande >= '2026-11-01';
-        });
-        setCommandesFournisseurs(filteredCmds);
-        saveSharedStorage('gp_shared_commandes', filteredCmds);
-
-        // Purge en base des commandes antérieures au mois 11 si détectées
-        const oldCmds = supaCommandes.filter((c) => c.dateCommande && c.dateCommande < '2026-11-01');
-        for (const old of oldCmds) {
-          deleteCommandeFournisseurFromSupabase(old.id);
+        if (supaCommandes.length > 0) {
+          setCommandesFournisseurs(supaCommandes);
+          saveSharedStorage('gp_shared_commandes', supaCommandes);
+        } else {
+          // Si aucune commande dans le cloud, initialiser avec les commandes du mois 11
+          setCommandesFournisseurs(INITIAL_COMMANDES_FOURNISSEURS);
+          saveSharedStorage('gp_shared_commandes', INITIAL_COMMANDES_FOURNISSEURS);
+          for (const cmd of INITIAL_COMMANDES_FOURNISSEURS) {
+            saveCommandeFournisseurToSupabase(cmd);
+          }
         }
       }
 

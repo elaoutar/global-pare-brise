@@ -607,7 +607,7 @@ export const fetchCommandesFournisseursFromSupabase = async (): Promise<BonComma
     const { data, error } = await supabase
       .from('commandes_fournisseurs')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('date_commande', { ascending: false });
 
     if (error) {
       console.warn('Erreur ou table commandes_fournisseurs absente Supabase:', error.message);
@@ -618,10 +618,11 @@ export const fetchCommandesFournisseursFromSupabase = async (): Promise<BonComma
 
     return data.map((row: any) => ({
       id: row.id,
-      numeroBC: row.numero_commande || row.numero_bc,
-      fournisseurId: row.fournisseur_id,
-      dateCommande: row.date_commande,
-      dateLivraisonPrevue: row.date_livraison_prevue || undefined,
+      numeroBC: row.numero_commande || row.numero_bc || '',
+      fournisseurId: row.fournisseur_id || '',
+      fournisseurNom: row.fournisseur_nom || '',
+      dateCommande: row.date_commande ? String(row.date_commande).slice(0, 10) : '',
+      dateLivraisonPrevue: row.date_livraison_prevue ? String(row.date_livraison_prevue).slice(0, 10) : undefined,
       agenceVille: row.agence_ville || 'Marrakech',
       lignes: row.lignes || [],
       totalHT: Number(row.total_ht || row.montant_total_ht || 0),
@@ -633,7 +634,7 @@ export const fetchCommandesFournisseursFromSupabase = async (): Promise<BonComma
       montantPaye: Number(row.montant_paye || 0),
       modePaiement: row.mode_paiement || undefined,
       referencePaiement: row.reference_paiement || undefined,
-      dateEcheancePaiement: row.date_echeance_paiement || undefined,
+      dateEcheancePaiement: row.date_echeance_paiement ? String(row.date_echeance_paiement).slice(0, 10) : undefined,
       numeroBLFournisseur: row.numero_bl_fournisseur || undefined,
       numeroFactureFournisseur: row.numero_facture_fournisseur || undefined,
       notes: row.notes || undefined,
@@ -653,23 +654,20 @@ export const saveCommandeFournisseurToSupabase = async (cmd: BonCommandeFourniss
       numero_commande: cmd.numeroBC,
       fournisseur_id: cmd.fournisseurId,
       fournisseur_nom: cmd.fournisseurNom || 'Fournisseur',
-      date_commande: cmd.dateCommande || new Date().toISOString().split('T')[0],
-      date_livraison_prevue: cmd.dateLivraisonPrevue || null,
+      date_commande: cmd.dateCommande ? cmd.dateCommande.slice(0, 10) : new Date().toISOString().split('T')[0],
+      date_livraison_prevue: cmd.dateLivraisonPrevue ? cmd.dateLivraisonPrevue.slice(0, 10) : null,
       agence_ville: cmd.agenceVille || 'Marrakech',
       lignes: cmd.lignes || [],
       total_ht: Number(cmd.totalHT) || 0,
       total_tva: Number(cmd.totalTVA) || 0,
       total_ttc: Number(cmd.totalTTC) || 0,
       statut: cmd.statutCommande || 'ENVOYEE',
-      statut_paiement: cmd.statutPaiement || 'NON_PAYE',
-      montant_paye: Number(cmd.montantPaye) || 0,
       mode_paiement: cmd.modePaiement || null,
-      reference_paiement: cmd.referencePaiement || null,
-      date_echeance_paiement: cmd.dateEcheancePaiement || null,
+      date_echeance_paiement: cmd.dateEcheancePaiement ? cmd.dateEcheancePaiement.slice(0, 10) : null,
       numero_bl_fournisseur: cmd.numeroBLFournisseur || null,
       numero_facture_fournisseur: cmd.numeroFactureFournisseur || null,
       notes: cmd.notes || null,
-      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase
@@ -677,16 +675,8 @@ export const saveCommandeFournisseurToSupabase = async (cmd: BonCommandeFourniss
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      console.warn('Erreur upsert commande fournisseur Supabase, repli minimal:', error.message);
-      // Tentative de repli sans colonnes optionnelles
-      const { agence_ville, mode_paiement, date_echeance_paiement, ...safePayload } = payload;
-      const { error: retryError } = await supabase
-        .from('commandes_fournisseurs')
-        .upsert(safePayload, { onConflict: 'id' });
-      if (retryError) {
-        console.error('Erreur persistante upsert commande fournisseur:', retryError.message);
-        return false;
-      }
+      console.warn('Erreur upsert commande fournisseur Supabase:', error.message);
+      return false;
     }
     return true;
   } catch (err) {
