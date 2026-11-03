@@ -565,6 +565,9 @@ export const NewDossierModal: React.FC<Props> = ({
       franchiseOfferte: isAssurance ? franchiseOfferte : false,
       tvaExclueParAssurance: effectiveTvaExclue,
       montantReversementAzurGlass: netReversementAzur,
+      commission: selectedPartenaire?.tauxCommissionPourcent 
+        ? +((computedTotalTTC * selectedPartenaire.tauxCommissionPourcent) / 100).toFixed(2) 
+        : 0,
       statut: (typeDossier === 'PARTICULIER_COMPTANT' && reglementImmediat) 
         ? 'VALIDE_REGLE' 
         : (isAssurance ? 'ENVOYE_AZUR_GLASS' : 'EN_COURS_POSE'),

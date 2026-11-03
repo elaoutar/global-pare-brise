@@ -94,6 +94,7 @@ export const fetchDossiersFromSupabase = async (): Promise<DossierSinistre[] | n
       tvaExclueParAssurance: Number(row.tva_exclue_par_assurance || 0),
       montantReversementAzurGlass: Number(row.montant_reversement_azur_glass || 0),
       montantPriseEnChargeAssurance: Number(row.montant_prise_en_charge_assurance || 0),
+      commission: Number(row.commission ?? row.partenaire?.commission ?? 0),
       statut: row.statut,
       isArchive: row.statut === 'ARCHIVE',
       dateArchivage: row.statut === 'ARCHIVE' ? (row.updated_at || row.date_creation) : undefined,
@@ -125,7 +126,9 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
       vehicule: dossier.vehicule || {},
       assurance: dossier.assurance || null,
       agence_assurance: dossier.agenceAssurance || null,
-      partenaire: dossier.partenaire || null,
+      partenaire: dossier.partenaire 
+        ? { ...dossier.partenaire, commission: dossier.commission } 
+        : (dossier.commission ? { commission: dossier.commission } : null),
       numero_sinistre: dossier.numeroSinistre || null,
       numero_police: dossier.numeroPolice || null,
       date_sinistre: dossier.dateSinistre || null,

@@ -62,6 +62,7 @@ export const EditDossierModal: React.FC<Props> = ({
   const [montantFranchise, setMontantFranchise] = useState<number>(dossier.montantFranchise || 0);
   const [franchiseOfferte, setFranchiseOfferte] = useState<boolean>(Boolean(dossier.franchiseOfferte));
   const [tvaExclueParAssurance, setTvaExclueParAssurance] = useState<number>(dossier.tvaExclueParAssurance || 0);
+  const [commission, setCommission] = useState<number>(dossier.commission || 0);
 
   // Technique & Pose
   const [poseur, setPoseur] = useState(dossier.poseur || 'Poseur Atelier');
@@ -113,6 +114,7 @@ export const EditDossierModal: React.FC<Props> = ({
       franchisePayeeParClient: !franchiseOfferte && Number(montantFranchise) > 0,
       tvaExclueParAssurance: effectiveTvaExclue,
       montantReversementAzurGlass: netReversement,
+      commission: Number(commission) || 0,
       poseur: poseur.trim(),
       observations: observations.trim(),
       statut,
@@ -436,6 +438,19 @@ export const EditDossierModal: React.FC<Props> = ({
                       step="0.01"
                       value={tvaExclueParAssurance}
                       onChange={(e) => setTvaExclueParAssurance(Number(e.target.value))}
+                      className="w-full px-3 py-2 border rounded-lg bg-white font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Commission Intermédiaire (DH)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={commission}
+                      onChange={(e) => setCommission(Number(e.target.value))}
                       className="w-full px-3 py-2 border rounded-lg bg-white font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     />
                   </div>

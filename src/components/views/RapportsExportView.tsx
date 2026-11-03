@@ -132,17 +132,127 @@ export const RapportsExportView: React.FC<Props> = ({
     return matchDateRange(r.datePaiement);
   });
 
+  // Helper to extract financial & product breakdown for a dossier
+  const getDossierBreakdown = (d: DossierSinistre) => {
+    const matchedFacture = factures?.find(
+      (f) =>
+        f.dossierId === d.id ||
+        (d.factureAssuranceId && f.id === d.factureAssuranceId) ||
+        (d.factureClientId && f.id === d.factureClientId)
+    );
+
+    let prestationFaite = '';
+    let prixArticlesHT = 0;
+    let prixMontageHT = 0;
+
+    if (matchedFacture && matchedFacture.lignes && matchedFacture.lignes.length > 0) {
+      const lignesMontage = matchedFacture.lignes.filter((l) => {
+        const desc = (l.designation || '').toLowerCase();
+        return (
+          desc.includes("main d'œuvre") ||
+          desc.includes("main d'oeuvre") ||
+          desc.includes("pose") ||
+          desc.includes("montage") ||
+          desc.includes("installation")
+        );
+      });
+
+      const lignesArticles = matchedFacture.lignes.filter((l) => {
+        const desc = (l.designation || '').toLowerCase();
+        return (
+          !desc.includes("main d'œuvre") &&
+          !desc.includes("main d'oeuvre") &&
+          !desc.includes("pose") &&
+          !desc.includes("montage") &&
+          !desc.includes("installation")
+        );
+      });
+
+      if (lignesArticles.length > 0) {
+        prestationFaite = lignesArticles
+          .map((l) => `${l.designation}${l.quantite > 1 ? ` (x${l.quantite})` : ''}`)
+          .join(' + ');
+        prixArticlesHT = +lignesArticles.reduce((acc, l) => acc + (l.totalHT || 0), 0).toFixed(2);
+      } else {
+        prestationFaite = getProduitPrincipal(d, bonsSortie, factures);
+      }
+
+      if (lignesMontage.length > 0) {
+        prixMontageHT = +lignesMontage.reduce((acc, l) => acc + (l.totalHT || 0), 0).toFixed(2);
+      } else {
+        prixMontageHT = 100;
+      }
+
+      if (prixArticlesHT === 0) {
+        const totalHT = +(matchedFacture.totalHT || d.montantTotalTTC / 1.20).toFixed(2);
+        prixArticlesHT = Math.max(0, +(totalHT - prixMontageHT).toFixed(2));
+      }
+    } else {
+      prestationFaite = getProduitPrincipal(d, bonsSortie, factures);
+      const totalHT = +(d.montantTotalTTC / 1.20).toFixed(2);
+      prixMontageHT = 100;
+      prixArticlesHT = Math.max(0, +(totalHT - prixMontageHT).toFixed(2));
+    }
+
+    const prixFactureTTC = matchedFacture ? matchedFacture.totalTTC : (d.montantTotalTTC || 0);
+    const franchiseVal = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
+
+    const isProOrLocation =
+      d.typeClientAssurance === 'PROFESSIONNEL' ||
+      d.typeClientAssurance === 'AGENCE_LOCATION' ||
+      (d.tvaExclueParAssurance !== undefined && d.tvaExclueParAssurance > 0);
+
+    const totalTvaFacture = matchedFacture
+      ? matchedFacture.totalTVA
+      : +(prixFactureTTC - +(prixFactureTTC / 1.20)).toFixed(2);
+
+    const tvaVal = isProOrLocation
+      ? (d.tvaExclueParAssurance !== undefined && d.tvaExclueParAssurance > 0
+          ? d.tvaExclueParAssurance
+          : totalTvaFacture)
+      : 0;
+
+    const commissionVal = d.commission !== undefined && d.commission !== null
+      ? Number(d.commission)
+      : (d.partenaire?.commission !== undefined && d.partenaire?.commission !== null
+          ? Number(d.partenaire.commission)
+          : (d.partenaire?.tauxCommissionPourcent
+              ? +((prixFactureTTC * d.partenaire.tauxCommissionPourcent) / 100).toFixed(2)
+              : 0));
+
+    const resteVal = Math.max(0, +(prixFactureTTC - tvaVal - franchiseVal).toFixed(2));
+
+    return {
+      matchedFacture,
+      prestationFaite,
+      prixArticlesHT,
+      prixMontageHT,
+      commissionVal,
+      tvaVal,
+      franchiseVal,
+      prixFactureTTC,
+      resteVal,
+    };
+  };
+
+  const azurBreakdowns = typeRapport === 'AZUR_GLASS'
+    ? filteredDossiers.map((d) => ({ dossier: d, ...getDossierBreakdown(d) }))
+    : [];
+
+  const totalAzurPrixArticles = azurBreakdowns.reduce((acc, b) => acc + b.prixArticlesHT, 0);
+  const totalAzurMontage = azurBreakdowns.reduce((acc, b) => acc + b.prixMontageHT, 0);
+  const totalAzurCommission = azurBreakdowns.reduce((acc, b) => acc + b.commissionVal, 0);
+  const totalAzurTva = azurBreakdowns.reduce((acc, b) => acc + b.tvaVal, 0);
+  const totalAzurFranchise = azurBreakdowns.reduce((acc, b) => acc + b.franchiseVal, 0);
+  const totalAzurPrixFacture = azurBreakdowns.reduce((acc, b) => acc + b.prixFactureTTC, 0);
+  const totalAzurReste = azurBreakdowns.reduce((acc, b) => acc + b.resteVal, 0);
+
   // Financial totals
   const totalTTC = filteredDossiers.reduce((acc, d) => acc + (d.montantTotalTTC || 0), 0);
   const totalAssurance = filteredDossiers.reduce((acc, d) => acc + (d.montantPriseEnChargeAssurance || 0), 0);
   const totalFranchise = filteredDossiers.reduce((acc, d) => acc + (!d.franchiseOfferte ? (d.montantFranchise || 0) : 0), 0);
   const totalTvaExclue = filteredDossiers.reduce((acc, d) => acc + (d.tvaExclueParAssurance || 0), 0);
-  const totalNetReversementAzur = filteredDossiers.reduce((acc, d) => {
-    const montantTTC = d.montantTotalTTC || 0;
-    const franchiseDeduite = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
-    const tva = d.tvaExclueParAssurance || 0;
-    return acc + (d.montantReversementAzurGlass || Math.max(0, montantTTC - franchiseDeduite - tva));
-  }, 0);
+  const totalNetReversementAzur = totalAzurReste;
 
   const totalRecettesMois = filteredRecettes.reduce((acc, r) => acc + r.montant, 0);
 
@@ -153,7 +263,7 @@ export const RapportsExportView: React.FC<Props> = ({
       const filtreLabel = selectedAssuranceId !== 'ALL' 
         ? assurances.find((a) => a.id === selectedAssuranceId)?.nom || 'Compagnie' 
         : selectedTypeClientAzur;
-      exportEtatAzurGlassExcel(filteredDossiers, `${filtreLabel}_${periodeLabel}`);
+      exportEtatAzurGlassExcel(filteredDossiers, `${filtreLabel}_${periodeLabel}`, factures, bonsSortie);
     } else if (typeRapport === 'PARTICULIERS') {
       exportEtatParticuliersExcel(filteredDossiers, periodeLabel, bonsSortie, factures);
     } else if (typeRapport === 'MENSUEL') {
@@ -496,28 +606,32 @@ export const RapportsExportView: React.FC<Props> = ({
 
         {/* Summary Metric Ribbon */}
         {typeRapport === 'AZUR_GLASS' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 mb-5 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 mb-5 text-center">
             <div>
               <span className="text-[10px] text-indigo-800 font-bold uppercase">Dossiers Sinistre</span>
               <p className="font-black text-slate-900 text-base">{filteredDossiers.length}</p>
             </div>
             <div>
-              <span className="text-[10px] text-indigo-800 font-bold uppercase">Total Prestations (TTC)</span>
-              <p className="font-black text-slate-900 text-sm font-mono">{formatDH(totalTTC)}</p>
+              <span className="text-[10px] text-indigo-800 font-bold uppercase">Total Prix Facture (TTC)</span>
+              <p className="font-black text-slate-900 text-sm font-mono">{formatDH(totalAzurPrixFacture)}</p>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-500 font-bold uppercase">Articles Posés (HT)</span>
+              <p className="font-bold text-slate-700 text-sm font-mono">{formatDH(totalAzurPrixArticles)}</p>
             </div>
             <div>
               <span className="text-[10px] text-slate-500 font-bold uppercase">Franchises Déduites</span>
-              <p className="font-bold text-slate-700 text-sm font-mono">{formatDH(totalFranchise)}</p>
+              <p className="font-bold text-slate-700 text-sm font-mono">{formatDH(totalAzurFranchise)}</p>
             </div>
             <div>
-              <span className="text-[10px] text-amber-800 font-bold uppercase">TVA Pro Exclue</span>
-              <p className="font-bold text-amber-700 text-sm font-mono">{formatDH(totalTvaExclue)}</p>
+              <span className="text-[10px] text-amber-800 font-bold uppercase">TVA Pro / Loc Exclue</span>
+              <p className="font-bold text-amber-700 text-sm font-mono">{formatDH(totalAzurTva)}</p>
             </div>
             <div className="bg-indigo-900 text-white p-2 rounded-lg">
               <span className="text-[9px] uppercase tracking-wider text-indigo-200 font-bold block">
-                Net Attendu AZUR GLASS
+                Total Reste (Net Attendu)
               </span>
-              <p className="font-black text-emerald-400 text-sm font-mono">{formatDH(totalNetReversementAzur)}</p>
+              <p className="font-black text-emerald-400 text-sm font-mono">{formatDH(totalAzurReste)}</p>
             </div>
           </div>
         ) : typeRapport === 'PARTICULIERS' ? (
@@ -567,93 +681,94 @@ export const RapportsExportView: React.FC<Props> = ({
 
         {/* Main Data Table */}
         {typeRapport === 'AZUR_GLASS' ? (
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 uppercase text-[11px]">
+          <div className="border border-slate-200 rounded-lg overflow-x-auto">
+            <table className="w-full text-left text-xs min-w-[1150px]">
+              <thead className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 uppercase text-[10px] tracking-wider">
                 <tr>
-                  <th className="p-2.5">Dossier / Réf Azur</th>
-                  <th className="p-2.5">Client & Véhicule</th>
-                  <th className="p-2.5">Compagnie & Agence Locale</th>
-                  <th className="p-2.5 text-center">Catégorie</th>
-                  <th className="p-2.5 text-right">Total TTC</th>
-                  <th className="p-2.5 text-right">Franchise</th>
-                  <th className="p-2.5 text-right">TVA Pro</th>
-                  <th className="p-2.5 text-right text-indigo-950 font-black">Net Reversement</th>
-                  <th className="p-2.5 text-center">Statut</th>
+                  <th className="p-2.5 whitespace-nowrap">DATE</th>
+                  <th className="p-2.5 whitespace-nowrap">INTERMÉDIAIRE</th>
+                  <th className="p-2.5 whitespace-nowrap">TYPE VOITURE</th>
+                  <th className="p-2.5 min-w-[180px]">PRESTATION FAITE</th>
+                  <th className="p-2.5 whitespace-nowrap">COMPAGNIE</th>
+                  <th className="p-2.5 whitespace-nowrap text-center">MAT</th>
+                  <th className="p-2.5 text-right whitespace-nowrap">PRIX</th>
+                  <th className="p-2.5 text-right whitespace-nowrap">MONTAGE</th>
+                  <th className="p-2.5 text-right whitespace-nowrap">COMMISSION</th>
+                  <th className="p-2.5 text-right whitespace-nowrap">TVA</th>
+                  <th className="p-2.5 text-right whitespace-nowrap">FRANCHISE</th>
+                  <th className="p-2.5 text-right whitespace-nowrap">PRIX FACTURE</th>
+                  <th className="p-2.5 text-right whitespace-nowrap text-indigo-950 font-black">RESTE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredDossiers.length === 0 ? (
+                {azurBreakdowns.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-6 text-center text-slate-400 italic">
-                      Aucun dossier assurance AZUR GLASS enregistré.
+                    <td colSpan={13} className="p-6 text-center text-slate-400 italic">
+                      Aucun dossier assurance AZUR GLASS enregistré sur cette période.
                     </td>
                   </tr>
                 ) : (
-                  filteredDossiers.map((d) => {
-                    const montantTTC = d.montantTotalTTC || 0;
-                    const franchiseDeduite = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
-                    const tva = d.tvaExclueParAssurance || 0;
-                    const net = d.montantReversementAzurGlass || Math.max(0, montantTTC - franchiseDeduite - tva);
-
-                    return (
-                      <tr key={d.id} className="hover:bg-indigo-50/30 transition-colors">
-                        <td className="p-2.5">
-                          <span className="font-mono font-bold text-slate-900 block">{d.numeroDossier}</span>
-                          <span className="text-[10px] text-indigo-700 font-semibold">
-                            {d.referenceDossierAzurGlass || `AZUR-${d.numeroDossier.slice(-4)}`}
-                          </span>
-                        </td>
-                        <td className="p-2.5">
-                          <strong className="text-slate-900 block">{d.client.nom}</strong>
-                          <span className="text-[11px] text-slate-500 font-mono">
-                            {d.vehicule.marque} {d.vehicule.modele} ({formatMatricule(d.vehicule.immatriculation, 'LATIN')})
-                          </span>
-                        </td>
-                        <td className="p-2.5">
-                          <strong className="text-slate-900 block">{d.assurance?.nom}</strong>
-                          <span className="text-[10px] text-slate-600 block">
-                            {d.agenceAssurance || 'Agence Principale'}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            Sinistre : {d.numeroSinistre || '-'}
-                          </span>
-                        </td>
-                        <td className="p-2.5 text-center">
-                          {d.typeClientAssurance === 'PROFESSIONNEL' ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">
-                              Pro (TVA Exclue)
-                            </span>
-                          ) : d.typeClientAssurance === 'AGENCE_LOCATION' ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800">
-                              Location
-                            </span>
-                          ) : (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
-                              Particulier
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-2.5 text-right font-mono">{formatDH(montantTTC)}</td>
-                        <td className="p-2.5 text-right font-mono text-slate-600">
-                          {franchiseDeduite > 0 ? `-${formatDH(franchiseDeduite)}` : '0 DH'}
-                        </td>
-                        <td className="p-2.5 text-right font-mono text-amber-700">
-                          {tva > 0 ? `-${formatDH(tva)}` : '0 DH'}
-                        </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-indigo-950 bg-indigo-50/50">
-                          {formatDH(net)}
-                        </td>
-                        <td className="p-2.5 text-center">
-                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800">
-                            {d.statut}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
+                  azurBreakdowns.map(({ dossier: d, prestationFaite, prixArticlesHT, prixMontageHT, commissionVal, tvaVal, franchiseVal, prixFactureTTC, resteVal }) => (
+                    <tr key={d.id} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="p-2.5 whitespace-nowrap font-mono text-slate-600">
+                        {formatDate(d.dateCreation || d.dateSinistre)}
+                      </td>
+                      <td className="p-2.5 whitespace-nowrap font-medium text-slate-900">
+                        {d.agenceAssurance || 'AZUR GLASS / Principale'}
+                      </td>
+                      <td className="p-2.5 whitespace-nowrap font-medium text-slate-800">
+                        {d.vehicule.marque} {d.vehicule.modele}
+                      </td>
+                      <td className="p-2.5 font-medium text-slate-800 max-w-xs break-words">
+                        {prestationFaite}
+                      </td>
+                      <td className="p-2.5 whitespace-nowrap font-semibold text-slate-900">
+                        {d.assurance?.nom || 'Assurance'}
+                      </td>
+                      <td className="p-2.5 whitespace-nowrap font-mono font-bold text-center text-slate-900" dir="ltr">
+                        {formatMatricule(d.vehicule.immatriculation, 'LATIN')}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-slate-700 whitespace-nowrap">
+                        {formatDH(prixArticlesHT)}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-slate-700 whitespace-nowrap">
+                        {formatDH(prixMontageHT)}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-slate-700 whitespace-nowrap">
+                        {commissionVal > 0 ? formatDH(commissionVal) : '0 DH'}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-amber-700 whitespace-nowrap">
+                        {tvaVal > 0 ? `-${formatDH(tvaVal)}` : '0 DH'}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-slate-600 whitespace-nowrap">
+                        {franchiseVal > 0 ? `-${formatDH(franchiseVal)}` : '0 DH'}
+                      </td>
+                      <td className="p-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap bg-slate-50/50">
+                        {formatDH(prixFactureTTC)}
+                      </td>
+                      <td className="p-2.5 text-right font-mono font-black text-indigo-950 whitespace-nowrap bg-indigo-50/60">
+                        {formatDH(resteVal)}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
+              {azurBreakdowns.length > 0 && (
+                <tfoot className="bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-900 text-xs">
+                  <tr>
+                    <td colSpan={6} className="p-2.5 text-right uppercase tracking-wider text-[11px] font-black">
+                      Totaux Période ({azurBreakdowns.length} dossiers) :
+                    </td>
+                    <td className="p-2.5 text-right font-mono font-bold">{formatDH(totalAzurPrixArticles)}</td>
+                    <td className="p-2.5 text-right font-mono font-bold">{formatDH(totalAzurMontage)}</td>
+                    <td className="p-2.5 text-right font-mono font-bold">{formatDH(totalAzurCommission)}</td>
+                    <td className="p-2.5 text-right font-mono font-bold text-amber-800">{totalAzurTva > 0 ? `-${formatDH(totalAzurTva)}` : '0 DH'}</td>
+                    <td className="p-2.5 text-right font-mono font-bold text-slate-700">{totalAzurFranchise > 0 ? `-${formatDH(totalAzurFranchise)}` : '0 DH'}</td>
+                    <td className="p-2.5 text-right font-mono font-black text-slate-900 bg-slate-200/60">{formatDH(totalAzurPrixFacture)}</td>
+                    <td className="p-2.5 text-right font-mono font-black text-indigo-950 bg-indigo-100/70">{formatDH(totalAzurReste)}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         ) : typeRapport === 'PARTICULIERS' ? (

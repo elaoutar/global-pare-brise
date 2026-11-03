@@ -14,11 +14,15 @@ export function exportTableToExcel(
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-  // Auto-fit column widths
+  // Auto-fit column widths dynamically based on headers and content
   const maxProps = Object.keys(data[0] || {});
-  worksheet['!cols'] = maxProps.map((key) => ({
-    wch: Math.max(key.length + 4, 15),
-  }));
+  worksheet['!cols'] = maxProps.map((key) => {
+    const maxContentLen = data.reduce((max, row) => {
+      const valStr = row[key] !== undefined && row[key] !== null ? String(row[key]) : '';
+      return Math.max(max, valStr.length);
+    }, key.length);
+    return { wch: Math.min(Math.max(maxContentLen + 3, 14), 50) };
+  });
 
   XLSX.writeFile(workbook, `${filename}.xlsx`);
 }
@@ -126,36 +130,118 @@ export function exportEtatRecettesExcel(
 // 5. Export État Intermédiaire AZUR GLASS (Bordereau / Réconciliation Financière)
 export function exportEtatAzurGlassExcel(
   dossiers: DossierSinistre[],
-  periodeOuFiltre: string = 'Global'
+  periodeOuFiltre: string = 'Global',
+  factures?: Facture[],
+  bonsSortie?: BonSortie[]
 ) {
   const dossiersAzur = dossiers.filter((d) => d.typeDossier === 'ASSURANCE');
   const rows = dossiersAzur.map((d) => {
-    const montantTTC = d.montantTotalTTC || 0;
-    const franchiseDeduite = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
-    const tvaExclue = d.tvaExclueParAssurance || 0;
-    const netReversement = d.montantReversementAzurGlass || Math.max(0, montantTTC - franchiseDeduite - tvaExclue);
+    // 1. Facture liée
+    const matchedFacture = factures?.find(
+      (f) =>
+        f.dossierId === d.id ||
+        (d.factureAssuranceId && f.id === d.factureAssuranceId) ||
+        (d.factureClientId && f.id === d.factureClientId)
+    );
+
+    // 2. Prestation faite (produits montés depuis facture)
+    let prestationFaite = '';
+    let prixArticlesHT = 0;
+    let prixMontageHT = 0;
+
+    if (matchedFacture && matchedFacture.lignes && matchedFacture.lignes.length > 0) {
+      const lignesMontage = matchedFacture.lignes.filter((l) => {
+        const desc = (l.designation || '').toLowerCase();
+        return (
+          desc.includes("main d'œuvre") ||
+          desc.includes("main d'oeuvre") ||
+          desc.includes("pose") ||
+          desc.includes("montage") ||
+          desc.includes("installation")
+        );
+      });
+
+      const lignesArticles = matchedFacture.lignes.filter((l) => {
+        const desc = (l.designation || '').toLowerCase();
+        return (
+          !desc.includes("main d'œuvre") &&
+          !desc.includes("main d'oeuvre") &&
+          !desc.includes("pose") &&
+          !desc.includes("montage") &&
+          !desc.includes("installation")
+        );
+      });
+
+      if (lignesArticles.length > 0) {
+        prestationFaite = lignesArticles
+          .map((l) => `${l.designation}${l.quantite > 1 ? ` (x${l.quantite})` : ''}`)
+          .join(' + ');
+        prixArticlesHT = +lignesArticles.reduce((acc, l) => acc + (l.totalHT || 0), 0).toFixed(2);
+      } else {
+        prestationFaite = getProduitPrincipal(d, bonsSortie, factures);
+      }
+
+      if (lignesMontage.length > 0) {
+        prixMontageHT = +lignesMontage.reduce((acc, l) => acc + (l.totalHT || 0), 0).toFixed(2);
+      } else {
+        prixMontageHT = 100;
+      }
+
+      if (prixArticlesHT === 0) {
+        const totalHT = +(matchedFacture.totalHT || d.montantTotalTTC / 1.20).toFixed(2);
+        prixArticlesHT = Math.max(0, +(totalHT - prixMontageHT).toFixed(2));
+      }
+    } else {
+      prestationFaite = getProduitPrincipal(d, bonsSortie, factures);
+      const totalHT = +(d.montantTotalTTC / 1.20).toFixed(2);
+      prixMontageHT = 100;
+      prixArticlesHT = Math.max(0, +(totalHT - prixMontageHT).toFixed(2));
+    }
+
+    // 3. Montants & Déductions
+    const prixFactureTTC = matchedFacture ? matchedFacture.totalTTC : (d.montantTotalTTC || 0);
+    const franchiseVal = !d.franchiseOfferte ? (d.montantFranchise || 0) : 0;
+
+    const isProOrLocation =
+      d.typeClientAssurance === 'PROFESSIONNEL' ||
+      d.typeClientAssurance === 'AGENCE_LOCATION' ||
+      (d.tvaExclueParAssurance !== undefined && d.tvaExclueParAssurance > 0);
+
+    const totalTvaFacture = matchedFacture
+      ? matchedFacture.totalTVA
+      : +(prixFactureTTC - +(prixFactureTTC / 1.20)).toFixed(2);
+
+    const tvaVal = isProOrLocation
+      ? (d.tvaExclueParAssurance !== undefined && d.tvaExclueParAssurance > 0
+          ? d.tvaExclueParAssurance
+          : totalTvaFacture)
+      : 0;
+
+    const commissionVal = d.commission !== undefined && d.commission !== null
+      ? Number(d.commission)
+      : (d.partenaire?.commission !== undefined && d.partenaire?.commission !== null
+          ? Number(d.partenaire.commission)
+          : (d.partenaire?.tauxCommissionPourcent
+              ? +((prixFactureTTC * d.partenaire.tauxCommissionPourcent) / 100).toFixed(2)
+              : 0));
+
+    // RESTE ( PRIX FACTURE MOINS TVA ( pour pro location voiture) et FRANCHISE)
+    const resteVal = Math.max(0, +(prixFactureTTC - tvaVal - franchiseVal).toFixed(2));
 
     return {
-      'Réf Dossier Global': d.numeroDossier,
-      'Réf Partenaire AZUR GLASS': d.referenceDossierAzurGlass || `AZUR-${d.numeroDossier.slice(-4)}`,
-      'Date Envoi AZUR': d.dateEnvoiAzurGlass ? formatDate(d.dateEnvoiAzurGlass) : 'Non envoyé',
-      'Compagnie Assurance': d.assurance?.nom || 'Assurance',
-      'Agence Locale': d.agenceAssurance || 'Principale',
-      'N° Sinistre': d.numeroSinistre || '-',
-      'N° Police': d.numeroPolice || '-',
-      'Catégorie Client': d.typeClientAssurance === 'PROFESSIONNEL' 
-        ? 'Professionnel (TVA exclue)' 
-        : (d.typeClientAssurance === 'AGENCE_LOCATION' ? 'Agence de Location' : 'Particulier'),
-      'Assuré (Client)': d.client.nom,
-      'Téléphone': d.client.telephone,
-      'Véhicule': `${d.vehicule.marque} ${d.vehicule.modele}`,
-      'Immatriculation': formatMatricule(d.vehicule.immatriculation, 'LATIN'),
-      'Montant Prestation TTC (DH)': montantTTC,
-      'Franchise Client Déduite (DH)': franchiseDeduite,
-      'Franchise Offerte par Garage': d.franchiseOfferte ? 'OUI' : 'NON',
-      'TVA Pro/Location Exclue (DH)': tvaExclue,
-      'Net Reversement Attendu AZUR GLASS (DH)': netReversement,
-      'Statut Dossier': d.statut,
+      'DATE': formatDate(d.dateCreation || d.dateSinistre),
+      'INTERMEDAIR': d.agenceAssurance || 'AZUR GLASS / Principale',
+      'TYPE VOITEUR': `${d.vehicule.marque} ${d.vehicule.modele}`,
+      'Prestation faite': prestationFaite,
+      'COMPAGNIE Assurance': d.assurance?.nom || 'Assurance',
+      'MAT': formatMatricule(d.vehicule.immatriculation, 'LATIN'),
+      'PRIX': prixArticlesHT,
+      'MONTAGE': prixMontageHT,
+      'COMMISSION': commissionVal,
+      'TVA': tvaVal,
+      'FRANCHISE': franchiseVal,
+      'PRIX FACTURE': prixFactureTTC,
+      'RESTE': resteVal,
     };
   });
 

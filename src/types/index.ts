@@ -53,6 +53,7 @@ export interface Partenaire {
   telephone: string;
   ville: string;
   tauxCommissionPourcent: number;
+  commission?: number;
 }
 
 export interface ArticleStock {
@@ -173,6 +174,7 @@ export interface DossierSinistre {
   
   // Montant net reversé par AZUR GLASS à Global Pare-Brise
   montantReversementAzurGlass?: number; // Total TTC - Franchise (si non offerte) - TVA exclue
+  commission?: number; // Montant commission intermédiaire / agence / apporteur (DH)
   
   // Prise en charge initiale globale (avant déductions)
   montantPriseEnChargeAssurance: number;
