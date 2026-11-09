@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { jsPDF } from 'jspdf';
+import { supabase } from '@/lib/supabaseClient';
 
 /**
  * Convertit une URL (data:image/..., data:application/pdf..., ou https://...)
@@ -169,6 +170,64 @@ function generateFallbackBonLivraisonPdf(bonLivraison: any, dossierNumero: strin
   return Buffer.from(doc.output('arraybuffer'));
 }
 
+function generateFallbackFacturePdf(facture: any, dossierNumero: string, dossier?: any): Buffer {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('GLOBAL PARE-BRISE', 15, 20);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Centre Specialise Vitrage Auto & Bris de Glace - Marrakech', 15, 26);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(`FACTURE OFFICIELLE N° ${facture.numeroFacture || 'N2028045'}`, 195, 20, { align: 'right' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date : ${facture.dateEmission || new Date().toISOString().split('T')[0]}`, 195, 26, { align: 'right' });
+  doc.text(`Dossier : ${dossierNumero || '-'}`, 195, 31, { align: 'right' });
+
+  doc.line(15, 36, 195, 36);
+
+  const clientNom = dossier?.client?.nom || 'AZUR GLASS SARL';
+  const vehiculeTxt = dossier?.vehicule
+    ? `${dossier.vehicule.marque || ''} ${dossier.vehicule.modele || ''} (${dossier.vehicule.immatriculation || ''})`
+    : '-';
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Client & Sinistre :', 15, 45);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Assure / Client : ${clientNom}`, 15, 51);
+  doc.text(`Vehicule : ${vehiculeTxt}`, 15, 57);
+
+  let y = 70;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(15, y - 6, 180, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Designation', 18, y);
+  doc.text('Qte', 135, y, { align: 'center' });
+  doc.text('P.U HT', 160, y, { align: 'right' });
+  doc.text('Total HT', 190, y, { align: 'right' });
+
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  (facture.lignes || []).forEach((l: any) => {
+    doc.text(String(l.designation || '-').slice(0, 60), 18, y);
+    doc.text(String(l.quantite || 1), 135, y, { align: 'center' });
+    doc.text(`${Number(l.prixUnitaireHT || 0).toFixed(2)}`, 160, y, { align: 'right' });
+    doc.text(`${Number(l.totalHT || 0).toFixed(2)} DH`, 190, y, { align: 'right' });
+    y += 8;
+  });
+
+  doc.line(15, y + 4, 195, y + 4);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total HT : ${Number(facture.totalHT || 0).toFixed(2)} DH`, 190, y + 12, { align: 'right' });
+  doc.text(`TVA (20%) : ${Number(facture.totalTVA || 0).toFixed(2)} DH`, 190, y + 18, { align: 'right' });
+  doc.text(`Total TTC : ${Number(facture.totalTTC || 0).toFixed(2)} DH`, 190, y + 25, { align: 'right' });
+
+  return Buffer.from(doc.output('arraybuffer'));
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -178,6 +237,7 @@ export async function POST(req: NextRequest) {
       objet, 
       message, 
       html, 
+      dossierId,
       dossierNumero,
       dossier,
       photos,
@@ -218,6 +278,54 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Récupération complémentaire des photos et documents depuis Supabase côté serveur
+    // (permet d'avoir 100% des photos/documents même si le client a allégé la requête HTTP)
+    let dbPhotos: Record<string, any> | null = null;
+    let dbDocuments: any[] | null = null;
+    const targetId = dossierId || dossier?.id;
+    try {
+      if (supabase && targetId) {
+        const { data: row } = await supabase
+          .from('dossiers')
+          .select('photos, documents')
+          .eq('id', targetId)
+          .maybeSingle();
+        if (row) {
+          dbPhotos = row.photos;
+          dbDocuments = row.documents;
+        }
+      } else if (supabase && dossierNumero) {
+        const { data: row } = await supabase
+          .from('dossiers')
+          .select('photos, documents')
+          .eq('numero_dossier', dossierNumero)
+          .maybeSingle();
+        if (row) {
+          dbPhotos = row.photos;
+          dbDocuments = row.documents;
+        }
+      }
+    } catch (e) {
+      console.warn('Lecture complémentaire Supabase dossiers ignorée:', e);
+    }
+
+    const mergedPhotos: Record<string, any> = {
+      ...(dbPhotos && typeof dbPhotos === 'object' ? dbPhotos : {}),
+      ...(photos && typeof photos === 'object' ? photos : {}),
+    };
+    if (Array.isArray(photos?.galerieUrls) && photos.galerieUrls.length > 0) {
+      mergedPhotos.galerieUrls = photos.galerieUrls;
+    } else if (Array.isArray(dbPhotos?.galerieUrls)) {
+      mergedPhotos.galerieUrls = dbPhotos.galerieUrls;
+    }
+
+    const mergedDocuments: any[] =
+      Array.isArray(documents) && documents.length > 0
+        ? documents
+        : Array.isArray(dbDocuments)
+        ? dbDocuments
+        : [];
+
     // Préparation des pièces jointes
     const attachments: Array<{ filename: string; path?: string; content?: string | Buffer; contentType?: string }> = [];
 
@@ -228,6 +336,13 @@ export async function POST(req: NextRequest) {
         `Facture_${facture?.numeroFacture || dossierNumero || 'Officielle'}.pdf`
       );
       if (facAtt) attachments.push(facAtt);
+    } else if (facture) {
+      const pdfBuf = generateFallbackFacturePdf(facture, dossierNumero, dossier);
+      attachments.push({
+        filename: `Facture_${facture.numeroFacture || dossierNumero || 'Officielle'}.pdf`,
+        content: pdfBuf,
+        contentType: 'application/pdf',
+      });
     }
 
     // 2. Joindre le Bon de Sortie Atelier en PDF A4 original (jamais en .txt)
@@ -263,8 +378,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Ajouter TOUTES les photos du dossier en pièces jointes (supporte Base64 data:image/... ET https://...)
-    if (photos && typeof photos === 'object') {
-      const addedUrls = new Set<string>();
+    if (mergedPhotos && typeof mergedPhotos === 'object') {
+      const addedKeysOrUrls = new Set<string>();
       const photoLabels: Record<string, string> = {
         avantSinistreUrl: 'Photo_1_Avant_Sinistre',
         apresPoseUrl: 'Photo_2_Apres_Pose',
@@ -276,24 +391,24 @@ export async function POST(req: NextRequest) {
         autreUrl: 'Photo_8_Detail_Complementaire',
       };
 
-      Object.entries(photos).forEach(([key, url]) => {
+      Object.entries(mergedPhotos).forEach(([key, url]) => {
         if (key === 'galerieUrls') return;
-        if (typeof url === 'string' && url.trim() && !addedUrls.has(url)) {
+        if (typeof url === 'string' && url.trim() && !addedKeysOrUrls.has(url)) {
           const label = photoLabels[key] || `Photo_${key}`;
           const att = buildAttachmentFromUrl(url, `${label}_${dossierNumero || 'Dossier'}`);
           if (att) {
-            addedUrls.add(url);
+            addedKeysOrUrls.add(url);
             attachments.push(att);
           }
         }
       });
 
-      if (Array.isArray(photos.galerieUrls)) {
-        photos.galerieUrls.forEach((url: any, idx: number) => {
-          if (typeof url === 'string' && url.trim() && !addedUrls.has(url)) {
+      if (Array.isArray(mergedPhotos.galerieUrls)) {
+        mergedPhotos.galerieUrls.forEach((url: any, idx: number) => {
+          if (typeof url === 'string' && url.trim() && !addedKeysOrUrls.has(url)) {
             const att = buildAttachmentFromUrl(url, `Photo_Voiture_${idx + 1}_${dossierNumero || 'Dossier'}`);
             if (att) {
-              addedUrls.add(url);
+              addedKeysOrUrls.add(url);
               attachments.push(att);
             }
           }
@@ -302,11 +417,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Ajouter les documents scannés du dossier (supporte Base64 data:... ET https://...)
-    if (Array.isArray(documents)) {
-      documents.forEach((doc: any, idx: number) => {
-        if (doc && typeof doc.url === 'string' && doc.url.trim()) {
+    if (Array.isArray(mergedDocuments)) {
+      const addedDocUrls = new Set<string>();
+      mergedDocuments.forEach((doc: any, idx: number) => {
+        if (doc && typeof doc.url === 'string' && doc.url.trim() && !addedDocUrls.has(doc.url)) {
           const att = buildAttachmentFromUrl(doc.url, doc.nom || `Document_${idx + 1}`);
           if (att) {
+            addedDocUrls.add(doc.url);
             attachments.push(att);
           }
         }

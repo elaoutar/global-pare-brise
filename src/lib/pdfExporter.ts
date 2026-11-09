@@ -21,11 +21,12 @@ export async function generatePdfBlobFromElement(element: HTMLElement): Promise<
     windowWidth: 794, // Standard A4 width at 96 DPI
   });
 
-  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+  const imgData = canvas.toDataURL('image/jpeg', 0.92);
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
+    compress: true,
   });
 
   const pdfWidth = 210;
@@ -37,25 +38,69 @@ export async function generatePdfBlobFromElement(element: HTMLElement): Promise<
 
   if (imgHeight <= pdfHeight) {
     // Fits in a single A4 page
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
   } else {
     // Multi-page A4
     let heightLeft = imgHeight;
     let position = 0;
 
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
     heightLeft -= pdfHeight;
 
     while (heightLeft > 5) { // 5mm tolerance
       position -= pdfHeight;
       pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
       heightLeft -= pdfHeight;
     }
   }
 
   const blob = pdf.output('blob');
   return { pdf, blob };
+}
+
+/**
+ * Capture an HTML element as a compact, email-optimized A4 PDF Base64 Data URI (~100-180 KB)
+ * Avoids HTTP 413 Request Entity Too Large on serverless functions (Vercel 4.5MB limit).
+ */
+export async function generateCompactPdfBase64FromElement(element: HTMLElement): Promise<string> {
+  const canvas = await html2canvas(element, {
+    scale: 1.5,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    windowWidth: 794,
+  });
+
+  const imgData = canvas.toDataURL('image/jpeg', 0.78);
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+
+  const pdfWidth = 210;
+  const pdfHeight = 297;
+  const imgWidth = pdfWidth;
+  const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+  if (imgHeight <= pdfHeight) {
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+  } else {
+    let heightLeft = imgHeight;
+    let position = 0;
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+    heightLeft -= pdfHeight;
+    while (heightLeft > 5) {
+      position -= pdfHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pdfHeight;
+    }
+  }
+
+  return pdf.output('datauristring');
 }
 
 /**

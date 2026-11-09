@@ -8,7 +8,7 @@ import {
 import { AZUR_GLASS_INFO, GARAGE_INFO } from '@/lib/data';
 import { formatDH, formatDate } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
-import { generatePdfBlobFromElement } from '@/lib/pdfExporter';
+import { generateCompactPdfBase64FromElement } from '@/lib/pdfExporter';
 import { 
   Mail, 
   Send, 
@@ -257,7 +257,54 @@ Email: ${GARAGE_INFO.email}`;
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<boolean>(false);
 
-  // Envoi réel 1-Clic via l'API Gmail SMTP avec génération des vrais PDF originaux A4
+  // Compresse une image Base64 (data:image/...) pour éviter de dépasser la limite Vercel de 4.5 Mo
+  const compressDataImageForEmail = (dataUrl: string, maxDim = 1100, quality = 0.68): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+        resolve(dataUrl);
+        return;
+      }
+      // Si déjà légère (< 80 Ko), inutile de recompresser
+      if (dataUrl.length < 100_000) {
+        resolve(dataUrl);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  };
+
+  // Envoi réel 1-Clic via l'API Gmail SMTP avec génération des vrais PDF originaux A4 compacts
   const handleSend1Click = async () => {
     setIsSending(true);
     setSendError(null);
@@ -266,37 +313,98 @@ Email: ${GARAGE_INFO.email}`;
       let bonLivraisonPdfBase64: string | undefined;
       let facturePdfBase64: string | undefined;
 
-      // 1. Générer le PDF original A4 du Bon de Sortie
+      // 1. Générer le PDF original A4 compact du Bon de Sortie
       if (bonSortiePrintRef.current) {
         setSendingStepText('Génération PDF Bon de Sortie...');
         try {
-          const { pdf } = await generatePdfBlobFromElement(bonSortiePrintRef.current);
-          bonSortiePdfBase64 = pdf.output('datauristring');
+          bonSortiePdfBase64 = await generateCompactPdfBase64FromElement(bonSortiePrintRef.current);
         } catch (e) {
           console.warn('Repli PDF serveur pour Bon de Sortie:', e);
         }
       }
 
-      // 2. Générer le PDF original A4 du Bon de Livraison
+      // 2. Générer le PDF original A4 compact du Bon de Livraison
       if (bonLivraisonPrintRef.current) {
         setSendingStepText('Génération PDF Bon de Livraison...');
         try {
-          const { pdf } = await generatePdfBlobFromElement(bonLivraisonPrintRef.current);
-          bonLivraisonPdfBase64 = pdf.output('datauristring');
+          bonLivraisonPdfBase64 = await generateCompactPdfBase64FromElement(bonLivraisonPrintRef.current);
         } catch (e) {
           console.warn('Repli PDF serveur pour Bon de Livraison:', e);
         }
       }
 
-      // 3. Générer le PDF original A4 de la Facture
+      // 3. Générer le PDF original A4 compact de la Facture
       if (facturePrintRef.current) {
         setSendingStepText('Génération PDF Facture...');
         try {
-          const { pdf } = await generatePdfBlobFromElement(facturePrintRef.current);
-          facturePdfBase64 = pdf.output('datauristring');
+          facturePdfBase64 = await generateCompactPdfBase64FromElement(facturePrintRef.current);
         } catch (e) {
           console.warn('Repli PDF serveur pour Facture:', e);
         }
+      }
+
+      // 4. Compresser les photos Base64 côté client et ne jamais les dupliquer dans `dossier`
+      setSendingStepText('Optimisation des photos & pièces jointes...');
+      const compressedPhotos: Record<string, any> = {};
+      if (dossier.photos && typeof dossier.photos === 'object') {
+        for (const [key, val] of Object.entries(dossier.photos)) {
+          if (key === 'galerieUrls' && Array.isArray(val)) {
+            const compressedGallery: string[] = [];
+            for (const gUrl of val) {
+              if (typeof gUrl === 'string' && gUrl.trim()) {
+                compressedGallery.push(await compressDataImageForEmail(gUrl));
+              }
+            }
+            compressedPhotos.galerieUrls = compressedGallery;
+          } else if (typeof val === 'string' && val.trim()) {
+            compressedPhotos[key] = await compressDataImageForEmail(val);
+          }
+        }
+      }
+
+      const compressedDocuments: NonNullable<DossierSinistre['documents']> = [];
+      if (Array.isArray(dossier.documents)) {
+        for (const doc of dossier.documents) {
+          if (doc && typeof doc.url === 'string' && doc.url.trim()) {
+            const cUrl = doc.url.startsWith('data:image/')
+              ? await compressDataImageForEmail(doc.url, 1200, 0.72)
+              : doc.url;
+            compressedDocuments.push({ ...doc, url: cUrl });
+          }
+        }
+      }
+
+      // Alléger `dossier` pour ne PAS dupliquer photos & documents une 2e fois dans le JSON
+      const { photos: _omitPhotos, documents: _omitDocs, ...lightDossier } = dossier;
+
+      const payloadObj: Record<string, any> = {
+        destinataire,
+        cc,
+        objet,
+        message,
+        dossierId: dossier.id,
+        dossierNumero: dossier.numeroDossier,
+        dossier: lightDossier,
+        photos: compressedPhotos,
+        documents: compressedDocuments,
+        bonSortie: effectiveBonSortie,
+        bonLivraison: effectiveBonLivraison,
+        facture: effectiveFacture,
+        bonSortiePdfBase64,
+        bonLivraisonPdfBase64,
+        facturePdfBase64,
+      };
+
+      // Garde-fou anti-413 (limite Vercel = 4.5 Mo) : si le JSON dépasse 3.6 Mo,
+      // le serveur récupérera directement `photos` et `documents` depuis Supabase via `dossierId`.
+      let serializedBody = JSON.stringify(payloadObj);
+      if (serializedBody.length > 3_600_000) {
+        delete payloadObj.documents;
+        serializedBody = JSON.stringify(payloadObj);
+      }
+      if (serializedBody.length > 3_600_000) {
+        delete payloadObj.photos;
+        serializedBody = JSON.stringify(payloadObj);
       }
 
       setSendingStepText('Envoi des PDF et photos par Email...');
@@ -304,25 +412,20 @@ Email: ${GARAGE_INFO.email}`;
       const response = await fetch('/api/send-dossier-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          destinataire,
-          cc,
-          objet,
-          message,
-          dossierNumero: dossier.numeroDossier,
-          dossier,
-          photos: dossier.photos,
-          documents: dossier.documents,
-          bonSortie: effectiveBonSortie,
-          bonLivraison: effectiveBonLivraison,
-          facture: effectiveFacture,
-          bonSortiePdfBase64,
-          bonLivraisonPdfBase64,
-          facturePdfBase64,
-        }),
+        body: serializedBody,
       });
 
-      const result = await response.json();
+      const rawText = await response.text();
+      let result: any;
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error(
+          response.status === 413
+            ? 'Le poids des pièces jointes dépasse la limite autorisée. Veuillez réessayer.'
+            : `Erreur serveur (${response.status}) : ${rawText.slice(0, 120)}`
+        );
+      }
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Erreur lors de l\'envoi de l\'email');
