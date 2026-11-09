@@ -134,17 +134,21 @@ function generateFallbackBonLivraisonPdf(bonLivraison: any, dossierNumero: strin
 
   doc.line(15, 36, 195, 36);
 
-  const clientNom = bonLivraison.receptionnaireNom || dossier?.client?.nom || 'Client';
+  const clientNom = bonLivraison.receptionnaireNom || bonLivraison.clientNom || dossier?.client?.nom || 'Client';
+  const immat = dossier?.vehicule?.immatriculation || bonLivraison.immatriculation || '';
   const vehiculeTxt = dossier?.vehicule
-    ? `${dossier.vehicule.marque || ''} ${dossier.vehicule.modele || ''} (${dossier.vehicule.immatriculation || ''})`
-    : '-';
+    ? `${dossier.vehicule.marque || ''} ${dossier.vehicule.modele || ''} (${dossier.vehicule.annee || ''})`.trim()
+    : (bonLivraison.vehiculeInfo || '-');
 
   doc.setFont('helvetica', 'bold');
   doc.text('Client & Vehicule :', 15, 45);
   doc.setFont('helvetica', 'normal');
   doc.text(`Client : ${clientNom} (CIN: ${bonLivraison.receptionnaireCin || dossier?.client?.cin || '-'})`, 15, 51);
   doc.text(`Vehicule : ${vehiculeTxt}`, 15, 57);
-  doc.text(`Technicien Poseur : ${bonLivraison.livreurPoseur || 'Poseur Atelier'}`, 15, 63);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Matricule : ${immat || 'N/A'}`, 15, 63);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Technicien Poseur : ${bonLivraison.livreurPoseur || 'Poseur Atelier'}`, 110, 63);
 
   let y = 75;
   doc.setFillColor(241, 245, 249);

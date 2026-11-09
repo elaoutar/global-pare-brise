@@ -34,13 +34,10 @@ export const BonLivraisonModal: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // Mode multi-véhicules / sans matricule unique
-  const [hideVehicleInfo, setHideVehicleInfo] = useState<boolean>(() => {
-    return Boolean(
-      bonLivraison.isMultiVehicules ||
-      (!dossier?.vehicule?.immatriculation && !bonLivraison.immatriculation)
-    );
-  });
+  // Extraction de secours depuis observations si ancien BL enregistré sans champ immatriculation
+  const obsMatch = (bonLivraison.observations || '').match(/Véhicule\s+([^(]+)\(([^)]+)\)/i);
+  const fallbackVehiculeFromObs = obsMatch ? obsMatch[1].trim() : '';
+  const fallbackImmatFromObs = obsMatch ? obsMatch[2].trim() : '';
 
   // Identité du client / réceptionnaire
   const clientNom = bonLivraison.receptionnaireNom || bonLivraison.clientNom || dossier?.client.nom || 'Client';
@@ -48,16 +45,39 @@ export const BonLivraisonModal: React.FC<Props> = ({
   const clientCin = bonLivraison.receptionnaireCin || bonLivraison.clientCin || dossier?.client.cin || '';
   const clientVille = bonLivraison.clientVille || dossier?.client.ville || 'Marrakech';
 
-  // Infos véhicule (si présent)
-  const vehiculeMarque = dossier?.vehicule?.marque || bonLivraison.vehiculeInfo || '';
-  const vehiculeModele = dossier?.vehicule?.modele || '';
+  // Infos véhicule (depuis dossier, ou BL, ou observations)
+  const vehiculeMarque = (dossier?.vehicule?.marque || bonLivraison.vehiculeInfo || fallbackVehiculeFromObs || '').trim();
+  const vehiculeModele = (dossier?.vehicule?.modele || '').trim();
   const vehiculeAnnee = dossier?.vehicule?.annee;
-  const vehiculeImmatriculation = dossier?.vehicule?.immatriculation || bonLivraison.immatriculation || '';
+  const vehiculeImmatriculation = (
+    dossier?.vehicule?.immatriculation ||
+    bonLivraison.immatriculation ||
+    fallbackImmatFromObs ||
+    ''
+  ).trim();
+  const formattedImmat = vehiculeImmatriculation
+    ? formatMatricule(vehiculeImmatriculation, 'LATIN')
+    : '';
+
+  // Mode multi-véhicules / sans matricule unique :
+  // Si un véhicule/matricule est rattaché au dossier ou au BL, on affiche toujours le matricule par défaut
+  const [hideVehicleInfo, setHideVehicleInfo] = useState<boolean>(() => {
+    if (vehiculeImmatriculation) {
+      return Boolean(bonLivraison.isMultiVehicules && !dossier?.vehicule?.immatriculation);
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (vehiculeImmatriculation && (!bonLivraison.isMultiVehicules || dossier?.vehicule?.immatriculation)) {
+      setHideVehicleInfo(false);
+    }
+  }, [vehiculeImmatriculation, bonLivraison.isMultiVehicules, dossier?.vehicule?.immatriculation]);
 
   // État observation éditable
   const defaultObs = (hideVehicleInfo || !vehiculeImmatriculation)
     ? 'Fournitures et vitrages livrés en parfait état de conformité.'
-    : `Véhicule ${vehiculeMarque} ${vehiculeModele} (${vehiculeImmatriculation}) remis en parfait état de conformité.`;
+    : `Véhicule ${vehiculeMarque} ${vehiculeModele} (${formattedImmat || vehiculeImmatriculation}) remis en parfait état de conformité.`;
 
   const [observations, setObservations] = useState(bonLivraison.observations || defaultObs);
   const [hasSavedObs, setHasSavedObs] = useState(false);
@@ -154,14 +174,15 @@ export const BonLivraisonModal: React.FC<Props> = ({
     : totalPrestationsTTC;
 
   const isMulti = hideVehicleInfo || !vehiculeImmatriculation;
+  const displayImmat = formattedImmat || vehiculeImmatriculation;
 
   const docSubtitle = isMulti
     ? `Client : ${clientNom} • Livraison Multi-Vitrages (${totalQuantiteArticles} article${totalQuantiteArticles > 1 ? 's' : ''}) • Total : ${formatDH(totalPrestationsTTC)} TTC`
-    : `Client : ${clientNom} • Véhicule : ${vehiculeMarque} ${vehiculeModele} (${vehiculeImmatriculation})`;
+    : `Client : ${clientNom} • Véhicule : ${vehiculeMarque} ${vehiculeModele} • Matricule : ${displayImmat}`;
 
   const shareMsg = isMulti
     ? `Bonjour ${clientNom}, voici votre Bon de Livraison N° ${bonLivraison.numeroBL} d'un montant de ${formatDH(totalPrestationsTTC)} TTC attestant de la livraison conforme de ${totalQuantiteArticles} vitrage(s) chez GLOBAL PARE-BRISE.`
-    : `Bonjour ${clientNom}, voici votre Bon de Livraison N° ${bonLivraison.numeroBL} d'un montant de ${formatDH(totalPrestationsTTC)} attestant de la pose et réception conforme du vitrage sur votre véhicule ${vehiculeMarque} ${vehiculeModele} (${vehiculeImmatriculation}) chez GLOBAL PARE-BRISE.`;
+    : `Bonjour ${clientNom}, voici votre Bon de Livraison N° ${bonLivraison.numeroBL} d'un montant de ${formatDH(totalPrestationsTTC)} attestant de la pose et réception conforme du vitrage sur votre véhicule ${vehiculeMarque} ${vehiculeModele} (Matricule : ${displayImmat}) chez GLOBAL PARE-BRISE.`;
 
   return (
     <div 
@@ -270,6 +291,11 @@ export const BonLivraisonModal: React.FC<Props> = ({
                     Type : <span>Livraison Directe / Client</span>
                   </p>
                 )}
+                {!isMulti && displayImmat && (
+                  <p className="text-xs text-slate-700 mt-0.5">
+                    Matricule : <strong className="font-mono font-black text-slate-900" dir="ltr">{displayImmat}</strong>
+                  </p>
+                )}
                 <p className="text-xs text-slate-600">
                   Régime : <strong>{isAssurance ? (dossier?.assurance?.nom || 'Assurance via AZUR GLASS') : 'Client Direct (Comptant)'}</strong>
                 </p>
@@ -295,7 +321,7 @@ export const BonLivraisonModal: React.FC<Props> = ({
               </div>
 
               {/* Right Box : IF multi-véhicules -> Affiche Détails de Livraison sans aucun véhicule ni matricule */}
-              {hideVehicleInfo || !vehiculeImmatriculation ? (
+              {isMulti ? (
                 <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 text-xs">
                   <p className="font-bold text-[10px] text-indigo-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <Truck className="w-3.5 h-3.5 text-indigo-600" /> Détails de la Livraison
@@ -321,12 +347,9 @@ export const BonLivraisonModal: React.FC<Props> = ({
                   <p className="font-bold text-slate-900 text-sm">
                     {vehiculeMarque} {vehiculeModele} {vehiculeAnnee ? `(${vehiculeAnnee})` : ''}
                   </p>
-                  <div className="mt-2 inline-flex items-center gap-2 bg-white px-2.5 py-1 rounded-md border border-slate-300 text-xs">
-                    <span className="font-medium text-slate-500">Matricule :</span>
-                    <span className="font-mono font-black text-slate-900" dir="ltr">
-                      {formatMatricule(vehiculeImmatriculation, 'LATIN')}
-                    </span>
-                  </div>
+                  <p className="text-slate-700 mt-1.5 bg-white px-2.5 py-1.5 rounded-md border border-slate-300">
+                    Matricule : <strong className="font-mono font-black text-slate-900 text-sm" dir="ltr">{displayImmat}</strong>
+                  </p>
                   {isAssurance && (
                     <p className="text-slate-600 mt-2 font-mono text-[11px]">
                       N° Sinistre : <strong>{dossier?.numeroSinistre || '-'}</strong>

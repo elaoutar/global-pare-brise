@@ -140,7 +140,19 @@ export const TransmettreAzurGlassModal: React.FC<TransmettreAzurGlassModalProps>
   }, [bonSortie, dossier, seqFallback, effectiveFacture]);
 
   const effectiveBonLivraison: BonLivraison = useMemo(() => {
-    if (bonLivraison) return bonLivraison;
+    const vehInfo = `${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`.trim();
+    if (bonLivraison) {
+      return {
+        ...bonLivraison,
+        immatriculation: bonLivraison.immatriculation || dossier.vehicule.immatriculation,
+        vehiculeInfo: bonLivraison.vehiculeInfo || vehInfo,
+        clientNom: bonLivraison.clientNom || dossier.client.nom,
+        clientTelephone: bonLivraison.clientTelephone || dossier.client.telephone,
+        clientCin: bonLivraison.clientCin || dossier.client.cin,
+        clientVille: bonLivraison.clientVille || dossier.client.ville,
+        isMultiVehicules: false,
+      };
+    }
     return {
       id: `bl-auto-${dossier.id}`,
       numeroBL: `BL-2026-${seqFallback}`,
@@ -149,6 +161,13 @@ export const TransmettreAzurGlassModal: React.FC<TransmettreAzurGlassModalProps>
       livreurPoseur: dossier.poseur || 'Poseur Atelier',
       receptionnaireNom: dossier.client.nom,
       receptionnaireCin: dossier.client.cin,
+      clientNom: dossier.client.nom,
+      clientTelephone: dossier.client.telephone,
+      clientCin: dossier.client.cin,
+      clientVille: dossier.client.ville,
+      vehiculeInfo: vehInfo,
+      immatriculation: dossier.vehicule.immatriculation,
+      isMultiVehicules: false,
       lignes: effectiveFacture.lignes.map((l) => ({
         designation: l.designation,
         codeEurocode: l.codeEurocode || '-',
@@ -992,6 +1011,14 @@ Email: ${GARAGE_INFO.email}`;
               <p className="text-xs text-slate-600">
                 Dossier Réf : <span className="font-mono font-semibold">{dossier.numeroDossier}</span>
               </p>
+              {(dossier.vehicule.immatriculation || effectiveBonLivraison.immatriculation) && (
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Matricule :{' '}
+                  <strong className="font-mono font-black text-slate-900" dir="ltr">
+                    {formatMatricule(dossier.vehicule.immatriculation || effectiveBonLivraison.immatriculation || '', 'LATIN')}
+                  </strong>
+                </p>
+              )}
               <p className="text-xs text-slate-600">
                 Régime : <strong>{isAssurance ? (dossier.assurance?.nom || 'Assurance via AZUR GLASS') : 'Client Direct (Comptant)'}</strong>
               </p>
@@ -1018,12 +1045,12 @@ Email: ${GARAGE_INFO.email}`;
               <p className="font-bold text-slate-900 text-sm">
                 {dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})
               </p>
-              <div className="mt-2 inline-flex items-center gap-2 bg-white px-2.5 py-1 rounded-md border border-slate-300 text-xs">
-                <span className="font-medium text-slate-500">Matricule :</span>
-                <span className="font-mono font-black text-slate-900" dir="ltr">
-                  {formatMatricule(dossier.vehicule.immatriculation, 'LATIN')}
-                </span>
-              </div>
+              <p className="text-slate-700 mt-1.5 bg-white px-2.5 py-1.5 rounded-md border border-slate-300">
+                Matricule :{' '}
+                <strong className="font-mono font-black text-slate-900 text-sm" dir="ltr">
+                  {formatMatricule(dossier.vehicule.immatriculation || effectiveBonLivraison.immatriculation || '', 'LATIN')}
+                </strong>
+              </p>
               {isAssurance && (
                 <p className="text-slate-600 mt-2 font-mono text-[11px]">
                   N° Sinistre : <strong>{dossier.numeroSinistre || '-'}</strong>

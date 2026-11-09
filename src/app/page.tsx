@@ -388,6 +388,13 @@ export default function Home() {
       livreurPoseur: newDossier.poseur || 'Poseur Atelier',
       receptionnaireNom: newDossier.client.nom,
       receptionnaireCin: newDossier.client.cin,
+      clientNom: newDossier.client.nom,
+      clientTelephone: newDossier.client.telephone,
+      clientCin: newDossier.client.cin,
+      clientVille: newDossier.client.ville,
+      vehiculeInfo: `${newDossier.vehicule.marque} ${newDossier.vehicule.modele} (${newDossier.vehicule.annee})`.trim(),
+      immatriculation: newDossier.vehicule.immatriculation,
+      isMultiVehicules: false,
       lignes: newBLLignes,
       totalHT: newFacture?.totalHT,
       totalTTC: newFacture?.totalTTC || newDossier.montantTotalTTC,
@@ -782,12 +789,18 @@ export default function Home() {
       livreurPoseur: 'Atelier Pose',
       receptionnaireNom: devis.clientNom,
       receptionnaireCin: devis.clientCin,
+      clientNom: devis.clientNom,
+      clientTelephone: devis.clientTelephone,
+      clientCin: devis.clientCin,
+      vehiculeInfo: `${devis.vehiculeMarque} ${devis.vehiculeModele} (${devis.vehiculeAnnee || new Date().getFullYear()})`.trim(),
+      immatriculation: devis.vehiculeImmatriculation,
+      isMultiVehicules: false,
       lignes: devis.lignes.map((l) => ({
         designation: l.designation,
         codeEurocode: l.codeEurocode,
         quantite: l.quantite,
       })),
-      observations: `Véhicule ${devis.vehiculeMarque} ${devis.vehiculeModele} pris en charge conforme au devis.`,
+      observations: `Véhicule ${devis.vehiculeMarque} ${devis.vehiculeModele} (${devis.vehiculeImmatriculation}) pris en charge conforme au devis.`,
     };
 
     // Auto-create Facture
@@ -1004,6 +1017,34 @@ export default function Home() {
       });
       saveSharedStorage('gp_shared_factures', updatedFactures);
       return updatedFactures;
+    });
+
+    // Mettre à jour le bon de livraison lié si existant
+    setBonsLivraison((prev) => {
+      const updatedBLs = prev.map((b) => {
+        if (b.dossierId === updatedDossier.id || (updatedDossier.bonLivraisonId && b.id === updatedDossier.bonLivraisonId)) {
+          const uBL: BonLivraison = {
+            ...b,
+            receptionnaireNom: updatedDossier.client.nom,
+            receptionnaireCin: updatedDossier.client.cin,
+            clientNom: updatedDossier.client.nom,
+            clientTelephone: updatedDossier.client.telephone,
+            clientCin: updatedDossier.client.cin,
+            clientVille: updatedDossier.client.ville,
+            vehiculeInfo: `${updatedDossier.vehicule.marque} ${updatedDossier.vehicule.modele} (${updatedDossier.vehicule.annee})`.trim(),
+            immatriculation: updatedDossier.vehicule.immatriculation,
+            isMultiVehicules: false,
+            totalTTC: updatedDossier.montantTotalTTC,
+            montantFranchise: updatedDossier.montantFranchise,
+            tvaExclue: updatedDossier.tvaExclueParAssurance,
+          };
+          saveBonLivraisonToSupabase(uBL);
+          return uBL;
+        }
+        return b;
+      });
+      saveSharedStorage('gp_shared_bons_livraison', updatedBLs);
+      return updatedBLs;
     });
 
     setEditingDossier(null);
@@ -1334,8 +1375,9 @@ export default function Home() {
 
   // Helper to open Bon Livraison modal from dossier
   const handleOpenBonLivraisonFromDossier = (dossier: DossierSinistre) => {
-    let matchedBL = bonsLivraison.find((b) => b.dossierId === dossier.id);
+    let matchedBL = bonsLivraison.find((b) => b.dossierId === dossier.id || (dossier.bonLivraisonId && b.id === dossier.bonLivraisonId));
     const matchedFacture = factures.find((f) => f.dossierId === dossier.id);
+    const vehInfo = `${dossier.vehicule.marque} ${dossier.vehicule.modele} (${dossier.vehicule.annee})`.trim();
 
     if (!matchedBL) {
       const seq = Math.floor(1000 + Math.random() * 9000);
@@ -1378,6 +1420,13 @@ export default function Home() {
         livreurPoseur: dossier.poseur || 'Karim Bennani (Chef d\'atelier)',
         receptionnaireNom: dossier.client.nom,
         receptionnaireCin: dossier.client.cin,
+        clientNom: dossier.client.nom,
+        clientTelephone: dossier.client.telephone,
+        clientCin: dossier.client.cin,
+        clientVille: dossier.client.ville,
+        vehiculeInfo: vehInfo,
+        immatriculation: dossier.vehicule.immatriculation,
+        isMultiVehicules: false,
         lignes: newLignes,
         totalHT: matchedFacture?.totalHT,
         totalTTC: matchedFacture?.totalTTC || dossier.montantTotalTTC,
@@ -1391,6 +1440,23 @@ export default function Home() {
         return updated;
       });
       saveBonLivraisonToSupabase(matchedBL!);
+    } else if (!matchedBL.immatriculation || !matchedBL.vehiculeInfo) {
+      matchedBL = {
+        ...matchedBL,
+        immatriculation: matchedBL.immatriculation || dossier.vehicule.immatriculation,
+        vehiculeInfo: matchedBL.vehiculeInfo || vehInfo,
+        clientNom: matchedBL.clientNom || dossier.client.nom,
+        clientTelephone: matchedBL.clientTelephone || dossier.client.telephone,
+        clientCin: matchedBL.clientCin || dossier.client.cin,
+        clientVille: matchedBL.clientVille || dossier.client.ville,
+        isMultiVehicules: false,
+      };
+      setBonsLivraison((prev) => {
+        const updated = prev.map((b) => (b.id === matchedBL!.id ? matchedBL! : b));
+        saveSharedStorage('gp_shared_bons_livraison', updated);
+        return updated;
+      });
+      saveBonLivraisonToSupabase(matchedBL);
     }
     setActiveBonLivraisonModal({ bonLivraison: matchedBL, dossier, facture: matchedFacture });
   };
@@ -1664,8 +1730,15 @@ export default function Home() {
             onAddStock={handleAddStock}
             onUpdateStock={handleUpdateStock}
             onDeleteStock={handleDeleteStock}
-            onOpenBonSortie={(bs, dossier) => setActiveBonSortieModal({ bonSortie: bs, dossier })}
-            onOpenBonLivraison={(bl, dossier) => setActiveBonLivraisonModal({ bonLivraison: bl, dossier })}
+            onOpenBonSortie={(bs, dossier) => {
+              const resolvedDossier = dossier || dossiers.find((d) => d.id === bs.dossierId || d.bonSortieId === bs.id);
+              setActiveBonSortieModal({ bonSortie: bs, dossier: resolvedDossier });
+            }}
+            onOpenBonLivraison={(bl, dossier) => {
+              const resolvedDossier = dossier || dossiers.find((d) => d.id === bl.dossierId || d.bonLivraisonId === bl.id);
+              const resolvedFacture = resolvedDossier ? factures.find((f) => f.dossierId === resolvedDossier.id) : undefined;
+              setActiveBonLivraisonModal({ bonLivraison: bl, dossier: resolvedDossier, facture: resolvedFacture });
+            }}
             onOpenNewBonLivraison={() => setShowNewBonLivraisonModal(true)}
             onDeleteBonLivraison={handleDeleteBonLivraison}
           />
