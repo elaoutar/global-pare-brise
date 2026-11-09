@@ -1,5 +1,173 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { jsPDF } from 'jspdf';
+
+/**
+ * Convertit une URL (data:image/..., data:application/pdf..., ou https://...)
+ * en objet d'attachement compatible Nodemailer.
+ */
+function buildAttachmentFromUrl(
+  url: string,
+  baseFilename: string
+): { filename: string; path?: string; content?: Buffer; contentType?: string } | null {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+
+  // 1. Cas Data URI Base64 (ex: data:image/jpeg;base64,... ou data:application/pdf;filename=...;base64,...)
+  if (trimmed.startsWith('data:')) {
+    const commaIdx = trimmed.indexOf(',');
+    if (commaIdx === -1) return null;
+
+    const header = trimmed.slice(5, commaIdx); // ex: "image/jpeg;base64"
+    const base64Data = trimmed.slice(commaIdx + 1);
+    if (!base64Data) return null;
+
+    const mimeMatch = header.split(';')[0] || 'application/octet-stream';
+    let ext = '.jpg';
+    if (mimeMatch.includes('png')) ext = '.png';
+    else if (mimeMatch.includes('webp')) ext = '.webp';
+    else if (mimeMatch.includes('pdf')) ext = '.pdf';
+    else if (mimeMatch.includes('jpeg') || mimeMatch.includes('jpg')) ext = '.jpg';
+
+    const hasExt = /\.[a-zA-Z0-9]{3,4}$/.test(baseFilename);
+    const finalName = hasExt ? baseFilename : `${baseFilename}${ext}`;
+
+    return {
+      filename: finalName,
+      content: Buffer.from(base64Data, 'base64'),
+      contentType: mimeMatch,
+    };
+  }
+
+  // 2. Cas URL HTTP/HTTPS classique
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    const hasExt = /\.[a-zA-Z0-9]{3,4}$/.test(baseFilename);
+    const finalName = hasExt ? baseFilename : `${baseFilename}.jpg`;
+    return {
+      filename: finalName,
+      path: trimmed,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Repli serveur : génère un vrai fichier PDF A4 propre via jsPDF si le PDF client n'a pas été transmis
+ */
+function generateFallbackBonSortiePdf(bonSortie: any, dossierNumero: string, dossier?: any): Buffer {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('GLOBAL PARE-BRISE', 15, 20);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Service Magasin & Gestion des Stocks - Marrakech', 15, 26);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(`BON DE SORTIE MATIERES N° ${bonSortie.numeroBS || 'BS-AUTO'}`, 195, 20, { align: 'right' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date : ${bonSortie.dateSortie || new Date().toISOString().split('T')[0]}`, 195, 26, { align: 'right' });
+  doc.text(`Dossier : ${dossierNumero || '-'}`, 195, 31, { align: 'right' });
+
+  doc.line(15, 36, 195, 36);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Affectation & Vehicule :', 15, 45);
+  doc.setFont('helvetica', 'normal');
+  const clientNom = dossier?.client?.nom || '-';
+  const vehiculeTxt = dossier?.vehicule
+    ? `${dossier.vehicule.marque || ''} ${dossier.vehicule.modele || ''} (${dossier.vehicule.immatriculation || ''})`
+    : (bonSortie.notes || '-');
+  doc.text(`Client : ${clientNom}`, 15, 51);
+  doc.text(`Vehicule : ${vehiculeTxt}`, 15, 57);
+  doc.text(`Technicien / Poseur : ${bonSortie.poseur || 'Poseur Atelier'}`, 15, 63);
+
+  // Tableau des lignes
+  let y = 75;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(15, y - 6, 180, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Reference', 18, y);
+  doc.text('Designation de l\'article', 55, y);
+  doc.text('Qte', 165, y, { align: 'center' });
+  doc.text('Controle', 185, y, { align: 'center' });
+
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  (bonSortie.lignes || []).forEach((l: any) => {
+    doc.text(String(l.reference || '-').slice(0, 18), 18, y);
+    doc.text(String(l.designation || '-').slice(0, 55), 55, y);
+    doc.text(String(l.quantite || 1), 165, y, { align: 'center' });
+    doc.text('Conforme', 185, y, { align: 'center' });
+    y += 8;
+  });
+
+  doc.line(15, y + 4, 195, y + 4);
+  if (bonSortie.notes) {
+    doc.setFontSize(9);
+    doc.text(`Remarques : ${bonSortie.notes}`, 15, y + 12);
+  }
+
+  return Buffer.from(doc.output('arraybuffer'));
+}
+
+function generateFallbackBonLivraisonPdf(bonLivraison: any, dossierNumero: string, dossier?: any): Buffer {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('GLOBAL PARE-BRISE', 15, 20);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Centre Specialise Vitrage Auto & Bris de Glace - Marrakech', 15, 26);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(`BON DE LIVRAISON N° ${bonLivraison.numeroBL || 'BL-AUTO'}`, 195, 20, { align: 'right' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date : ${bonLivraison.dateLivraison || new Date().toISOString().split('T')[0]}`, 195, 26, { align: 'right' });
+  doc.text(`Dossier : ${dossierNumero || '-'}`, 195, 31, { align: 'right' });
+
+  doc.line(15, 36, 195, 36);
+
+  const clientNom = bonLivraison.receptionnaireNom || dossier?.client?.nom || 'Client';
+  const vehiculeTxt = dossier?.vehicule
+    ? `${dossier.vehicule.marque || ''} ${dossier.vehicule.modele || ''} (${dossier.vehicule.immatriculation || ''})`
+    : '-';
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Client & Vehicule :', 15, 45);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Client : ${clientNom} (CIN: ${bonLivraison.receptionnaireCin || dossier?.client?.cin || '-'})`, 15, 51);
+  doc.text(`Vehicule : ${vehiculeTxt}`, 15, 57);
+  doc.text(`Technicien Poseur : ${bonLivraison.livreurPoseur || 'Poseur Atelier'}`, 15, 63);
+
+  let y = 75;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(15, y - 6, 180, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.text('Prestations & Fournitures Livrees', 18, y);
+  doc.text('Qte', 145, y, { align: 'center' });
+  doc.text('Total TTC (DH)', 190, y, { align: 'right' });
+
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  (bonLivraison.lignes || []).forEach((l: any) => {
+    doc.text(String(l.designation || '-').slice(0, 65), 18, y);
+    doc.text(String(l.quantite || 1), 145, y, { align: 'center' });
+    doc.text(l.totalTTC ? `${Number(l.totalTTC).toFixed(2)} DH` : '-', 190, y, { align: 'right' });
+    y += 8;
+  });
+
+  doc.line(15, y + 4, 195, y + 4);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total TTC : ${Number(bonLivraison.totalTTC || 0).toFixed(2)} DH`, 190, y + 12, { align: 'right' });
+
+  return Buffer.from(doc.output('arraybuffer'));
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,11 +179,15 @@ export async function POST(req: NextRequest) {
       message, 
       html, 
       dossierNumero,
+      dossier,
       photos,
       documents,
       bonSortie,
       bonLivraison,
-      facture
+      facture,
+      bonSortiePdfBase64,
+      bonLivraisonPdfBase64,
+      facturePdfBase64,
     } = body;
 
     if (!destinataire || !objet || !message) {
@@ -47,9 +219,50 @@ export async function POST(req: NextRequest) {
     });
 
     // Préparation des pièces jointes
-    const attachments: Array<{ filename: string; path?: string; content?: string | Buffer }> = [];
+    const attachments: Array<{ filename: string; path?: string; content?: string | Buffer; contentType?: string }> = [];
 
-    // Ajouter les photos du dossier en pièces jointes si des URLs existent (jusqu'à 8 photos)
+    // 1. Joindre la Facture Officielle en PDF A4 original
+    if (facturePdfBase64) {
+      const facAtt = buildAttachmentFromUrl(
+        facturePdfBase64,
+        `Facture_${facture?.numeroFacture || dossierNumero || 'Officielle'}.pdf`
+      );
+      if (facAtt) attachments.push(facAtt);
+    }
+
+    // 2. Joindre le Bon de Sortie Atelier en PDF A4 original (jamais en .txt)
+    if (bonSortiePdfBase64) {
+      const bsAtt = buildAttachmentFromUrl(
+        bonSortiePdfBase64,
+        `Bon_de_Sortie_${bonSortie?.numeroBS || dossierNumero || 'BS'}.pdf`
+      );
+      if (bsAtt) attachments.push(bsAtt);
+    } else if (bonSortie) {
+      const pdfBuf = generateFallbackBonSortiePdf(bonSortie, dossierNumero, dossier);
+      attachments.push({
+        filename: `Bon_de_Sortie_${bonSortie.numeroBS || dossierNumero || 'BS'}.pdf`,
+        content: pdfBuf,
+        contentType: 'application/pdf',
+      });
+    }
+
+    // 3. Joindre le Bon de Livraison Client en PDF A4 original (jamais en .txt)
+    if (bonLivraisonPdfBase64) {
+      const blAtt = buildAttachmentFromUrl(
+        bonLivraisonPdfBase64,
+        `Bon_de_Livraison_${bonLivraison?.numeroBL || dossierNumero || 'BL'}.pdf`
+      );
+      if (blAtt) attachments.push(blAtt);
+    } else if (bonLivraison) {
+      const pdfBuf = generateFallbackBonLivraisonPdf(bonLivraison, dossierNumero, dossier);
+      attachments.push({
+        filename: `Bon_de_Livraison_${bonLivraison.numeroBL || dossierNumero || 'BL'}.pdf`,
+        content: pdfBuf,
+        contentType: 'application/pdf',
+      });
+    }
+
+    // 4. Ajouter TOUTES les photos du dossier en pièces jointes (supporte Base64 data:image/... ET https://...)
     if (photos && typeof photos === 'object') {
       const addedUrls = new Set<string>();
       const photoLabels: Record<string, string> = {
@@ -64,90 +277,39 @@ export async function POST(req: NextRequest) {
       };
 
       Object.entries(photos).forEach(([key, url]) => {
-        if (typeof url === 'string' && url.startsWith('http') && !addedUrls.has(url)) {
-          addedUrls.add(url);
+        if (key === 'galerieUrls') return;
+        if (typeof url === 'string' && url.trim() && !addedUrls.has(url)) {
           const label = photoLabels[key] || `Photo_${key}`;
-          attachments.push({
-            filename: `${label}_${dossierNumero || 'Dossier'}.jpg`,
-            path: url,
-          });
+          const att = buildAttachmentFromUrl(url, `${label}_${dossierNumero || 'Dossier'}`);
+          if (att) {
+            addedUrls.add(url);
+            attachments.push(att);
+          }
         }
       });
 
       if (Array.isArray(photos.galerieUrls)) {
         photos.galerieUrls.forEach((url: any, idx: number) => {
-          if (typeof url === 'string' && url.startsWith('http') && !addedUrls.has(url)) {
-            addedUrls.add(url);
-            attachments.push({
-              filename: `Photo_Voiture_${idx + 1}_${dossierNumero || 'Dossier'}.jpg`,
-              path: url,
-            });
+          if (typeof url === 'string' && url.trim() && !addedUrls.has(url)) {
+            const att = buildAttachmentFromUrl(url, `Photo_Voiture_${idx + 1}_${dossierNumero || 'Dossier'}`);
+            if (att) {
+              addedUrls.add(url);
+              attachments.push(att);
+            }
           }
         });
       }
     }
 
-    // Ajouter les documents joints si disponibles
+    // 5. Ajouter les documents scannés du dossier (supporte Base64 data:... ET https://...)
     if (Array.isArray(documents)) {
       documents.forEach((doc: any, idx: number) => {
-        if (doc.url && doc.url.startsWith('http')) {
-          attachments.push({
-            filename: doc.nom || `Document_${idx + 1}.pdf`,
-            path: doc.url,
-          });
+        if (doc && typeof doc.url === 'string' && doc.url.trim()) {
+          const att = buildAttachmentFromUrl(doc.url, doc.nom || `Document_${idx + 1}`);
+          if (att) {
+            attachments.push(att);
+          }
         }
-      });
-    }
-
-    // Joindre directement le Bon de Sortie Atelier (pas besoin de scan/signature papier)
-    if (bonSortie) {
-      const bsContent = `
-========================================================================
-                  GLOBAL PARE-BRISE - BON DE SORTIE ATELIER
-========================================================================
-N° Bon de Sortie : ${bonSortie.numeroBS || 'BS-AUTO'}
-Date de Sortie   : ${bonSortie.dateSortie || new Date().toISOString().split('T')[0]}
-Dossier Réf      : ${dossierNumero || '-'}
-Poseur / Atelier : ${bonSortie.poseur || 'Poseur Atelier'}
-------------------------------------------------------------------------
-ARTICLES ET FOURNITURES SORTIS DU STOCK :
-${(bonSortie.lignes || []).map((l: any, i: number) => `  ${i + 1}. [Réf: ${l.reference || '-'}] ${l.designation} - Quantité: ${l.quantite}`).join('\n')}
-------------------------------------------------------------------------
-Observations     : ${bonSortie.notes || 'Sortie conforme pour intervention vitrage.'}
-Statut           : CONFORME & JOINT AUTOMATIQUEMENT (Non soumis à signature physique)
-========================================================================
-      `.trim();
-
-      attachments.push({
-        filename: `Bon_de_Sortie_${bonSortie.numeroBS || dossierNumero || 'BS'}.txt`,
-        content: Buffer.from(bsContent, 'utf-8'),
-      });
-    }
-
-    // Joindre directement le Bon de Livraison & Décharge client
-    if (bonLivraison) {
-      const blContent = `
-========================================================================
-               GLOBAL PARE-BRISE - BON DE LIVRAISON CLIENT
-========================================================================
-N° Bon Livraison : ${bonLivraison.numeroBL || 'BL-AUTO'}
-Date Livraison   : ${bonLivraison.dateLivraison || new Date().toISOString().split('T')[0]}
-Dossier Réf      : ${dossierNumero || '-'}
-Client / Décharge: ${bonLivraison.receptionnaireNom || 'Client'} (CIN: ${bonLivraison.receptionnaireCin || '-'})
-Livreur / Poseur : ${bonLivraison.livreurPoseur || 'Poseur Atelier'}
-------------------------------------------------------------------------
-PRESTATIONS ET VITRAGES LIVRÉS :
-${(bonLivraison.lignes || []).map((l: any, i: number) => `  ${i + 1}. ${l.designation} - Quantité: ${l.quantite} ${l.totalTTC ? `(${l.totalTTC} DH TTC)` : ''}`).join('\n')}
-------------------------------------------------------------------------
-Total TTC        : ${bonLivraison.totalTTC || 0} DH
-Observations     : ${bonLivraison.observations || 'Véhicule et vitrage remis conformes.'}
-Statut           : CONFORME & JOINT AUTOMATIQUEMENT (Non soumis à signature physique)
-========================================================================
-      `.trim();
-
-      attachments.push({
-        filename: `Bon_de_Livraison_${bonLivraison.numeroBL || dossierNumero || 'BL'}.txt`,
-        content: Buffer.from(blContent, 'utf-8'),
       });
     }
 
@@ -172,7 +334,7 @@ Statut           : CONFORME & JOINT AUTOMATIQUEMENT (Non soumis à signature phy
           ${attachments.length > 0 ? `
             <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1;">
               <p style="font-weight: bold; font-size: 12px; color: #0f172a; margin-bottom: 8px;">
-                📎 Pièces Jointes Incluses (${attachments.length}) :
+                📎 Pièces Jointes PDF & Photos Incluses (${attachments.length}) :
               </p>
               <ul style="font-size: 12px; color: #475569; padding-left: 20px; margin: 0;">
                 ${attachments.map(att => `<li>${att.filename}</li>`).join('')}

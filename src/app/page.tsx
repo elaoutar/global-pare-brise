@@ -436,9 +436,11 @@ export default function Home() {
     }
 
     if (newFacture) {
-      const updatedFactures = [newFacture, ...factures];
-      setFactures(updatedFactures);
-      saveSharedStorage('gp_shared_factures', updatedFactures);
+      setFactures((prev) => {
+        const updated = [newFacture, ...prev.filter((f) => f.id !== newFacture.id)];
+        saveSharedStorage('gp_shared_factures', updated);
+        return updated;
+      });
       saveFactureToSupabase(newFacture);
     }
 
@@ -448,6 +450,7 @@ export default function Home() {
       saveSharedStorage('gp_shared_recettes', updatedRecettes);
     }
 
+    lastFetchRef.current = Date.now();
     saveDossierToSupabase(dossierWithDocs);
 
     setShowNewDossierModal(false);
@@ -1074,12 +1077,23 @@ export default function Home() {
   };
 
   const handleCreateDirectFacture = async (newFac: Facture) => {
-    const updated = [newFac, ...factures];
-    setFactures(updated);
-    saveSharedStorage('gp_shared_factures', updated);
+    lastFetchRef.current = Date.now();
+    setFactures((prev) => {
+      const updated = [newFac, ...prev.filter((f) => f.id !== newFac.id)];
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
     await saveFactureToSupabase(newFac);
+    lastFetchRef.current = Date.now();
+    setFactures((prev) => {
+      const exists = prev.some((f) => f.id === newFac.id);
+      const updated = exists ? prev : [newFac, ...prev];
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
     setShowNewDirectFactureModal(false);
-    showToast(`Facture directe ${newFac.numeroFacture} créée avec succès.`);
+    setActiveFactureModal({ facture: newFac, dossier: null });
+    showToast(`Facture directe ${newFac.numeroFacture} créée et enregistrée avec succès.`);
   };
 
   const handlePurgeExpiredDossiers = async () => {
@@ -1174,19 +1188,25 @@ export default function Home() {
 
   const handleMarquerFacturePayee = (factureId: string) => {
     const fac = factures.find((f) => f.id === factureId);
-    setFactures((prev) =>
-      prev.map((f) =>
-        f.id === factureId
-          ? {
-              ...f,
-              statutPaiement: 'REGLE',
-              montantRegle: f.totalTTC,
-              datePaiement: new Date().toISOString().split('T')[0],
-              referencePaiement: 'Virement Assurance Validé',
-            }
-          : f
-      )
-    );
+    const dateNow = new Date().toISOString().split('T')[0];
+    setFactures((prev) => {
+      const updated = prev.map((f) => {
+        if (f.id === factureId) {
+          const updatedFac: Facture = {
+            ...f,
+            statutPaiement: 'REGLE',
+            montantRegle: f.totalTTC,
+            datePaiement: dateNow,
+            referencePaiement: 'Virement Assurance Validé',
+          };
+          saveFactureToSupabase(updatedFac);
+          return updatedFac;
+        }
+        return f;
+      });
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
 
     // Also automatically create a Recette entry for this settled invoice
     if (fac) {
@@ -1439,11 +1459,15 @@ export default function Home() {
   const handleUpdateFactureObservations = (newObservations: string) => {
     if (!activeFactureModal) return;
     const facId = activeFactureModal.facture.id;
-    setFactures((prev) =>
-      prev.map((f) => (f.id === facId ? { ...f, observations: newObservations } : f))
-    );
+    const updatedFac = { ...activeFactureModal.facture, observations: newObservations };
+    setFactures((prev) => {
+      const updated = prev.map((f) => (f.id === facId ? updatedFac : f));
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
+    saveFactureToSupabase(updatedFac);
     setActiveFactureModal((prev) =>
-      prev ? { ...prev, facture: { ...prev.facture, observations: newObservations } } : null
+      prev ? { ...prev, facture: updatedFac } : null
     );
   };
 
@@ -1451,11 +1475,11 @@ export default function Home() {
     const cleanNum = newNumero.trim().toUpperCase();
     if (!cleanNum) return;
 
-    let updatedFac: Facture | undefined;
     setFactures((prev) => {
       const updated = prev.map((f) => {
         if (f.id === factureId) {
-          updatedFac = { ...f, numeroFacture: cleanNum };
+          const updatedFac = { ...f, numeroFacture: cleanNum };
+          saveFactureToSupabase(updatedFac);
           return updatedFac;
         }
         return f;
@@ -1463,10 +1487,6 @@ export default function Home() {
       saveSharedStorage('gp_shared_factures', updated);
       return updated;
     });
-
-    if (updatedFac) {
-      saveFactureToSupabase(updatedFac);
-    }
 
     setActiveFactureModal((prev) => {
       if (!prev || prev.facture.id !== factureId) return prev;

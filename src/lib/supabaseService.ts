@@ -317,22 +317,41 @@ export const fetchFacturesFromSupabase = async (): Promise<Facture[] | null> => 
 
     if (!data) return [];
 
-    return data.map((row: any) => ({
-      id: row.id,
-      numeroFacture: row.numero_facture,
-      dossierId: row.dossier_id,
-      destinataire: row.destinataire,
-      dateEmission: row.date_emission,
-      dateEcheance: row.date_echeance,
-      lignes: row.lignes || [],
-      totalHT: Number(row.total_ht || 0),
-      totalTVA: Number(row.total_tva || 0),
-      totalTTC: Number(row.total_ttc || 0),
-      montantRegle: Number(row.montant_regle || 0),
-      statutPaiement: row.statut_paiement,
-      datePaiement: row.date_paiement,
-      referencePaiement: row.reference_paiement,
-    }));
+    return data.map((row: any) => {
+      const rawLignes = Array.isArray(row.lignes) ? row.lignes : [];
+      const meta = rawLignes[0]?._meta || {};
+      const cleanLignes = rawLignes.map((l: any) => {
+        const { _meta, ...rest } = l;
+        return rest;
+      });
+
+      return {
+        id: row.id,
+        numeroFacture: row.numero_facture,
+        dossierId: row.dossier_id === 'DIRECT' ? undefined : row.dossier_id,
+        destinataire: row.destinataire,
+        dateEmission: row.date_emission ? String(row.date_emission).slice(0, 10) : '',
+        dateEcheance: row.date_echeance ? String(row.date_echeance).slice(0, 10) : '',
+        lignes: cleanLignes,
+        totalHT: Number(row.total_ht || 0),
+        totalTVA: Number(row.total_tva || 0),
+        totalTTC: Number(row.total_ttc || 0),
+        montantRegle: Number(row.montant_regle || 0),
+        statutPaiement: row.statut_paiement,
+        datePaiement: row.date_paiement ? String(row.date_paiement).slice(0, 10) : undefined,
+        referencePaiement: row.reference_paiement || undefined,
+        observations: row.observations || meta.observations || undefined,
+        montantRegleEspeces: meta.montantRegleEspeces !== undefined ? Number(meta.montantRegleEspeces) : undefined,
+        montantSoldeVirement: meta.montantSoldeVirement !== undefined ? Number(meta.montantSoldeVirement) : undefined,
+        clientNom: row.client_nom || meta.clientNom || undefined,
+        clientTelephone: row.client_telephone || meta.clientTelephone || undefined,
+        clientCin: row.client_cin || meta.clientCin || undefined,
+        clientIce: row.client_ice || meta.clientIce || undefined,
+        clientAdresse: row.client_adresse || meta.clientAdresse || undefined,
+        vehiculeInfo: row.vehicule_info || meta.vehiculeInfo || undefined,
+        immatriculation: row.immatriculation || meta.immatriculation || undefined,
+      };
+    });
   } catch (err) {
     console.error('Exception fetch factures Supabase:', err);
     return null;
@@ -343,20 +362,49 @@ export const saveFactureToSupabase = async (facture: Facture): Promise<boolean> 
   if (!isSupabaseConfigured || !supabase) return false;
 
   try {
+    const metaFields = {
+      observations: facture.observations,
+      montantRegleEspeces: facture.montantRegleEspeces,
+      montantSoldeVirement: facture.montantSoldeVirement,
+      clientNom: facture.clientNom,
+      clientTelephone: facture.clientTelephone,
+      clientCin: facture.clientCin,
+      clientIce: facture.clientIce,
+      clientAdresse: facture.clientAdresse,
+      vehiculeInfo: facture.vehiculeInfo,
+      immatriculation: facture.immatriculation,
+    };
+
+    const baseLignes = Array.isArray(facture.lignes) && facture.lignes.length > 0
+      ? facture.lignes
+      : [
+          {
+            designation: 'Prestation vitrage automobile',
+            quantite: 1,
+            prixUnitaireHT: Number(facture.totalHT) || 0,
+            tauxTva: 20,
+            totalHT: Number(facture.totalHT) || 0,
+          },
+        ];
+
+    const lignesWithMeta = baseLignes.map((l, idx) =>
+      idx === 0 ? { ...l, _meta: metaFields } : l
+    );
+
     const payload = {
       id: facture.id,
       numero_facture: facture.numeroFacture,
-      dossier_id: facture.dossierId,
-      destinataire: facture.destinataire,
-      date_emission: facture.dateEmission,
-      date_echeance: facture.dateEcheance,
-      lignes: facture.lignes,
+      dossier_id: facture.dossierId || 'DIRECT',
+      destinataire: facture.destinataire || 'CLIENT',
+      date_emission: facture.dateEmission ? String(facture.dateEmission).slice(0, 10) : new Date().toISOString().split('T')[0],
+      date_echeance: facture.dateEcheance ? String(facture.dateEcheance).slice(0, 10) : new Date().toISOString().split('T')[0],
+      lignes: lignesWithMeta,
       total_ht: Number(facture.totalHT) || 0,
       total_tva: Number(facture.totalTVA) || 0,
       total_ttc: Number(facture.totalTTC) || 0,
       montant_regle: Number(facture.montantRegle) || 0,
       statut_paiement: facture.statutPaiement || 'EN_ATTENTE',
-      date_paiement: facture.datePaiement ? facture.datePaiement : null,
+      date_paiement: facture.datePaiement ? String(facture.datePaiement).slice(0, 10) : null,
       reference_paiement: facture.referencePaiement || null,
     };
 
