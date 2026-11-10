@@ -91,6 +91,8 @@ import { DevisClientModal } from '@/components/documents/DevisClientModal';
 import { NewDevisModal } from '@/components/documents/NewDevisModal';
 import { TransmettreAzurGlassModal } from '@/components/dossiers/TransmettreAzurGlassModal';
 import { DeclarationBrisGlaceModal } from '@/components/documents/DeclarationBrisGlaceModal';
+import { BackupRestoreModal } from '@/components/modals/BackupRestoreModal';
+import { SystemBackupData } from '@/lib/backupService';
 import { LoginView } from '@/components/auth/LoginView';
 import { Menu, X, ShieldCheck, LogOut } from 'lucide-react';
 
@@ -184,6 +186,9 @@ export default function Home() {
   const [showNewDevisModal, setShowNewDevisModal] = useState(false);
   const [editingDevis, setEditingDevis] = useState<DevisClient | null>(null);
   const [activeDevisModal, setActiveDevisModal] = useState<DevisClient | null>(null);
+
+  // Backup & Restore Modal
+  const [showBackupModal, setShowBackupModal] = useState(false);
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -383,7 +388,8 @@ export default function Home() {
       activeCommandeFournisseurModal ||
       activeTransmettreAzurGlassDossier ||
       showNewDevisModal ||
-      activeDevisModal
+      activeDevisModal ||
+      showBackupModal
     );
   }, [
     showNewDossierModal,
@@ -400,6 +406,7 @@ export default function Home() {
     activeTransmettreAzurGlassDossier,
     showNewDevisModal,
     activeDevisModal,
+    showBackupModal,
   ]);
 
   // Chargement des données réelles depuis Supabase Cloud au montage & lors du retour sur l'onglet
@@ -1750,6 +1757,156 @@ export default function Home() {
     showToast(`Numéro de facture modifié : ${cleanNum}`);
   };
 
+  const handleRestoreDatasets = async (
+    restoredData: SystemBackupData['data'],
+    mode: 'MERGE' | 'REPLACE'
+  ) => {
+    lastFetchRef.current = Date.now();
+
+    if (mode === 'REPLACE') {
+      // 1. Dossiers
+      setDossiers(restoredData.dossiers);
+      saveSharedStorage('gp_shared_dossiers', restoredData.dossiers);
+      restoredData.dossiers.forEach((d) => registerLocalDossierSave(d));
+
+      // 2. Stock
+      setStock(restoredData.stock);
+      saveSharedStorage('gp_shared_stock', restoredData.stock);
+
+      // 3. Factures
+      setFactures(restoredData.factures);
+      saveSharedStorage('gp_shared_factures', restoredData.factures);
+
+      // 4. Bons de sortie
+      setBonsSortie(restoredData.bonsSortie);
+      saveSharedStorage('gp_shared_bons_sortie', restoredData.bonsSortie);
+
+      // 5. Bons de livraison
+      setBonsLivraison(restoredData.bonsLivraison);
+      saveSharedStorage('gp_shared_bons_livraison', restoredData.bonsLivraison);
+
+      // 6. Recettes
+      setRecettes(restoredData.recettes);
+      saveSharedStorage('gp_shared_recettes', restoredData.recettes);
+
+      // 7. Devis
+      setDevisList(restoredData.devis);
+      saveSharedStorage('gp_shared_devis', restoredData.devis);
+
+      // 8. Fournisseurs & Commandes
+      setFournisseurs(restoredData.fournisseurs);
+      saveSharedStorage('gp_shared_fournisseurs', restoredData.fournisseurs);
+      setCommandesFournisseurs(restoredData.commandesFournisseurs);
+      saveSharedStorage('gp_shared_commandes', restoredData.commandesFournisseurs);
+
+      // 9. Partenaires & Assurances
+      setPartenaires(restoredData.partenaires);
+      saveSharedStorage('gp_shared_partenaires', restoredData.partenaires);
+      if (restoredData.assurances && restoredData.assurances.length > 0) {
+        setAssurances(restoredData.assurances);
+      }
+    } else {
+      // MERGE MODE (Conserve l'existant et met à jour/ajoute les éléments du backup)
+      // 1. Dossiers
+      setDossiers((prev) => {
+        const map = new Map(prev.map((d) => [d.id, d]));
+        restoredData.dossiers.forEach((d) => map.set(d.id, d));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_dossiers', merged);
+        merged.forEach((d) => registerLocalDossierSave(d));
+        return merged;
+      });
+
+      // 2. Stock
+      setStock((prev) => {
+        const map = new Map(prev.map((a) => [a.id, a]));
+        restoredData.stock.forEach((a) => map.set(a.id, a));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_stock', merged);
+        return merged;
+      });
+
+      // 3. Factures
+      setFactures((prev) => {
+        const map = new Map(prev.map((f) => [f.id, f]));
+        restoredData.factures.forEach((f) => map.set(f.id, f));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_factures', merged);
+        return merged;
+      });
+
+      // 4. Bons de sortie
+      setBonsSortie((prev) => {
+        const map = new Map(prev.map((b) => [b.id, b]));
+        restoredData.bonsSortie.forEach((b) => map.set(b.id, b));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_bons_sortie', merged);
+        return merged;
+      });
+
+      // 5. Bons de livraison
+      setBonsLivraison((prev) => {
+        const map = new Map(prev.map((b) => [b.id, b]));
+        restoredData.bonsLivraison.forEach((b) => map.set(b.id, b));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_bons_livraison', merged);
+        return merged;
+      });
+
+      // 6. Recettes
+      setRecettes((prev) => {
+        const map = new Map(prev.map((r) => [r.id, r]));
+        restoredData.recettes.forEach((r) => map.set(r.id, r));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_recettes', merged);
+        return merged;
+      });
+
+      // 7. Devis
+      setDevisList((prev) => {
+        const map = new Map(prev.map((d) => [d.id, d]));
+        restoredData.devis.forEach((d) => map.set(d.id, d));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_devis', merged);
+        return merged;
+      });
+
+      // 8. Fournisseurs & Commandes
+      setFournisseurs((prev) => {
+        const map = new Map(prev.map((f) => [f.id, f]));
+        restoredData.fournisseurs.forEach((f) => map.set(f.id, f));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_fournisseurs', merged);
+        return merged;
+      });
+
+      setCommandesFournisseurs((prev) => {
+        const map = new Map(prev.map((c) => [c.id, c]));
+        restoredData.commandesFournisseurs.forEach((c) => map.set(c.id, c));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_commandes', merged);
+        return merged;
+      });
+
+      // 9. Partenaires & Assurances
+      setPartenaires((prev) => {
+        const map = new Map(prev.map((p) => [p.id, p]));
+        restoredData.partenaires.forEach((p) => map.set(p.id, p));
+        const merged = Array.from(map.values());
+        saveSharedStorage('gp_shared_partenaires', merged);
+        return merged;
+      });
+
+      if (restoredData.assurances && restoredData.assurances.length > 0) {
+        setAssurances((prev) => {
+          const map = new Map(prev.map((a) => [a.id, a]));
+          restoredData.assurances.forEach((a) => map.set(a.id, a));
+          return Array.from(map.values());
+        });
+      }
+    }
+  };
+
   const stockCritiqueCount = stock.filter((a) => a.quantiteEnStock <= a.stockMinimumAlerte).length;
 
   // Écran d'attente lors du chargement de la session
@@ -1783,6 +1940,7 @@ export default function Home() {
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           onOpenNewDossier={() => setShowNewDossierModal(true)}
+          onOpenBackup={() => setShowBackupModal(true)}
           dossiersCount={dossiers.length}
           stockAlerteCount={stockCritiqueCount}
           devisCount={devisList.length}
@@ -1833,6 +1991,10 @@ export default function Home() {
               }}
               onOpenNewDossier={() => {
                 setShowNewDossierModal(true);
+                setIsMobileMenuOpen(false);
+              }}
+              onOpenBackup={() => {
+                setShowBackupModal(true);
                 setIsMobileMenuOpen(false);
               }}
               dossiersCount={dossiers.length}
@@ -1959,6 +2121,7 @@ export default function Home() {
             recettes={recettes}
             bonsSortie={bonsSortie}
             factures={factures}
+            onOpenBackup={() => setShowBackupModal(true)}
           />
         )}
 
@@ -2132,6 +2295,26 @@ export default function Home() {
           bonLivraison={bonsLivraison.find((bl) => bl.dossierId === activeTransmettreAzurGlassDossier.id)}
           onClose={() => setActiveTransmettreAzurGlassDossier(null)}
           onSendComplete={handleSendCompleteAzurGlass}
+        />
+      )}
+
+      {showBackupModal && (
+        <BackupRestoreModal
+          currentUser={currentUser}
+          dossiers={dossiers}
+          stock={stock}
+          factures={factures}
+          bonsSortie={bonsSortie}
+          bonsLivraison={bonsLivraison}
+          recettes={recettes}
+          assurances={assurances}
+          partenaires={partenaires}
+          fournisseurs={fournisseurs}
+          commandesFournisseurs={commandesFournisseurs}
+          devisList={devisList}
+          onClose={() => setShowBackupModal(false)}
+          onRestoreDatasets={handleRestoreDatasets}
+          onShowToast={showToast}
         />
       )}
     </div>

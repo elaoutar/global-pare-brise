@@ -24,7 +24,8 @@ import {
   Filter, 
   CheckCircle2, 
   Building2, 
-  UserCheck 
+  UserCheck,
+  Database
 } from 'lucide-react';
 import { formatMatricule } from '@/lib/matriculeMaroc';
 
@@ -34,6 +35,7 @@ interface Props {
   recettes: ReglementRecette[];
   bonsSortie?: BonSortie[];
   factures?: Facture[];
+  onOpenBackup?: () => void;
 }
 
 export const RapportsExportView: React.FC<Props> = ({
@@ -42,6 +44,7 @@ export const RapportsExportView: React.FC<Props> = ({
   recettes,
   bonsSortie,
   factures,
+  onOpenBackup,
 }) => {
   const [typeRapport, setTypeRapport] = useState<'AZUR_GLASS' | 'PARTICULIERS' | 'MENSUEL' | 'ASSURANCE' | 'CLIENT' | 'RECETTES'>('AZUR_GLASS');
   const [selectedAssuranceId, setSelectedAssuranceId] = useState<string>('ALL');
@@ -298,7 +301,17 @@ export const RapportsExportView: React.FC<Props> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {onOpenBackup && (
+              <button
+                onClick={onOpenBackup}
+                className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 border border-slate-700"
+                title="Créer ou importer un backup de sécurité"
+              >
+                <Database className="w-4 h-4 text-sky-400" />
+                <span>Sauvegarde & Backup (.json)</span>
+              </button>
+            )}
             <button
               onClick={handleExportExcel}
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"

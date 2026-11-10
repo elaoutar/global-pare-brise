@@ -8,15 +8,16 @@ import {
   Receipt, 
   ShieldAlert, 
   Users2, 
-  Truck,
-  Wrench,
-  ShieldCheck,
-  Plus,
-  Coins,
-  FileSpreadsheet,
-  Crown,
-  User,
-  LogOut
+  Truck, 
+  Wrench, 
+  ShieldCheck, 
+  Plus, 
+  Coins, 
+  FileSpreadsheet, 
+  Crown, 
+  User, 
+  LogOut,
+  Database
 } from 'lucide-react';
 import { GARAGE_INFO } from '@/lib/data';
 import { UserSession } from '@/types';
@@ -25,6 +26,7 @@ interface Props {
   activeTab: string;
   onSelectTab: (tab: string) => void;
   onOpenNewDossier: () => void;
+  onOpenBackup?: () => void;
   dossiersCount: number;
   stockAlerteCount: number;
   devisCount?: number;
@@ -36,6 +38,7 @@ export const Navigation: React.FC<Props> = ({
   activeTab,
   onSelectTab,
   onOpenNewDossier,
+  onOpenBackup,
   dossiersCount,
   stockAlerteCount,
   devisCount = 0,
@@ -95,6 +98,11 @@ export const Navigation: React.FC<Props> = ({
       id: 'fournisseurs',
       label: 'Fournisseurs & Commandes',
       icon: Truck,
+    },
+    {
+      id: 'backup',
+      label: 'Sauvegarde & Backup',
+      icon: Database,
     },
     {
       id: 'utilisateurs',
@@ -180,7 +188,13 @@ export const Navigation: React.FC<Props> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => onSelectTab(item.id)}
+                onClick={() => {
+                  if (item.id === 'backup' && onOpenBackup) {
+                    onOpenBackup();
+                  } else {
+                    onSelectTab(item.id);
+                  }
+                }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-brand-600 text-white font-bold shadow-md shadow-brand-600/20'
