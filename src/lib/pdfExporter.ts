@@ -9,16 +9,22 @@ export interface DocumentExportOptions {
 }
 
 /**
- * Capture an HTML element and generate an A4 format PDF (210mm x 297mm)
+ * Capture an HTML element and generate a single-page A4 format PDF (210mm x 297mm)
  */
 export async function generatePdfBlobFromElement(element: HTMLElement): Promise<{ pdf: jsPDF; blob: Blob }> {
-  // Capture with html2canvas with sharp rendering (scale 2)
+  // Capture with html2canvas with sharp rendering (scale 2) on a single A4 page
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
-    windowWidth: 794, // Standard A4 width at 96 DPI
+    windowWidth: 900,
+    onclone: (_doc, clonedEl) => {
+      clonedEl.style.width = '794px';
+      clonedEl.style.maxWidth = '794px';
+      clonedEl.style.minHeight = 'auto';
+      clonedEl.style.margin = '0';
+    },
   });
 
   const imgData = canvas.toDataURL('image/jpeg', 0.92);
@@ -31,36 +37,27 @@ export async function generatePdfBlobFromElement(element: HTMLElement): Promise<
 
   const pdfWidth = 210;
   const pdfHeight = 297;
-  
-  // Calculate scaled height
-  const imgWidth = pdfWidth;
-  const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-  if (imgHeight <= pdfHeight) {
-    // Fits in a single A4 page
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
-  } else {
-    // Multi-page A4
-    let heightLeft = imgHeight;
-    let position = 0;
+  // Always fit onto 1 single A4 page (never duplicate/slice across 2 or 3 pages)
+  let renderWidth = pdfWidth;
+  let renderHeight = (canvas.height * pdfWidth) / canvas.width;
+  let offsetX = 0;
 
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pdfHeight;
-
-    while (heightLeft > 5) { // 5mm tolerance
-      position -= pdfHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pdfHeight;
-    }
+  if (renderHeight > pdfHeight) {
+    const scaleFactor = pdfHeight / renderHeight;
+    renderHeight = pdfHeight;
+    renderWidth = pdfWidth * scaleFactor;
+    offsetX = (pdfWidth - renderWidth) / 2;
   }
+
+  pdf.addImage(imgData, 'JPEG', offsetX, 0, renderWidth, renderHeight, undefined, 'FAST');
 
   const blob = pdf.output('blob');
   return { pdf, blob };
 }
 
 /**
- * Capture an HTML element as a compact, email-optimized A4 PDF Base64 Data URI (~100-180 KB)
+ * Capture an HTML element as a compact, email-optimized single-page A4 PDF Base64 Data URI (~100-180 KB)
  * Avoids HTTP 413 Request Entity Too Large on serverless functions (Vercel 4.5MB limit).
  */
 export async function generateCompactPdfBase64FromElement(element: HTMLElement): Promise<string> {
@@ -69,7 +66,13 @@ export async function generateCompactPdfBase64FromElement(element: HTMLElement):
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
-    windowWidth: 794,
+    windowWidth: 900,
+    onclone: (_doc, clonedEl) => {
+      clonedEl.style.width = '794px';
+      clonedEl.style.maxWidth = '794px';
+      clonedEl.style.minHeight = 'auto';
+      clonedEl.style.margin = '0';
+    },
   });
 
   const imgData = canvas.toDataURL('image/jpeg', 0.78);
@@ -82,29 +85,124 @@ export async function generateCompactPdfBase64FromElement(element: HTMLElement):
 
   const pdfWidth = 210;
   const pdfHeight = 297;
-  const imgWidth = pdfWidth;
-  const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+  let renderWidth = pdfWidth;
+  let renderHeight = (canvas.height * pdfWidth) / canvas.width;
+  let offsetX = 0;
 
-  if (imgHeight <= pdfHeight) {
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
-  } else {
-    let heightLeft = imgHeight;
-    let position = 0;
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pdfHeight;
-    while (heightLeft > 5) {
-      position -= pdfHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pdfHeight;
-    }
+  if (renderHeight > pdfHeight) {
+    const scaleFactor = pdfHeight / renderHeight;
+    renderHeight = pdfHeight;
+    renderWidth = pdfWidth * scaleFactor;
+    offsetX = (pdfWidth - renderWidth) / 2;
   }
+
+  pdf.addImage(imgData, 'JPEG', offsetX, 0, renderWidth, renderHeight, undefined, 'FAST');
 
   return pdf.output('datauristring');
 }
 
 /**
- * Download document as A4 PDF
+ * Print an HTML element on a guaranteed single A4 page (1 single copy) using an isolated iframe.
+ * Prevents the browser bug where `position: fixed` modals repeat across 3 pages.
+ */
+export async function printElementSinglePage(element: HTMLElement, documentTitle = 'Document'): Promise<void> {
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+    windowWidth: 900,
+    onclone: (_doc, clonedEl) => {
+      clonedEl.style.width = '794px';
+      clonedEl.style.maxWidth = '794px';
+      clonedEl.style.minHeight = 'auto';
+      clonedEl.style.margin = '0';
+    },
+  });
+
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) {
+    document.body.removeChild(iframe);
+    window.print();
+    return;
+  }
+
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${documentTitle}</title>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        background: #ffffff;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      img {
+        max-width: 210mm;
+        max-height: 297mm;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        display: block;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    </style>
+  </head>
+  <body>
+    <img id="print-img" src="${imgData}" alt="${documentTitle}" />
+  </body>
+</html>`);
+  doc.close();
+
+  const printImg = doc.getElementById('print-img') as HTMLImageElement | null;
+  const triggerPrint = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } finally {
+      setTimeout(() => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      }, 2000);
+    }
+  };
+
+  if (printImg && !printImg.complete) {
+    printImg.onload = triggerPrint;
+    printImg.onerror = triggerPrint;
+  } else {
+    setTimeout(triggerPrint, 100);
+  }
+}
+
+/**
+ * Download document as A4 PDF (1 single copy)
  */
 export async function downloadElementAsPdf(element: HTMLElement, filename: string): Promise<void> {
   const cleanFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;

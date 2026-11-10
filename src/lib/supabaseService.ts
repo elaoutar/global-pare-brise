@@ -13,6 +13,11 @@ import {
   Partenaire 
 } from '@/types';
 
+const normalizeMatriculeText = (val?: string | null): string | undefined => {
+  if (!val || typeof val !== 'string') return val || undefined;
+  return val.replace(/\s*\|\s*/g, '-');
+};
+
 // ==============================================================================
 // 1. SERVICE DE STOCKAGE DE FICHIERS (SUPABASE STORAGE)
 // ==============================================================================
@@ -71,42 +76,49 @@ export const fetchDossiersFromSupabase = async (): Promise<DossierSinistre[] | n
 
     if (!data) return [];
 
-    return data.map((row: any) => ({
-      id: row.id,
-      numeroDossier: row.numero_dossier,
-      typeDossier: row.type_dossier,
-      dateCreation: row.date_creation,
-      client: row.client,
-      vehicule: row.vehicule,
-      assurance: row.assurance,
-      agenceAssurance: row.agence_assurance,
-      partenaire: row.partenaire,
-      numeroSinistre: row.numero_sinistre,
-      numeroPolice: row.numero_police,
-      dateSinistre: row.date_sinistre,
-      typeClientAssurance: row.type_client_assurance,
-      referenceDossierAzurGlass: row.reference_dossier_azur_glass,
-      dateEnvoiAzurGlass: row.date_envoi_azur_glass,
-      montantTotalTTC: Number(row.montant_total_ttc || 0),
-      montantFranchise: Number(row.montant_franchise || 0),
-      franchisePayeeParClient: Boolean(row.franchise_payee_par_client),
-      franchiseOfferte: Boolean(row.franchise_offerte),
-      tvaExclueParAssurance: Number(row.tva_exclue_par_assurance || 0),
-      montantReversementAzurGlass: Number(row.montant_reversement_azur_glass || 0),
-      montantPriseEnChargeAssurance: Number(row.montant_prise_en_charge_assurance || 0),
-      commission: Number(row.commission ?? row.partenaire?.commission ?? 0),
-      statut: row.statut,
-      isArchive: row.statut === 'ARCHIVE',
-      dateArchivage: row.statut === 'ARCHIVE' ? (row.updated_at || row.date_creation) : undefined,
-      poseur: row.poseur,
-      observations: row.observations,
-      photos: row.photos || {},
-      documents: row.documents || [],
-      bonSortieId: row.bon_sortie_id,
-      bonLivraisonId: row.bon_livraison_id,
-      factureAssuranceId: row.facture_assurance_id,
-      factureClientId: row.facture_client_id,
-    }));
+    return data.map((row: any) => {
+      const rawVehicule = row.vehicule || {};
+      const vehicule = {
+        ...rawVehicule,
+        immatriculation: normalizeMatriculeText(rawVehicule.immatriculation) || '',
+      };
+      return {
+        id: row.id,
+        numeroDossier: row.numero_dossier,
+        typeDossier: row.type_dossier,
+        dateCreation: row.date_creation,
+        client: row.client,
+        vehicule,
+        assurance: row.assurance,
+        agenceAssurance: row.agence_assurance,
+        partenaire: row.partenaire,
+        numeroSinistre: row.numero_sinistre,
+        numeroPolice: row.numero_police,
+        dateSinistre: row.date_sinistre,
+        typeClientAssurance: row.type_client_assurance,
+        referenceDossierAzurGlass: row.reference_dossier_azur_glass,
+        dateEnvoiAzurGlass: row.date_envoi_azur_glass,
+        montantTotalTTC: Number(row.montant_total_ttc || 0),
+        montantFranchise: Number(row.montant_franchise || 0),
+        franchisePayeeParClient: Boolean(row.franchise_payee_par_client),
+        franchiseOfferte: Boolean(row.franchise_offerte),
+        tvaExclueParAssurance: Number(row.tva_exclue_par_assurance || 0),
+        montantReversementAzurGlass: Number(row.montant_reversement_azur_glass || 0),
+        montantPriseEnChargeAssurance: Number(row.montant_prise_en_charge_assurance || 0),
+        commission: Number(row.commission ?? row.partenaire?.commission ?? 0),
+        statut: row.statut,
+        isArchive: row.statut === 'ARCHIVE',
+        dateArchivage: row.statut === 'ARCHIVE' ? (row.updated_at || row.date_creation) : undefined,
+        poseur: row.poseur,
+        observations: normalizeMatriculeText(row.observations),
+        photos: row.photos || {},
+        documents: row.documents || [],
+        bonSortieId: row.bon_sortie_id,
+        bonLivraisonId: row.bon_livraison_id,
+        factureAssuranceId: row.facture_assurance_id,
+        factureClientId: row.facture_client_id,
+      };
+    });
   } catch (err) {
     console.error('Exception fetch dossiers:', err);
     return null;
@@ -117,13 +129,28 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
   if (!isSupabaseConfigured || !supabase) return false;
 
   try {
+    const cleanVehicule = dossier.vehicule
+      ? {
+          ...dossier.vehicule,
+          immatriculation: normalizeMatriculeText(dossier.vehicule.immatriculation) || '',
+        }
+      : {};
+
+    // Éviter toute duplication entre galerieUrls et les anciennes clés nommées pour alléger le JSON
+    let cleanPhotos: DossierSinistre['photos'] = dossier.photos || {};
+    if (Array.isArray(cleanPhotos.galerieUrls) && cleanPhotos.galerieUrls.length > 0) {
+      cleanPhotos = {
+        galerieUrls: Array.from(new Set(cleanPhotos.galerieUrls.filter(Boolean))),
+      };
+    }
+
     const payload = {
       id: dossier.id,
       numero_dossier: dossier.numeroDossier,
       type_dossier: dossier.typeDossier || 'ASSURANCE',
       date_creation: dossier.dateCreation || new Date().toISOString(),
       client: dossier.client || {},
-      vehicule: dossier.vehicule || {},
+      vehicule: cleanVehicule,
       assurance: dossier.assurance || null,
       agence_assurance: dossier.agenceAssurance || null,
       partenaire: dossier.partenaire 
@@ -146,8 +173,8 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
       is_archive: Boolean(dossier.isArchive),
       date_archivage: (dossier.isArchive && dossier.dateArchivage) ? dossier.dateArchivage : null,
       poseur: dossier.poseur || null,
-      observations: dossier.observations || null,
-      photos: dossier.photos || {},
+      observations: normalizeMatriculeText(dossier.observations) || null,
+      photos: cleanPhotos,
       documents: dossier.documents || [],
       bon_sortie_id: dossier.bonSortieId || null,
       bon_livraison_id: dossier.bonLivraisonId || null,
@@ -168,8 +195,18 @@ export const saveDossierToSupabase = async (dossier: DossierSinistre): Promise<b
         .from('dossiers')
         .upsert(safePayload, { onConflict: 'id' });
       if (retryError) {
-        console.error('Erreur persistante upsert dossier:', retryError);
-        return false;
+        console.warn('Erreur persistante upsert dossier, repli allégé:', retryError.message);
+        const lightDocs = (payload.documents || []).map((doc: any) => ({
+          ...doc,
+          url: typeof doc.url === 'string' && doc.url.length > 1500000 ? '#' : doc.url,
+        }));
+        const { error: finalError } = await supabase
+          .from('dossiers')
+          .upsert({ ...safePayload, documents: lightDocs }, { onConflict: 'id' });
+        if (finalError) {
+          console.error('Erreur finale upsert dossier:', finalError);
+          return false;
+        }
       }
     }
     return true;
@@ -340,7 +377,7 @@ export const fetchFacturesFromSupabase = async (): Promise<Facture[] | null> => 
         statutPaiement: row.statut_paiement,
         datePaiement: row.date_paiement ? String(row.date_paiement).slice(0, 10) : undefined,
         referencePaiement: row.reference_paiement || undefined,
-        observations: row.observations || meta.observations || undefined,
+        observations: normalizeMatriculeText(row.observations || meta.observations),
         montantRegleEspeces: meta.montantRegleEspeces !== undefined ? Number(meta.montantRegleEspeces) : undefined,
         montantSoldeVirement: meta.montantSoldeVirement !== undefined ? Number(meta.montantSoldeVirement) : undefined,
         clientNom: row.client_nom || meta.clientNom || undefined,
@@ -349,7 +386,7 @@ export const fetchFacturesFromSupabase = async (): Promise<Facture[] | null> => 
         clientIce: row.client_ice || meta.clientIce || undefined,
         clientAdresse: row.client_adresse || meta.clientAdresse || undefined,
         vehiculeInfo: row.vehicule_info || meta.vehiculeInfo || undefined,
-        immatriculation: row.immatriculation || meta.immatriculation || undefined,
+        immatriculation: normalizeMatriculeText(row.immatriculation || meta.immatriculation),
       };
     });
   } catch (err) {
@@ -363,7 +400,7 @@ export const saveFactureToSupabase = async (facture: Facture): Promise<boolean> 
 
   try {
     const metaFields = {
-      observations: facture.observations,
+      observations: normalizeMatriculeText(facture.observations),
       montantRegleEspeces: facture.montantRegleEspeces,
       montantSoldeVirement: facture.montantSoldeVirement,
       clientNom: facture.clientNom,
@@ -372,7 +409,7 @@ export const saveFactureToSupabase = async (facture: Facture): Promise<boolean> 
       clientIce: facture.clientIce,
       clientAdresse: facture.clientAdresse,
       vehiculeInfo: facture.vehiculeInfo,
-      immatriculation: facture.immatriculation,
+      immatriculation: normalizeMatriculeText(facture.immatriculation),
     };
 
     const baseLignes = Array.isArray(facture.lignes) && facture.lignes.length > 0
@@ -476,7 +513,7 @@ export const fetchDevisFromSupabase = async (): Promise<DevisClient[] | null> =>
       vehiculeMarque: row.vehicule_marque,
       vehiculeModele: row.vehicule_modele,
       vehiculeAnnee: Number(row.vehicule_annee || 2022),
-      vehiculeImmatriculation: row.vehicule_immatriculation,
+      vehiculeImmatriculation: normalizeMatriculeText(row.vehicule_immatriculation) || '',
       vehiculeChassisVin: row.vehicule_chassis_vin,
       typeDemande: row.type_demande || 'PARTICULIER_DIRECT',
       compagnieAssurance: row.compagnie_assurance || row.assurance_nom,
@@ -486,7 +523,7 @@ export const fetchDevisFromSupabase = async (): Promise<DevisClient[] | null> =>
       totalTTC: Number(row.total_ttc || 0),
       statut: row.statut || 'BROUILLON',
       dossierIdGenere: row.dossier_id_genere,
-      observations: row.observations,
+      observations: normalizeMatriculeText(row.observations),
     }));
   } catch (err) {
     console.error('Exception fetch devis Supabase:', err);
@@ -512,7 +549,7 @@ export const saveDevisToSupabase = async (devis: DevisClient): Promise<boolean> 
       vehicule_marque: devis.vehiculeMarque,
       vehicule_modele: devis.vehiculeModele,
       vehicule_annee: devis.vehiculeAnnee,
-      vehicule_immatriculation: devis.vehiculeImmatriculation,
+      vehicule_immatriculation: normalizeMatriculeText(devis.vehiculeImmatriculation) || '',
       vehicule_chassis_vin: devis.vehiculeChassisVin,
       type_demande: devis.typeDemande,
       compagnie_assurance: devis.compagnieAssurance,
@@ -522,7 +559,7 @@ export const saveDevisToSupabase = async (devis: DevisClient): Promise<boolean> 
       total_ttc: devis.totalTTC,
       statut: devis.statut,
       dossier_id_genere: devis.dossierIdGenere,
-      observations: devis.observations,
+      observations: normalizeMatriculeText(devis.observations),
       updated_at: new Date().toISOString(),
     };
 
@@ -864,7 +901,7 @@ export const fetchBonsLivraisonFromSupabase = async (): Promise<BonLivraison[] |
       clientAdresse: row.client_adresse || undefined,
       isMultiVehicules: Boolean(row.is_multi_vehicules),
       vehiculeInfo: row.vehicule_info || undefined,
-      immatriculation: row.immatriculation || undefined,
+      immatriculation: normalizeMatriculeText(row.immatriculation),
       dateLivraison: row.date_livraison,
       livreurPoseur: row.livreur_poseur || 'Poseur Atelier',
       receptionnaireNom: row.receptionnaire_nom || row.client_nom || 'Client',
@@ -874,7 +911,7 @@ export const fetchBonsLivraisonFromSupabase = async (): Promise<BonLivraison[] |
       totalTTC: Number(row.total_ttc || 0),
       montantFranchise: Number(row.montant_franchise || 0),
       tvaExclue: Number(row.tva_exclue || 0),
-      observations: row.observations || undefined,
+      observations: normalizeMatriculeText(row.observations),
       created_at: row.created_at,
     }));
   } catch (err) {
@@ -898,7 +935,7 @@ export const saveBonLivraisonToSupabase = async (bl: BonLivraison): Promise<bool
       client_adresse: bl.clientAdresse || null,
       is_multi_vehicules: Boolean(bl.isMultiVehicules),
       vehicule_info: bl.vehiculeInfo || null,
-      immatriculation: bl.immatriculation || null,
+      immatriculation: normalizeMatriculeText(bl.immatriculation) || null,
       date_livraison: bl.dateLivraison || new Date().toISOString(),
       livreur_poseur: bl.livreurPoseur || 'Poseur Atelier',
       receptionnaire_nom: bl.receptionnaireNom || bl.clientNom || 'Client',
@@ -908,7 +945,7 @@ export const saveBonLivraisonToSupabase = async (bl: BonLivraison): Promise<bool
       total_ttc: Number(bl.totalTTC || 0),
       montant_franchise: Number(bl.montantFranchise || 0),
       tva_exclue: Number(bl.tvaExclue || 0),
-      observations: bl.observations || null,
+      observations: normalizeMatriculeText(bl.observations) || null,
       updated_at: new Date().toISOString(),
     };
 

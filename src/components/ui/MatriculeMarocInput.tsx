@@ -54,7 +54,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
           ? lettreSelection 
           : latinVersArabe(lettreSelection);
 
-        const formatted = `${numero.trim()} | ${lettreAffichee.trim()} | ${prefecture.trim()}`;
+        const formatted = `${numero.trim()}-${lettreAffichee.trim()}-${prefecture.trim()}`;
         onChange(formatted);
       } else {
         onChange('');
@@ -85,7 +85,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
                     ? 'bg-blue-600 text-white shadow-xs font-bold' 
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Format standard avec lettre en français/latin (ex: 45892 | A | 6)"
+                title="Format standard avec lettre en français/latin (ex: 45892-A-6)"
               >
                 Format Latin (A)
               </button>
@@ -97,7 +97,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
                     ? 'bg-blue-600 text-white shadow-xs font-bold' 
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Format avec lettre en arabe (ex: 45892 | أ | 6)"
+                title="Format avec lettre en arabe (ex: 45892-أ-6)"
               >
                 Format Arabe (أ)
               </button>
@@ -152,7 +152,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
 
             {/* Séparateur visuel */}
             <div className="col-span-1 text-center font-bold text-slate-400 text-lg select-none">
-              |
+              -
             </div>
 
             {/* 2. Emplacement Lettre (Centre) */}
@@ -177,7 +177,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
 
             {/* Séparateur visuel */}
             <div className="col-span-1 text-center font-bold text-slate-400 text-lg select-none">
-              |
+              -
             </div>
 
             {/* 3. Emplacement Préfecture (Droite) */}
@@ -204,7 +204,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
             <div className="flex items-center gap-2">
               {/* Badge Latin standard */}
               <div 
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md font-mono font-black border text-xs tracking-wider transition ${
+                className={`inline-flex items-center gap-1 px-3 py-1 rounded-md font-mono font-black border text-xs tracking-wider transition ${
                   formatMode === 'LATIN'
                     ? 'bg-amber-100 text-amber-950 border-amber-300 ring-2 ring-blue-500/30'
                     : 'bg-white text-slate-600 border-slate-200 opacity-80'
@@ -212,15 +212,15 @@ export const MatriculeMarocInput: React.FC<Props> = ({
                 title="Format Latin"
               >
                 <span>{numero || '00000'}</span>
-                <span className="text-amber-800/40 select-none font-bold">|</span>
+                <span className="text-amber-800/60 select-none font-bold">-</span>
                 <span className="text-center font-bold px-0.5">{currentLettreLatin}</span>
-                <span className="text-amber-800/40 select-none font-bold">|</span>
+                <span className="text-amber-800/60 select-none font-bold">-</span>
                 <span>{prefecture || '0'}</span>
               </div>
 
               {/* Badge Arabe équivalent (Lettre arabe STRICTEMENT verrouillée au CENTRE) */}
               <div 
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md font-mono font-black border text-xs tracking-wider transition ${
+                className={`inline-flex items-center gap-1 px-3 py-1 rounded-md font-mono font-black border text-xs tracking-wider transition ${
                   formatMode === 'ARABE'
                     ? 'bg-amber-100 text-amber-950 border-amber-300 ring-2 ring-blue-500/30'
                     : 'bg-white text-slate-600 border-slate-200 opacity-80'
@@ -231,7 +231,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
                 <span>{numero || '00000'}</span>
 
                 {/* Séparateur */}
-                <span className="text-amber-800/40 select-none font-bold">|</span>
+                <span className="text-amber-800/60 select-none font-bold">-</span>
 
                 {/* 2. Lettre arabe au CENTRE avec isolation bdi */}
                 <span className="text-center font-extrabold px-1 min-w-[20px] text-sm leading-none">
@@ -239,7 +239,7 @@ export const MatriculeMarocInput: React.FC<Props> = ({
                 </span>
 
                 {/* Séparateur */}
-                <span className="text-amber-800/40 select-none font-bold">|</span>
+                <span className="text-amber-800/60 select-none font-bold">-</span>
 
                 {/* 3. Région à droite */}
                 <span>{prefecture || '0'}</span>

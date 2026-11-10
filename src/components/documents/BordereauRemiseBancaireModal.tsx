@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import { ReglementRecette } from '@/types';
 import { GARAGE_INFO } from '@/lib/data';
 import { formatDate, formatDH, montantEnToutesLettres } from '@/lib/utils';
-import { downloadElementAsPdf, shareElementToWhatsApp } from '@/lib/pdfExporter';
+import { downloadElementAsPdf, shareElementToWhatsApp, printElementSinglePage } from '@/lib/pdfExporter';
 import { 
   Printer, 
   X, 
@@ -103,8 +103,13 @@ export const BordereauRemiseBancaireModal: React.FC<Props> = ({
   const totalMontant = itemsRemise.reduce((acc, curr) => acc + curr.montant, 0);
   const totalNombre = itemsRemise.length;
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!printRef.current) return;
+    try {
+      await printElementSinglePage(printRef.current, `Bordereau Remise ${numeroBordereau}`);
+    } catch {
+      window.print();
+    }
   };
 
   const handleDownloadPdf = async () => {

@@ -95,12 +95,17 @@ import { LoginView } from '@/components/auth/LoginView';
 import { Menu, X, ShieldCheck, LogOut } from 'lucide-react';
 
 // Helpers pour persistance locale partagée instantanée entre comptes (Admin & Assistante)
+const normalizeMatriculeInData = (raw: string): string => {
+  return raw.replace(/\s*\|\s*/g, '-');
+};
+
 const loadSharedStorage = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
   try {
     const raw = localStorage.getItem(key);
     if (raw) {
-      const parsed = JSON.parse(raw);
+      const normalized = normalizeMatriculeInData(raw);
+      const parsed = JSON.parse(normalized);
       if (Array.isArray(parsed)) return parsed as T;
       if (parsed && typeof parsed === 'object') return parsed as T;
     }
@@ -115,7 +120,25 @@ const saveSharedStorage = <T,>(key: string, data: T) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
-    console.error(`Erreur écriture ${key}:`, e);
+    // Si QuotaExceededError sur localStorage (ex: nombreuses photos/documents base64),
+    // on allège uniquement la copie cache localStorage tout en gardant 100% dans React et Supabase Cloud
+    try {
+      if (key === 'gp_shared_dossiers' && Array.isArray(data)) {
+        const lightDossiers = (data as unknown as DossierSinistre[]).map((d) => ({
+          ...d,
+          photos: {
+            galerieUrls: (d.photos?.galerieUrls || []).slice(0, 6),
+          },
+          documents: (d.documents || []).map((doc) => ({
+            ...doc,
+            url: doc.url && doc.url.length > 150000 ? '#' : doc.url,
+          })),
+        }));
+        localStorage.setItem(key, JSON.stringify(lightDossiers));
+      }
+    } catch (retryErr) {
+      console.warn(`Quota localStorage atteint pour ${key}, persistance assurée par Supabase Cloud.`, retryErr);
+    }
   }
 };
 
@@ -170,10 +193,20 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Référence pour limiter les requêtes intempestives sur focus / boîte de dialogue
+  // Références pour protéger les dossiers récemment créés/modifiés contre l'écrasement lors du focus (téléchargement PDF / sélection fichiers)
   const lastFetchRef = useRef<number>(0);
+  const recentlySavedDossiersRef = useRef<Map<string, { dossier: DossierSinistre; timestamp: number }>>(new Map());
+  const deletedDossierIdsRef = useRef<Set<string>>(new Set());
 
-  // Synchronisation avec Supabase Cloud (avec réconciliation et poussée automatique des données locales orphelines)
+  const registerLocalDossierSave = (dossier: DossierSinistre) => {
+    lastFetchRef.current = Date.now();
+    recentlySavedDossiersRef.current.set(dossier.id, {
+      dossier,
+      timestamp: Date.now(),
+    });
+  };
+
+  // Synchronisation avec Supabase Cloud (avec protection des dossiers locaux en cours de sauvegarde)
   const loadSupabaseData = async () => {
     if (!isSupabaseConfigured) return;
     lastFetchRef.current = Date.now();
@@ -199,10 +232,38 @@ export default function Home() {
         fetchBonsLivraisonFromSupabase(),
       ]);
 
-      // 1. DOSSIERS : Supabase Cloud est la source de vérité
+      // 1. DOSSIERS : Fusion intelligente pour ne jamais perdre un dossier créé ou modifié localement
       if (supaDossiers !== null) {
-        setDossiers(supaDossiers);
-        saveSharedStorage('gp_shared_dossiers', supaDossiers);
+        const now = Date.now();
+        const filteredSupa = supaDossiers.filter((d) => !deletedDossierIdsRef.current.has(d.id));
+        const supaIds = new Set(filteredSupa.map((d) => d.id));
+
+        // Remplacer par la version locale si elle a été modifiée il y a moins de 60s
+        const mergedDossiers = filteredSupa.map((supaDos) => {
+          const recent = recentlySavedDossiersRef.current.get(supaDos.id);
+          if (recent && now - recent.timestamp < 60000) {
+            return recent.dossier;
+          }
+          return supaDos;
+        });
+
+        // Ajouter en tête tout dossier récemment créé localement (< 10 min) qui ne serait pas encore revenu de Supabase
+        recentlySavedDossiersRef.current.forEach((entry, id) => {
+          if (deletedDossierIdsRef.current.has(id)) {
+            recentlySavedDossiersRef.current.delete(id);
+            return;
+          }
+          if (!supaIds.has(id) && now - entry.timestamp < 10 * 60 * 1000) {
+            mergedDossiers.unshift(entry.dossier);
+            // Re-pousser en arrière-plan vers Supabase pour garantir la persistance Cloud
+            saveDossierToSupabase(entry.dossier);
+          } else if (supaIds.has(id) && now - entry.timestamp >= 60000) {
+            recentlySavedDossiersRef.current.delete(id);
+          }
+        });
+
+        setDossiers(mergedDossiers);
+        saveSharedStorage('gp_shared_dossiers', mergedDossiers);
       }
 
       // 2. STOCK
@@ -305,19 +366,57 @@ export default function Home() {
     }
   }, [currentUser, activeTab]);
 
-  // Chargement des données réelles depuis Supabase Cloud au montage & lors du focus/retour sur l'onglet
+  // Référence indiquant si une fenêtre modale (création, édition, aperçu/téléchargement document) est ouverte
+  const isAnyModalOpenRef = useRef<boolean>(false);
+  useEffect(() => {
+    isAnyModalOpenRef.current = Boolean(
+      showNewDossierModal ||
+      editingDossier ||
+      activeQuittanceDossier ||
+      activeDeclarationBrisGlaceDossier ||
+      activeFactureModal ||
+      showNewDirectFactureModal ||
+      activeBonSortieModal ||
+      activeBonLivraisonModal ||
+      showNewBonLivraisonModal ||
+      activeEncaisserModal ||
+      activeCommandeFournisseurModal ||
+      activeTransmettreAzurGlassDossier ||
+      showNewDevisModal ||
+      activeDevisModal
+    );
+  }, [
+    showNewDossierModal,
+    editingDossier,
+    activeQuittanceDossier,
+    activeDeclarationBrisGlaceDossier,
+    activeFactureModal,
+    showNewDirectFactureModal,
+    activeBonSortieModal,
+    activeBonLivraisonModal,
+    showNewBonLivraisonModal,
+    activeEncaisserModal,
+    activeCommandeFournisseurModal,
+    activeTransmettreAzurGlassDossier,
+    showNewDevisModal,
+    activeDevisModal,
+  ]);
+
+  // Chargement des données réelles depuis Supabase Cloud au montage & lors du retour sur l'onglet
   useEffect(() => {
     loadSupabaseData();
 
     const handleFocus = () => {
-      // Éviter les rechargements concurrents lors de la fermeture des boîtes de confirmation
-      if (Date.now() - lastFetchRef.current > 3000) {
+      // Ne pas recharger pendant la création d'un dossier, la sélection de fichiers ou le téléchargement/impression d'un PDF
+      if (isAnyModalOpenRef.current) return;
+      if (Date.now() - lastFetchRef.current > 15000) {
         loadSupabaseData();
       }
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lastFetchRef.current > 3000) {
+      if (isAnyModalOpenRef.current) return;
+      if (document.visibilityState === 'visible' && Date.now() - lastFetchRef.current > 15000) {
         loadSupabaseData();
       }
     };
@@ -409,17 +508,25 @@ export default function Home() {
       bonLivraisonId: newBL.id,
     };
 
-    const updatedDossiers = [dossierWithDocs, ...dossiers];
-    setDossiers(updatedDossiers);
-    saveSharedStorage('gp_shared_dossiers', updatedDossiers);
+    registerLocalDossierSave(dossierWithDocs);
 
-    const updatedBS = [finalBS, ...bonsSortie];
-    setBonsSortie(updatedBS);
-    saveSharedStorage('gp_shared_bons_sortie', updatedBS);
+    setDossiers((prev) => {
+      const updated = [dossierWithDocs, ...prev.filter((d) => d.id !== dossierWithDocs.id)];
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
 
-    const updatedBL = [newBL, ...bonsLivraison];
-    setBonsLivraison(updatedBL);
-    saveSharedStorage('gp_shared_bons_livraison', updatedBL);
+    setBonsSortie((prev) => {
+      const updated = [finalBS, ...prev.filter((b) => b.id !== finalBS.id)];
+      saveSharedStorage('gp_shared_bons_sortie', updated);
+      return updated;
+    });
+
+    setBonsLivraison((prev) => {
+      const updated = [newBL, ...prev.filter((b) => b.id !== newBL.id)];
+      saveSharedStorage('gp_shared_bons_livraison', updated);
+      return updated;
+    });
     saveBonLivraisonToSupabase(newBL);
 
     if (newBonSortie) {
@@ -452,12 +559,13 @@ export default function Home() {
     }
 
     if (newRecette) {
-      const updatedRecettes = [newRecette, ...recettes];
-      setRecettes(updatedRecettes);
-      saveSharedStorage('gp_shared_recettes', updatedRecettes);
+      setRecettes((prev) => {
+        const updated = [newRecette, ...prev];
+        saveSharedStorage('gp_shared_recettes', updated);
+        return updated;
+      });
     }
 
-    lastFetchRef.current = Date.now();
     saveDossierToSupabase(dossierWithDocs);
 
     setShowNewDossierModal(false);
@@ -838,12 +946,32 @@ export default function Home() {
       factureAssuranceId: devis.typeDemande === 'ASSURANCE' ? newFacture.id : undefined,
     };
 
-    setDossiers([dossierWithDocs, ...dossiers]);
-    setBonsSortie([finalBS, ...bonsSortie]);
-    setBonsLivraison([newBL, ...bonsLivraison]);
-    setFactures([newFacture, ...factures]);
-    saveSharedStorage('gp_shared_bons_livraison', [newBL, ...bonsLivraison]);
+    registerLocalDossierSave(dossierWithDocs);
+    setDossiers((prev) => {
+      const updated = [dossierWithDocs, ...prev.filter((d) => d.id !== dossierWithDocs.id)];
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
+    saveDossierToSupabase(dossierWithDocs);
+
+    setBonsSortie((prev) => {
+      const updated = [finalBS, ...prev];
+      saveSharedStorage('gp_shared_bons_sortie', updated);
+      return updated;
+    });
+    setBonsLivraison((prev) => {
+      const updated = [newBL, ...prev];
+      saveSharedStorage('gp_shared_bons_livraison', updated);
+      return updated;
+    });
     saveBonLivraisonToSupabase(newBL);
+
+    setFactures((prev) => {
+      const updated = [newFacture, ...prev];
+      saveSharedStorage('gp_shared_factures', updated);
+      return updated;
+    });
+    saveFactureToSupabase(newFacture);
 
     // Mark devis as converted
     setDevisList((prev) =>
@@ -923,6 +1051,7 @@ export default function Home() {
       const updated = prev.map((d) => {
         if (d.id === dossierId) {
           const u = { ...d, statut: newStatut };
+          registerLocalDossierSave(u);
           saveDossierToSupabase(u);
           return u;
         }
@@ -949,6 +1078,7 @@ export default function Home() {
             statut: 'ARCHIVE',
             motifArchivage: motif || 'Dossier archivé',
           };
+          registerLocalDossierSave(u);
           saveDossierToSupabase(u);
           return u;
         }
@@ -970,6 +1100,7 @@ export default function Home() {
             dateArchivage: undefined,
             statut: d.statutPrecedent || 'NOUVEAU',
           };
+          registerLocalDossierSave(u);
           saveDossierToSupabase(u);
           return u;
         }
@@ -982,12 +1113,14 @@ export default function Home() {
   };
 
   const handleSaveEditedDossier = async (updatedDossier: DossierSinistre) => {
+    registerLocalDossierSave(updatedDossier);
     setDossiers((prev) => {
       const updated = prev.map((d) => (d.id === updatedDossier.id ? updatedDossier : d));
       saveSharedStorage('gp_shared_dossiers', updated);
       return updated;
     });
     await saveDossierToSupabase(updatedDossier);
+    registerLocalDossierSave(updatedDossier);
 
     // Mettre à jour la facture liée si existante
     setFactures((prev) => {
@@ -1052,6 +1185,10 @@ export default function Home() {
   };
 
   const handleDeleteDossierPermanent = async (dossierId: string) => {
+    deletedDossierIdsRef.current.add(dossierId);
+    recentlySavedDossiersRef.current.delete(dossierId);
+    lastFetchRef.current = Date.now();
+
     // 1. Suppression du dossier
     setDossiers((prev) => {
       const updated = prev.filter((d) => d.id !== dossierId);
@@ -1150,7 +1287,15 @@ export default function Home() {
     }
 
     const expiredIds = expired.map((d) => d.id);
-    setDossiers((prev) => prev.filter((d) => !expiredIds.includes(d.id)));
+    expiredIds.forEach((id) => {
+      deletedDossierIdsRef.current.add(id);
+      recentlySavedDossiersRef.current.delete(id);
+    });
+    setDossiers((prev) => {
+      const updated = prev.filter((d) => !expiredIds.includes(d.id));
+      saveSharedStorage('gp_shared_dossiers', updated);
+      return updated;
+    });
     for (const id of expiredIds) {
       await deleteDossierFromSupabase(id);
     }
@@ -1171,40 +1316,80 @@ export default function Home() {
       dateEnvoi: string;
     }
   ) => {
-    setDossiers((prev) =>
-      prev.map((d) => {
+    setDossiers((prev) => {
+      const updatedList = prev.map((d) => {
         if (d.id === dossierId) {
           const updated = {
             ...d,
             statut: 'ENVOYE_AZUR_GLASS' as StatutDossier,
             dateEnvoiAzurGlass: transmissionData.dateEnvoi,
           };
+          registerLocalDossierSave(updated);
           saveDossierToSupabase(updated);
           return updated;
         }
         return d;
-      })
-    );
+      });
+      saveSharedStorage('gp_shared_dossiers', updatedList);
+      return updatedList;
+    });
     setActiveTransmettreAzurGlassDossier(null);
     showToast(`Dossier complet transmis avec succès par email à AZUR GLASS (${transmissionData.destinataire}) !`);
   };
 
   const handleAddDocumentToDossier = (dossierId: string, doc: DocumentAttache) => {
-    setDossiers((prev) =>
-      prev.map((d) => {
+    setDossiers((prev) => {
+      const updatedList = prev.map((d) => {
         if (d.id === dossierId) {
           const currentDocs = d.documents || [];
           const updated = {
             ...d,
             documents: [doc, ...currentDocs],
           };
+          registerLocalDossierSave(updated);
           saveDossierToSupabase(updated);
           return updated;
         }
         return d;
-      })
-    );
-    showToast(`Document "${doc.nom}" attaché au dossier.`);
+      });
+      saveSharedStorage('gp_shared_dossiers', updatedList);
+      return updatedList;
+    });
+    showToast(`Document "${doc.nom}" optimisé et attaché au dossier.`);
+  };
+
+  const handleAddPhotosToDossier = (dossierId: string, newPhotoUrls: string[]) => {
+    if (!newPhotoUrls || newPhotoUrls.length === 0) return;
+    setDossiers((prev) => {
+      const updatedList = prev.map((d) => {
+        if (d.id === dossierId) {
+          const existingGalerie = d.photos?.galerieUrls || [
+            d.photos?.avantSinistreUrl,
+            d.photos?.apresPoseUrl,
+            d.photos?.carteGriseUrl,
+            d.photos?.attestationAssuranceUrl,
+            d.photos?.declarationRectoUrl,
+            d.photos?.declarationVersoUrl,
+            d.photos?.vignetteUrl,
+            d.photos?.autreUrl,
+          ].filter(Boolean) as string[];
+          const mergedGalerie = [...existingGalerie, ...newPhotoUrls];
+          const updated: DossierSinistre = {
+            ...d,
+            photos: {
+              galerieUrls: mergedGalerie,
+            },
+          };
+          registerLocalDossierSave(updated);
+          saveDossierToSupabase(updated);
+          return updated;
+        }
+        return d;
+      });
+      saveSharedStorage('gp_shared_dossiers', updatedList);
+      return updatedList;
+    });
+    showToast(`${newPhotoUrls.length} photo(s) optimisée(s) ajoutée(s) au dossier.`);
   };
 
   const handleAddRecette = (newRecette: ReglementRecette) => {
@@ -1593,7 +1778,7 @@ export default function Home() {
       )}
 
       {/* Desktop Sidebar */}
-      <div className="hidden md:block">
+      <div className="hidden md:block no-print">
         <Navigation
           activeTab={activeTab}
           onSelectTab={setActiveTab}
@@ -1638,7 +1823,7 @@ export default function Home() {
 
       {/* Mobile Drawer */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
+        <div className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm no-print">
           <div className="w-72 bg-slate-900 h-full p-4 flex flex-col justify-between">
             <Navigation
               activeTab={activeTab}
@@ -1664,7 +1849,7 @@ export default function Home() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 min-w-0 p-4 md:p-8 pt-16 md:pt-8 max-w-7xl mx-auto overflow-y-auto">
+      <main className="flex-1 min-w-0 p-4 md:p-8 pt-16 md:pt-8 max-w-7xl mx-auto overflow-y-auto print:hidden">
         {activeTab === 'dashboard' && (
           <DashboardView
             dossiers={dossiers}
@@ -1711,6 +1896,7 @@ export default function Home() {
             onOpenDeclarationBrisGlace={(d) => setActiveDeclarationBrisGlaceDossier(d)}
             onOpenTransmettreAzurGlass={handleOpenTransmettreAzurGlass}
             onAddDocumentToDossier={handleAddDocumentToDossier}
+            onAddPhotosToDossier={handleAddPhotosToDossier}
             onUpdateStatut={handleUpdateStatutDossier}
             onOpenEncaisserModal={handleOpenEncaisserModalFromDossier}
             onArchiveDossier={handleArchiveDossier}

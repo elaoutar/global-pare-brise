@@ -4,12 +4,12 @@
  */
 export async function optimizeImageFile(
   file: File,
-  maxWidth: number = 1600,
-  maxHeight: number = 1600,
-  quality: number = 0.8
+  maxWidth: number = 1150,
+  maxHeight: number = 1150,
+  quality: number = 0.72
 ): Promise<{ file: File; dataUrl: string }> {
   return new Promise((resolve, reject) => {
-    // Si ce n'est pas une image (ex: PDF), on ne touche pas
+    // Si ce n'est pas une image (ex: PDF), on retourne le fichier et son DataURL
     if (!file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = () => resolve({ file, dataUrl: reader.result as string });
@@ -48,7 +48,9 @@ export async function optimizeImageFile(
           return;
         }
 
-        // Amélioration de la netteté lors du redimensionnement
+        // Fond blanc pour les PNG transparents et netteté optimale
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);

@@ -19,7 +19,9 @@ export const DeclarationBrisGlaceModal: React.FC<Props> = ({ dossier, onClose })
   // Valeurs éditables avec pré-remplissage automatique
   const [nomSociete, setNomSociete] = useState(dossier.client.nom || '');
   const [numeroPolice, setNumeroPolice] = useState(dossier.numeroPolice || 'AU 11201500427788');
-  const [immatriculation, setImmatriculation] = useState(dossier.vehicule.immatriculation || '');
+  const [immatriculation, setImmatriculation] = useState(
+    formatMatricule(dossier.vehicule.immatriculation || '', 'LATIN')
+  );
   const [marqueVehicule, setMarqueVehicule] = useState(
     `${dossier.vehicule.marque} ${dossier.vehicule.modele}`.trim()
   );

@@ -42,6 +42,7 @@ import { exportEtatMensuelExcel } from '@/lib/exportUtils';
 import { MatriculeBadge } from '@/components/ui/MatriculeBadge';
 import { formatMatricule } from '@/lib/matriculeMaroc';
 import { uploadFileToSupabase } from '@/lib/supabaseService';
+import { optimizeImageFile } from '@/lib/imageOptimizer';
 
 interface Props {
   dossiers: DossierSinistre[];
@@ -54,6 +55,7 @@ interface Props {
   onOpenDeclarationBrisGlace?: (dossier: DossierSinistre) => void;
   onOpenTransmettreAzurGlass?: (dossier: DossierSinistre) => void;
   onAddDocumentToDossier: (dossierId: string, doc: DocumentAttache) => void;
+  onAddPhotosToDossier?: (dossierId: string, newPhotoUrls: string[]) => void;
   onUpdateStatut: (dossierId: string, newStatut: StatutDossier) => void;
   onOpenEncaisserModal?: (dossier: DossierSinistre) => void;
   onArchiveDossier?: (dossierId: string, motif?: string) => void;
@@ -74,6 +76,7 @@ export const DossiersView: React.FC<Props> = ({
   onOpenDeclarationBrisGlace,
   onOpenTransmettreAzurGlass,
   onAddDocumentToDossier,
+  onAddPhotosToDossier,
   onUpdateStatut,
   onOpenEncaisserModal,
   onArchiveDossier,
@@ -96,8 +99,9 @@ export const DossiersView: React.FC<Props> = ({
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newDocNom, setNewDocNom] = useState('');
   const [newDocType, setNewDocType] = useState<DocumentAttache['typeDocument']>('PRISE_EN_CHARGE_ASSURANCE');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [isAddingPhotos, setIsAddingPhotos] = useState(false);
 
   // Séparation stricte : Dossiers Actifs vs Corbeille / Archives 30j
   const activeDossiers = dossiers.filter((d) => !d.isArchive && d.statut !== 'ARCHIVE');
@@ -927,11 +931,44 @@ export const DossiersView: React.FC<Props> = ({
 
                   return (
                     <>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                           <Camera className="w-3.5 h-3.5" /> Photos de la voiture ({galerieList.length})
-                        </span>
-                      </p>
+                        </p>
+                        {onAddPhotosToDossier && (
+                          <label className="cursor-pointer text-[11px] font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1 bg-brand-50 px-2 py-1 rounded-lg">
+                            <Upload className="w-3 h-3" />
+                            <span>{isAddingPhotos ? 'Optimisation...' : '+ Ajouter Photos'}</span>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              disabled={isAddingPhotos}
+                              className="hidden"
+                              onChange={async (e) => {
+                                const files = e.target.files ? Array.from(e.target.files) : [];
+                                e.target.value = '';
+                                if (files.length === 0) return;
+                                setIsAddingPhotos(true);
+                                try {
+                                  const folder = `dossiers/${selectedDossier.numeroDossier}`;
+                                  const newUrls: string[] = [];
+                                  for (const file of files) {
+                                    const { file: optFile, dataUrl } = await optimizeImageFile(file, 1150, 1150, 0.72);
+                                    const uploadedUrl = await uploadFileToSupabase(optFile, folder);
+                                    newUrls.push(uploadedUrl || dataUrl);
+                                  }
+                                  if (newUrls.length > 0) {
+                                    onAddPhotosToDossier(selectedDossier.id, newUrls);
+                                  }
+                                } finally {
+                                  setIsAddingPhotos(false);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
                       {galerieList.length === 0 ? (
                         <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center text-slate-400 text-xs italic">
                           Aucune photo ajoutée pour ce dossier.
@@ -952,7 +989,7 @@ export const DossiersView: React.FC<Props> = ({
                                 className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                               />
                               <span className="absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-xs text-white text-[9px] p-0.5 text-center font-medium">
-                                Photo de voiture {idx + 1}
+                                Photo {idx + 1}
                               </span>
                             </a>
                           ))}
@@ -971,14 +1008,14 @@ export const DossiersView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Modal Upload Fichier / Document Assurance */}
+      {/* Modal Upload Fichier / Document Assurance (Supporte plusieurs fichiers optimisés) */}
       {showUploadModal && selectedDossier && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-6 backdrop-blur-sm flex justify-center items-start">
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-2 sm:my-6 animate-in fade-in zoom-in-95 duration-150">
             <div className="sticky top-0 z-30 flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 bg-slate-900 text-white shadow-sm">
               <div className="flex items-center gap-2">
                 <Paperclip className="w-5 h-5 text-brand-400" />
-                <h3 className="font-bold text-sm">Joindre Document Sinistre</h3>
+                <h3 className="font-bold text-sm">Joindre Document(s) & Fichier(s) Sinistre</h3>
               </div>
               <button 
                 onClick={() => setShowUploadModal(false)} 
@@ -992,29 +1029,35 @@ export const DossiersView: React.FC<Props> = ({
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (selectedFiles.length === 0) return;
                 setIsUploadingDoc(true);
                 try {
-                  let fileUrl = '#';
-                  let taille = '850 Ko';
-                  if (selectedFile) {
-                    taille = `${(selectedFile.size / 1024).toFixed(0)} Ko`;
-                    const uploadedUrl = await uploadFileToSupabase(selectedFile, `sinistres/${selectedDossier.numeroDossier}`);
-                    if (uploadedUrl) {
-                      fileUrl = uploadedUrl;
-                    }
+                  const dateAjout = new Date().toISOString().split('T')[0];
+                  for (let i = 0; i < selectedFiles.length; i++) {
+                    const file = selectedFiles[i];
+                    const { file: optimizedFile, dataUrl } = await optimizeImageFile(file, 1150, 1150, 0.72);
+                    const taille = `${Math.max(1, Math.round(optimizedFile.size / 1024))} Ko`;
+                    const uploadedUrl = await uploadFileToSupabase(optimizedFile, `sinistres/${selectedDossier.numeroDossier}`);
+                    const fileUrl = uploadedUrl || dataUrl;
+
+                    const docNomFinal =
+                      selectedFiles.length === 1 && newDocNom.trim()
+                        ? newDocNom.trim()
+                        : file.name || `Document_${i + 1}_${selectedDossier.numeroDossier}.jpg`;
+
+                    const newDoc: DocumentAttache = {
+                      id: `doc-${Date.now()}-${i}`,
+                      nom: docNomFinal,
+                      typeDocument: newDocType,
+                      url: fileUrl,
+                      taille,
+                      dateAjout,
+                    };
+                    onAddDocumentToDossier(selectedDossier.id, newDoc);
                   }
-                  const newDoc: DocumentAttache = {
-                    id: `doc-${Date.now()}`,
-                    nom: newDocNom || selectedFile?.name || 'Document_Assurance.pdf',
-                    typeDocument: newDocType,
-                    url: fileUrl,
-                    taille,
-                    dateAjout: new Date().toISOString().split('T')[0],
-                  };
-                  onAddDocumentToDossier(selectedDossier.id, newDoc);
                   setShowUploadModal(false);
                   setNewDocNom('');
-                  setSelectedFile(null);
+                  setSelectedFiles([]);
                 } finally {
                   setIsUploadingDoc(false);
                 }
@@ -1046,10 +1089,9 @@ export const DossiersView: React.FC<Props> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Nom du Fichier / Titre *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Nom du Fichier / Titre</label>
                 <input
                   type="text"
-                  required
                   placeholder="Ex: Quittance_Signee_DOS-2026-0042.pdf"
                   value={newDocNom}
                   onChange={(e) => setNewDocNom(e.target.value)}
@@ -1057,22 +1099,29 @@ export const DossiersView: React.FC<Props> = ({
                 />
               </div>
 
-              {/* Upload Dropzone with real file input */}
+              {/* Upload Dropzone with real multi-file input */}
               <label className="border-2 border-dashed border-indigo-300 hover:border-indigo-500 rounded-xl p-4 text-center bg-indigo-50/40 hover:bg-indigo-50 transition-colors cursor-pointer block">
                 <Upload className="w-6 h-6 text-indigo-600 mx-auto mb-1" />
                 <p className="font-semibold text-slate-800">
-                  {selectedFile ? `Fichier prêt : ${selectedFile.name}` : (newDocNom ? `Fichier prêt : ${newDocNom}` : 'Cliquez pour choisir la photo ou le scan signé')}
+                  {selectedFiles.length > 0
+                    ? `${selectedFiles.length} fichier(s) sélectionné(s) : ${selectedFiles.map((f) => f.name).join(', ')}`
+                    : 'Cliquez pour choisir une ou plusieurs photos / scans PDF (Sans limite)'}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Formats acceptés : PDF, JPG, PNG</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Formats acceptés : PDF, JPG, PNG — Optimisation automatique avant enregistrement
+                </p>
                 <input
                   type="file"
+                  multiple
                   accept="image/*,.pdf"
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setSelectedFile(file);
-                      setNewDocNom(file.name);
+                    const files = e.target.files ? Array.from(e.target.files) : [];
+                    if (files.length > 0) {
+                      setSelectedFiles(files);
+                      if (files.length === 1 && !newDocNom) {
+                        setNewDocNom(files[0].name);
+                      }
                     }
                   }}
                 />
@@ -1084,7 +1133,7 @@ export const DossiersView: React.FC<Props> = ({
                   disabled={isUploadingDoc}
                   onClick={() => {
                     setShowUploadModal(false);
-                    setSelectedFile(null);
+                    setSelectedFiles([]);
                   }}
                   className="px-4 py-2 border rounded-lg font-semibold text-slate-700"
                 >
@@ -1092,10 +1141,10 @@ export const DossiersView: React.FC<Props> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isUploadingDoc}
+                  disabled={isUploadingDoc || selectedFiles.length === 0}
                   className="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold disabled:opacity-50"
                 >
-                  {isUploadingDoc ? 'Enregistrement...' : 'Enregistrer le document'}
+                  {isUploadingDoc ? 'Optimisation & Enregistrement...' : 'Enregistrer'}
                 </button>
               </div>
             </form>

@@ -10,7 +10,7 @@ import {
   Check, 
   MessageCircle 
 } from 'lucide-react';
-import { downloadElementAsPdf, shareElementToWhatsApp, DocumentExportOptions } from '@/lib/pdfExporter';
+import { downloadElementAsPdf, shareElementToWhatsApp, printElementSinglePage, DocumentExportOptions } from '@/lib/pdfExporter';
 
 interface Props {
   documentRef: React.RefObject<HTMLDivElement>;
@@ -37,10 +37,20 @@ export const DocumentActionBar: React.FC<Props> = ({
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!documentRef.current || isPrinting) return;
+    try {
+      setIsPrinting(true);
+      await printElementSinglePage(documentRef.current, documentTitle || filename);
+    } catch (err) {
+      console.error('Erreur impression :', err);
+      window.print();
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleDownloadPdf = async () => {

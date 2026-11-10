@@ -154,7 +154,7 @@ export function parseImmatriculation(matricule: string) {
 }
 
 /**
- * Formate l'immatriculation pour un affichage propre (Standard: 45892 | A | 6)
+ * Formate l'immatriculation pour un affichage propre (Standard: 45892-A-6)
  */
 export function formatMatricule(
   matricule: string, 
@@ -168,18 +168,18 @@ export function formatMatricule(
   }
 
   if (!parsed.numero && !parsed.lettre) {
-    return matricule;
+    return matricule.replace(/\s*\|\s*/g, '-');
   }
 
   if (mode === 'ARABE') {
-    return `${parsed.numero} | ${parsed.lettreArabe || parsed.lettre} | ${parsed.prefecture}`;
+    return `${parsed.numero}-${parsed.lettreArabe || parsed.lettre}-${parsed.prefecture}`;
   }
 
   if (mode === 'DUAL' && parsed.lettreLatin && parsed.lettreArabe && parsed.lettreLatin !== parsed.lettreArabe) {
-    return `${parsed.numero} | ${parsed.lettreLatin} (${parsed.lettreArabe}) | ${parsed.prefecture}`;
+    return `${parsed.numero}-${parsed.lettreLatin} (${parsed.lettreArabe})-${parsed.prefecture}`;
   }
 
-  // Mode LATIN par défaut (45892 | A | 6)
+  // Mode LATIN par défaut (45892-A-6)
   const ltr = parsed.lettreLatin || parsed.lettre;
-  return `${parsed.numero} | ${ltr} | ${parsed.prefecture}`;
+  return `${parsed.numero}-${ltr}-${parsed.prefecture}`;
 }

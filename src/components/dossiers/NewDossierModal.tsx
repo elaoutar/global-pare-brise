@@ -215,46 +215,57 @@ export const NewDossierModal: React.FC<Props> = ({
   const [refPaiementClient, setRefPaiementClient] = useState('');
   const [echeancePaiementClient, setEcheancePaiementClient] = useState(new Date().toISOString().split('T')[0]);
 
-  // Photos de la voiture (Upload groupé 1 à 8 photos ou plus, optimisées pour Supabase)
+  // Photos et fichiers du dossier (Nombre illimité, optimisés automatiquement avant stockage)
   const [photosVoiture, setPhotosVoiture] = useState<string[]>([]);
+  const [documentsImportes, setDocumentsImportes] = useState<NonNullable<DossierSinistre['documents']>>([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
   const [uploadProgressText, setUploadProgressText] = useState<string>('');
 
   const handleMultiPhotoUpload = async (files: FileList | File[]) => {
-    const fileArray = Array.from(files);
-    if (fileArray.length === 0) return;
-
-    // Limiter à 8 photos au total dans le dossier pour ne pas surcharger
-    const availableSlots = Math.max(0, 8 - photosVoiture.length);
-    const selectedFiles = fileArray.slice(0, availableSlots);
-
-    if (selectedFiles.length === 0) {
-      alert("Vous avez déjà atteint la limite recommandée de 8 photos pour ce dossier.");
-      return;
-    }
+    const selectedFiles = Array.from(files);
+    if (selectedFiles.length === 0) return;
 
     setIsUploadingPhoto(true);
-    setUploadProgressText(`Compression de ${selectedFiles.length} photo(s)...`);
+    setUploadProgressText(`Optimisation de ${selectedFiles.length} fichier(s)...`);
 
     try {
-      const folderName = `dossiers/${vehiculeImm || 'photos'}`;
-      const newUrls: string[] = [];
+      const folderName = `dossiers/${(vehiculeImm || 'photos').replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+      const newPhotoUrls: string[] = [];
+      const newDocs: NonNullable<DossierSinistre['documents']> = [];
 
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
-        setUploadProgressText(`Optimisation photo ${i + 1}/${selectedFiles.length}...`);
+        setUploadProgressText(`Optimisation fichier ${i + 1}/${selectedFiles.length}...`);
 
-        // 1. Compression HD côté client (réduction drastique du poids vers ~200-250 Ko)
-        const { file: optimizedFile, dataUrl } = await optimizeImageFile(file, 1600, 1600, 0.8);
+        // 1. Compression automatique côté client (~70-120 Ko par photo)
+        const { file: optimizedFile, dataUrl } = await optimizeImageFile(file, 1150, 1150, 0.72);
 
-        // 2. Upload vers Supabase Storage
+        // 2. Upload vers Supabase Storage (ou repli Base64 optimisé)
         const uploadedUrl = await uploadFileToSupabase(optimizedFile, folderName);
-        newUrls.push(uploadedUrl || dataUrl);
+        const finalUrl = uploadedUrl || dataUrl;
+
+        if (file.type.startsWith('image/')) {
+          newPhotoUrls.push(finalUrl);
+        } else {
+          newDocs.push({
+            id: `doc-${Date.now()}-${i}`,
+            nom: file.name,
+            typeDocument: 'AUTRE',
+            url: finalUrl,
+            taille: `${Math.max(1, Math.round(optimizedFile.size / 1024))} Ko`,
+            dateAjout: new Date().toISOString().split('T')[0],
+          });
+        }
       }
 
-      setPhotosVoiture((prev) => [...prev, ...newUrls].slice(0, 8));
+      if (newPhotoUrls.length > 0) {
+        setPhotosVoiture((prev) => [...prev, ...newPhotoUrls]);
+      }
+      if (newDocs.length > 0) {
+        setDocumentsImportes((prev) => [...prev, ...newDocs]);
+      }
     } catch (err) {
-      console.warn('Erreur lors de l\'upload des photos de la voiture:', err);
+      console.warn('Erreur lors de l\'upload des fichiers du dossier:', err);
     } finally {
       setIsUploadingPhoto(false);
       setUploadProgressText('');
@@ -263,6 +274,10 @@ export const NewDossierModal: React.FC<Props> = ({
 
   const handleRemovePhoto = (indexToRemove: number) => {
     setPhotosVoiture((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleRemoveImportedDoc = (docId: string) => {
+    setDocumentsImportes((prev) => prev.filter((d) => d.id !== docId));
   };
 
   // Dynamic Financials Calculations (Total TTC saisi -> Calcul automatique du HT et TVA)
@@ -572,16 +587,9 @@ export const NewDossierModal: React.FC<Props> = ({
         ? 'VALIDE_REGLE' 
         : (isAssurance ? 'ENVOYE_AZUR_GLASS' : 'EN_COURS_POSE'),
       photos: {
-        avantSinistreUrl: photosVoiture[0] || undefined,
-        apresPoseUrl: photosVoiture[1] || undefined,
-        carteGriseUrl: photosVoiture[2] || undefined,
-        vinChassisUrl: photosVoiture[3] || undefined,
-        compteurKmUrl: photosVoiture[4] || undefined,
-        permisUrl: photosVoiture[5] || undefined,
-        angle360Url: photosVoiture[6] || undefined,
-        autreUrl: photosVoiture[7] || undefined,
         galerieUrls: photosVoiture,
       },
+      documents: documentsImportes.length > 0 ? documentsImportes : undefined,
       bonSortieId: bonSortie ? bsId : undefined,
       factureAssuranceId: isAssurance ? facId : undefined,
       factureClientId: !isAssurance ? facId : undefined,
@@ -1847,14 +1855,14 @@ export const NewDossierModal: React.FC<Props> = ({
                 />
               </div>
 
-              {/* Photos de la voiture (Upload groupé 1 à 8 photos avec compression automatique) */}
+              {/* Photos & Fichiers du dossier (Nombre illimité avec optimisation automatique) */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-200">
                   <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <Camera className="w-4 h-4 text-brand-600" /> Photos de la voiture
+                    <Camera className="w-4 h-4 text-brand-600" /> Photos de la voiture & Fichiers du dossier
                   </span>
                   <span className="px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-full text-[11px] font-bold text-brand-700">
-                    {photosVoiture.length} / 8 photo{photosVoiture.length > 1 ? 's' : ''}
+                    {photosVoiture.length} photo{photosVoiture.length > 1 ? 's' : ''}{documentsImportes.length > 0 ? ` • ${documentsImportes.length} fichier(s)` : ''} (Illimité)
                   </span>
                 </div>
 
@@ -1863,43 +1871,41 @@ export const NewDossierModal: React.FC<Props> = ({
                   <div className="p-6 border-2 border-dashed border-brand-300 rounded-xl bg-brand-50/60 flex flex-col items-center justify-center text-center space-y-2">
                     <Loader2 className="w-6 h-6 text-brand-600 animate-spin" />
                     <p className="text-xs font-bold text-brand-900">
-                      {uploadProgressText || 'Envoi des photos en cours...'}
+                      {uploadProgressText || 'Optimisation et envoi des fichiers en cours...'}
                     </p>
                   </div>
                 ) : (
                   <>
-                    {/* Zone de sélection unique */}
-                    {photosVoiture.length < 8 && (
-                      <label className="cursor-pointer group block border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 bg-white hover:bg-brand-50/30 transition text-center">
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              handleMultiPhotoUpload(e.target.files);
-                            }
-                            e.target.value = '';
-                          }}
-                        />
-                        <div className="flex flex-col items-center justify-center gap-1.5">
-                          <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Upload className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <span className="text-xs font-bold text-slate-800 block">
-                              {photosVoiture.length === 0 
-                                ? 'Importer les photos de la voiture' 
-                                : '+ Ajouter d\'autres photos'}
-                            </span>
-                            <span className="text-[11px] text-slate-500">
-                              Sélectionnez jusqu'à 8 photos (JPEG, PNG)
-                            </span>
-                          </div>
+                    {/* Zone de sélection sans limite */}
+                    <label className="cursor-pointer group block border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 bg-white hover:bg-brand-50/30 transition text-center">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            handleMultiPhotoUpload(e.target.files);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Upload className="w-5 h-5" />
                         </div>
-                      </label>
-                    )}
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">
+                            {photosVoiture.length === 0 && documentsImportes.length === 0
+                              ? 'Importer les photos de la voiture & fichiers'
+                              : '+ Ajouter d\'autres photos ou fichiers (Sans limite)'}
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            Sélectionnez autant de photos (JPEG, PNG) ou PDF que nécessaire — Optimisation automatique
+                          </span>
+                        </div>
+                      </div>
+                    </label>
 
                     {/* Grille des photos de la voiture importées */}
                     {photosVoiture.length > 0 && (
@@ -1915,13 +1921,39 @@ export const NewDossierModal: React.FC<Props> = ({
                               className="w-full h-full object-cover" 
                             />
                             <div className="absolute inset-x-0 bottom-0 bg-slate-900/80 text-white text-[10px] px-1.5 py-0.5 flex justify-between items-center">
-                              <span className="truncate font-medium">Photo de voiture {idx + 1}</span>
+                              <span className="truncate font-medium">Photo {idx + 1}</span>
                             </div>
                             <button
                               type="button"
                               onClick={() => handleRemovePhoto(idx)}
                               className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md p-1 shadow transition"
                               title="Supprimer cette photo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Liste des documents PDF / fichiers importés */}
+                    {documentsImportes.length > 0 && (
+                      <div className="space-y-1.5 pt-2">
+                        {documentsImportes.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-xs"
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <FileText className="w-4 h-4 text-brand-600 flex-shrink-0" />
+                              <span className="font-semibold text-slate-800 truncate">{doc.nom}</span>
+                              {doc.taille && <span className="text-[10px] text-slate-400">({doc.taille})</span>}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImportedDoc(doc.id)}
+                              className="p-1 text-rose-500 hover:text-rose-700"
+                              title="Supprimer ce fichier"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

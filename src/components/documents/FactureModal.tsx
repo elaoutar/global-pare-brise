@@ -74,7 +74,8 @@ export const FactureModal: React.FC<Props> = ({
   };
 
   const clientNomDisplay = dossier?.client?.nom || facture.clientNom || 'Client';
-  const immatDisplay = dossier?.vehicule?.immatriculation || facture.immatriculation || '';
+  const rawImmat = dossier?.vehicule?.immatriculation || facture.immatriculation || '';
+  const immatDisplay = rawImmat ? formatMatricule(rawImmat, 'LATIN') : '';
   const destinataireNom = isAssuranceOrAzur
     ? (dossier?.assurance?.nom || 'AZUR GLASS / Assurance')
     : clientNomDisplay;

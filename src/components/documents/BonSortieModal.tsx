@@ -16,7 +16,8 @@ interface Props {
 export const BonSortieModal: React.FC<Props> = ({ bonSortie, dossier, onClose }) => {
   const printRef = useRef<HTMLDivElement>(null);
 
-  const shareMsg = `Bonjour, voici le Bon de Sortie Stock N° ${bonSortie.numeroBS} pour l'intervention sur le dossier ${dossier.numeroDossier} (${dossier.vehicule.immatriculation} - Poseur: ${bonSortie.poseur}) chez GLOBAL PARE-BRISE Marrakech.`;
+  const immatDisplay = formatMatricule(dossier.vehicule.immatriculation, 'LATIN');
+  const shareMsg = `Bonjour, voici le Bon de Sortie Stock N° ${bonSortie.numeroBS} pour l'intervention sur le dossier ${dossier.numeroDossier} (${immatDisplay} - Poseur: ${bonSortie.poseur}) chez GLOBAL PARE-BRISE Marrakech.`;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
@@ -27,7 +28,7 @@ export const BonSortieModal: React.FC<Props> = ({ bonSortie, dossier, onClose })
           documentRef={printRef}
           filename={`BON-SORTIE-${bonSortie.numeroBS}`}
           documentTitle={`Bon de Sortie Stock #${bonSortie.numeroBS}`}
-          subtitle={`Atelier / Poseur : ${bonSortie.poseur} • Dossier : ${dossier.numeroDossier} (${dossier.vehicule.immatriculation})`}
+          subtitle={`Atelier / Poseur : ${bonSortie.poseur} • Dossier : ${dossier.numeroDossier} (${immatDisplay})`}
           clientPhone={dossier.client.telephone}
           shareMessage={shareMsg}
           badgeText="Stock"

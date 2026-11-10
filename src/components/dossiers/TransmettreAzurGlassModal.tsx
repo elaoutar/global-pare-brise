@@ -53,9 +53,8 @@ export const TransmettreAzurGlassModal: React.FC<TransmettreAzurGlassModalProps>
   
   const bonSortiePrintRef = useRef<HTMLDivElement>(null);
   const bonLivraisonPrintRef = useRef<HTMLDivElement>(null);
-  const facturePrintRef = useRef<HTMLDivElement>(null);
 
-  const immat = dossier.vehicule.immatriculation;
+  const immat = formatMatricule(dossier.vehicule.immatriculation, 'LATIN');
   const assNom = dossier.assurance?.nom || 'Compagnie';
   const agence = dossier.agenceAssurance || 'Agence Principale';
   const numDossier = dossier.numeroDossier;
@@ -253,12 +252,11 @@ ${tvaPro > 0 ? `• TVA Pro / Location exclue par l'assurance : -${tvaPro.toFixe
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. PIÈCES JOINTES AU PACK DOSSIER (FORMAT PDF & PHOTOS)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[X] 1. Facture Officielle N° ${effectiveFacture.numeroFacture} libellée à AZUR GLASS SARL (ICE ${AZUR_GLASS_INFO.ice}) [PDF]
-[X] 2. Quittance Subrogative d'Assurance remplie et signée
-${dossier.typeClientAssurance === 'PROFESSIONNEL' || dossier.typeClientAssurance === 'AGENCE_LOCATION' ? `[X] 3. Déclaration de bris de glaces signée & cachetée par la société (${dossier.client.nom})\n` : ''}[X] 4. Bon de Sortie Atelier N° ${effectiveBonSortie.numeroBS} (Vitrage & fournitures de pose) [PDF]
-[X] 5. Bon de Livraison & Décharge client N° ${effectiveBonLivraison.numeroBL} [PDF]
-[X] 6. Photocopie Carte Grise & Attestation d'Assurance
-[X] 7. Photos justificatives de la voiture et du sinistre (${uniquePhotos.length} photo(s) jointe(s))
+[X] 1. Bon de Sortie Atelier N° ${effectiveBonSortie.numeroBS} (Vitrage & fournitures de pose) [PDF]
+[X] 2. Bon de Livraison & Décharge client N° ${effectiveBonLivraison.numeroBL} [PDF]
+[X] 3. Quittance Subrogative d'Assurance remplie et signée
+${dossier.typeClientAssurance === 'PROFESSIONNEL' || dossier.typeClientAssurance === 'AGENCE_LOCATION' ? `[X] 4. Déclaration de bris de glaces signée & cachetée par la société (${dossier.client.nom})\n` : ''}[X] 5. Photocopie Carte Grise & Attestation d'Assurance
+[X] 6. Photos justificatives de la voiture et du sinistre (${uniquePhotos.length} photo(s) jointe(s))
 
 Merci de bien vouloir valider ce dossier et nous transmettre l'accord de règlement par virement bancaire.
 
@@ -323,14 +321,13 @@ Email: ${GARAGE_INFO.email}`;
     });
   };
 
-  // Envoi réel 1-Clic via l'API Gmail SMTP avec génération des vrais PDF originaux A4 compacts
+  // Envoi réel 1-Clic via l'API Gmail SMTP avec génération des vrais PDF originaux A4 compacts (BL + BS par défaut)
   const handleSend1Click = async () => {
     setIsSending(true);
     setSendError(null);
     try {
       let bonSortiePdfBase64: string | undefined;
       let bonLivraisonPdfBase64: string | undefined;
-      let facturePdfBase64: string | undefined;
 
       // 1. Générer le PDF original A4 compact du Bon de Sortie
       if (bonSortiePrintRef.current) {
@@ -352,17 +349,7 @@ Email: ${GARAGE_INFO.email}`;
         }
       }
 
-      // 3. Générer le PDF original A4 compact de la Facture
-      if (facturePrintRef.current) {
-        setSendingStepText('Génération PDF Facture...');
-        try {
-          facturePdfBase64 = await generateCompactPdfBase64FromElement(facturePrintRef.current);
-        } catch (e) {
-          console.warn('Repli PDF serveur pour Facture:', e);
-        }
-      }
-
-      // 4. Compresser les photos Base64 côté client et ne jamais les dupliquer dans `dossier`
+      // 3. Compresser les photos Base64 côté client et ne jamais les dupliquer dans `dossier`
       setSendingStepText('Optimisation des photos & pièces jointes...');
       const compressedPhotos: Record<string, any> = {};
       if (dossier.photos && typeof dossier.photos === 'object') {
@@ -408,10 +395,8 @@ Email: ${GARAGE_INFO.email}`;
         documents: compressedDocuments,
         bonSortie: effectiveBonSortie,
         bonLivraison: effectiveBonLivraison,
-        facture: effectiveFacture,
         bonSortiePdfBase64,
         bonLivraisonPdfBase64,
-        facturePdfBase64,
       };
 
       // Garde-fou anti-413 (limite Vercel = 4.5 Mo) : si le JSON dépasse 3.6 Mo,
@@ -545,7 +530,7 @@ Email: ${GARAGE_INFO.email}`;
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Transmission de la facture PDF, bon de sortie PDF, bon de livraison PDF et photos
+                Transmission du bon de sortie PDF, bon de livraison PDF et photos du dossier
               </p>
             </div>
           </div>
@@ -632,15 +617,22 @@ Email: ${GARAGE_INFO.email}`;
                 Pack des Pièces Jointes PDF & Photos transmises à AZUR GLASS
               </span>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Format PDF A4 + Images
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> BL + Bon de Sortie + Photos
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-slate-800">
-                <FileText className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <div className="flex items-center gap-2 p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 text-slate-800">
+                <PackageMinus className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                 <span className="truncate">
-                  <strong>Facture N° {effectiveFacture.numeroFacture}.pdf</strong> (Format A4 original)
+                  <strong>Bon de Sortie {effectiveBonSortie.numeroBS}.pdf</strong> (PDF A4 original)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 text-slate-800">
+                <Truck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span className="truncate">
+                  <strong>Bon de Livraison {effectiveBonLivraison.numeroBL}.pdf</strong> (PDF A4 original)
                 </span>
               </div>
 
@@ -659,20 +651,6 @@ Email: ${GARAGE_INFO.email}`;
                   </span>
                 </div>
               )}
-
-              <div className="flex items-center gap-2 p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 text-slate-800">
-                <PackageMinus className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                <span className="truncate">
-                  <strong>Bon de Sortie {effectiveBonSortie.numeroBS}.pdf</strong> (PDF A4 original)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 text-slate-800">
-                <Truck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                <span className="truncate">
-                  <strong>Bon de Livraison {effectiveBonLivraison.numeroBL}.pdf</strong> (PDF A4 original)
-                </span>
-              </div>
 
               <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-slate-800">
                 <Camera className="w-4 h-4 text-sky-600 flex-shrink-0" />
@@ -790,7 +768,7 @@ Email: ${GARAGE_INFO.email}`;
           {sendSuccess && (
             <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-bold animate-in fade-in">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-              <span>Email transmis avec succès à AZUR GLASS (PDF Bon de Sortie, PDF Bon de Livraison, PDF Facture & Photos joints) !</span>
+              <span>Email transmis avec succès à AZUR GLASS (PDF Bon de Sortie, PDF Bon de Livraison & Photos joints) !</span>
             </div>
           )}
 
@@ -864,7 +842,7 @@ Email: ${GARAGE_INFO.email}`;
 
       {/* ===================================================================== */}
       {/* RENDU A4 HORS-ÉCRAN POUR GÉNÉRATION DES VRAIS PDF ORIGINAUX           */}
-      {/* (Bon de Sortie Atelier, Bon de Livraison Client, Facture Officielle)   */}
+      {/* (Bon de Sortie Atelier & Bon de Livraison Client inclus par défaut)   */}
       {/* ===================================================================== */}
       <div
         aria-hidden="true"
@@ -881,7 +859,7 @@ Email: ${GARAGE_INFO.email}`;
         <div
           ref={bonSortiePrintRef}
           className="p-10 text-slate-800 text-sm leading-relaxed bg-white"
-          style={{ width: '794px', minHeight: '1123px', backgroundColor: '#ffffff' }}
+          style={{ width: '794px', minHeight: 'auto', backgroundColor: '#ffffff' }}
         >
           <div className="flex justify-between items-start border-b border-slate-300 pb-4 mb-4">
             <div>
@@ -984,7 +962,7 @@ Email: ${GARAGE_INFO.email}`;
         <div
           ref={bonLivraisonPrintRef}
           className="p-10 text-slate-800 text-sm leading-relaxed bg-white"
-          style={{ width: '794px', minHeight: '1123px', backgroundColor: '#ffffff' }}
+          style={{ width: '794px', minHeight: 'auto', backgroundColor: '#ffffff' }}
         >
           <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-6">
             <div>
@@ -1155,134 +1133,6 @@ Email: ${GARAGE_INFO.email}`;
                 </span>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* 3. TEMPLATE A4 ORIGINAL : FACTURE OFFICIELLE */}
-        <div
-          ref={facturePrintRef}
-          className="p-10 text-slate-800 text-sm leading-relaxed bg-white"
-          style={{ width: '794px', minHeight: '1123px', backgroundColor: '#ffffff' }}
-        >
-          <div className="flex justify-between items-start border-b border-slate-200 pb-6 mb-6">
-            <div>
-              <img
-                src={GARAGE_INFO.logoUrl}
-                alt={GARAGE_INFO.nom}
-                className="h-14 w-auto max-w-[260px] object-contain mb-2"
-              />
-              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">
-                Remplacement & Réparation de Pare-Brise et Vitrage Automobile
-              </p>
-              <p className="text-xs text-slate-600">{GARAGE_INFO.adresse}</p>
-              <p className="text-xs text-slate-600">Tél : {GARAGE_INFO.telephone}</p>
-              <p className="text-xs text-slate-600">Email : {GARAGE_INFO.email}</p>
-            </div>
-            <div className="text-right">
-              <div className="inline-block px-3 py-1 bg-slate-100 border border-slate-300 rounded font-bold text-xs uppercase tracking-wider mb-2">
-                FACTURE N° {effectiveFacture.numeroFacture}
-              </div>
-              <p className="text-xs text-slate-600">
-                Date émission : <span className="font-medium text-slate-900">{formatDate(effectiveFacture.dateEmission)}</span>
-              </p>
-              <p className="text-xs text-slate-600">
-                Date échéance : <span className="font-medium text-slate-900">{formatDate(effectiveFacture.dateEcheance)}</span>
-              </p>
-              <p className="text-xs text-slate-600 mt-1">
-                Dossier Réf : <span className="font-mono font-semibold">{dossier.numeroDossier}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 my-6 text-xs">
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Facturé à :</p>
-              {isAssurance ? (
-                <>
-                  <p className="text-base font-black text-slate-900">{AZUR_GLASS_INFO.nom} SARL</p>
-                  <p className="text-xs text-slate-600">{AZUR_GLASS_INFO.designationComplete}</p>
-                  <p className="text-xs text-slate-600">{AZUR_GLASS_INFO.adresse}</p>
-                  <p className="text-xs font-mono text-slate-800 mt-1 font-bold">ICE : {AZUR_GLASS_INFO.ice}</p>
-                  <p className="text-xs text-slate-600 mt-1">
-                    Compagnie : <strong>{dossier.assurance?.nom}</strong> ({dossier.agenceAssurance || 'Agence'})
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-base font-bold text-slate-900">{dossier.client.nom}</p>
-                  <p className="text-xs text-slate-600">Tél : {dossier.client.telephone}</p>
-                  <p className="text-xs text-slate-600">CIN : {dossier.client.cin || '-'}</p>
-                </>
-              )}
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Assuré & Véhicule :</p>
-              <p className="text-sm font-bold text-slate-900">{dossier.client.nom}</p>
-              <p className="text-xs text-slate-600">
-                Véhicule : <strong>{dossier.vehicule.marque} {dossier.vehicule.modele} ({dossier.vehicule.annee})</strong>
-              </p>
-              <p className="text-xs text-slate-600 mt-1">
-                Matricule : <strong className="font-mono">{formatMatricule(dossier.vehicule.immatriculation, 'LATIN')}</strong>
-              </p>
-              {dossier.numeroSinistre && (
-                <p className="text-xs text-slate-600 mt-1 font-mono">
-                  N° Sinistre : <strong>{dossier.numeroSinistre}</strong>
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="my-6 border border-slate-300 rounded-xl overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase">
-                <tr>
-                  <th className="py-3 px-4">Désignation des Prestations & Fournitures</th>
-                  <th className="py-3 px-4 text-center">Qté</th>
-                  <th className="py-3 px-4 text-right">P.U HT (DH)</th>
-                  <th className="py-3 px-4 text-center">TVA</th>
-                  <th className="py-3 px-4 text-right">Total HT (DH)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {effectiveFacture.lignes.map((l, i) => (
-                  <tr key={i}>
-                    <td className="py-3 px-4 font-semibold text-slate-900">{l.designation}</td>
-                    <td className="py-3 px-4 text-center font-mono">{l.quantite}</td>
-                    <td className="py-3 px-4 text-right font-mono">{l.prixUnitaireHT.toFixed(2)}</td>
-                    <td className="py-3 px-4 text-center font-mono">{l.tauxTva}%</td>
-                    <td className="py-3 px-4 text-right font-mono font-bold">{l.totalHT.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-end my-6">
-            <div className="w-72 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1.5 text-xs">
-              <div className="flex justify-between text-slate-600">
-                <span>Total HT :</span>
-                <span className="font-mono font-semibold">{formatDH(effectiveFacture.totalHT)}</span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>TVA (20%) :</span>
-                <span className="font-mono font-semibold">{formatDH(effectiveFacture.totalTVA)}</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-slate-300 font-bold text-slate-900 text-sm">
-                <span>Total TTC :</span>
-                <span className="font-mono text-emerald-700">{formatDH(effectiveFacture.totalTTC)}</span>
-              </div>
-            </div>
-          </div>
-
-          {obsFacture && (
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700 my-4">
-              <strong>Observation :</strong> {obsFacture}
-            </div>
-          )}
-
-          <div className="mt-10 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-500">
-            {GARAGE_INFO.nom} • ICE : {GARAGE_INFO.ice} • RC : {GARAGE_INFO.rc} • IF : {GARAGE_INFO.ifiscal} • {GARAGE_INFO.adresse}
           </div>
         </div>
       </div>
