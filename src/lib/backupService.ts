@@ -21,7 +21,8 @@ import {
   saveDevisToSupabase, 
   saveFournisseurToSupabase, 
   saveCommandeFournisseurToSupabase, 
-  savePartenaireToSupabase 
+  savePartenaireToSupabase,
+  saveAssuranceToSupabase
 } from '@/lib/supabaseService';
 
 export interface SystemBackupData {
@@ -328,6 +329,15 @@ export const syncRestoredDataToSupabaseCloud = async (
         await savePartenaireToSupabase(p);
       } catch (e: any) {
         errors.push(`Partenaire ${p.nom}: ${e?.message}`);
+      }
+    }
+
+    // 8. Assurances
+    for (const ass of data.assurances) {
+      try {
+        await saveAssuranceToSupabase(ass);
+      } catch (e: any) {
+        errors.push(`Assurance ${ass.nom}: ${e?.message}`);
       }
     }
 

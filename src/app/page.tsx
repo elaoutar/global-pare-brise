@@ -60,7 +60,10 @@ import {
   saveCommandeFournisseurToSupabase,
   deleteCommandeFournisseurFromSupabase,
   savePartenaireToSupabase,
-  deleteFactureFromSupabase
+  deleteFactureFromSupabase,
+  fetchAssurancesFromSupabase,
+  saveAssuranceToSupabase,
+  deleteAssuranceFromSupabase
 } from '@/lib/supabaseService';
 import { getActiveSupabaseSession, logoutSupabase } from '@/lib/authService';
 
@@ -160,7 +163,7 @@ export default function Home() {
   const [bonsSortie, setBonsSortie] = useState<BonSortie[]>(() => loadSharedStorage('gp_shared_bons_sortie', INITIAL_BONS_SORTIE));
   const [bonsLivraison, setBonsLivraison] = useState<BonLivraison[]>(() => loadSharedStorage('gp_shared_bons_livraison', INITIAL_BONS_LIVRAISON));
   const [recettes, setRecettes] = useState<ReglementRecette[]>(() => loadSharedStorage('gp_shared_recettes', INITIAL_RECETTES));
-  const [assurances, setAssurances] = useState<Assurance[]>(INITIAL_ASSURANCES);
+  const [assurances, setAssurances] = useState<Assurance[]>(() => loadSharedStorage('gp_shared_assurances', INITIAL_ASSURANCES));
   const [partenaires, setPartenaires] = useState<Partenaire[]>(() => loadSharedStorage('gp_shared_partenaires', INITIAL_PARTENAIRES));
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(() => loadSharedStorage('gp_shared_fournisseurs', INITIAL_FOURNISSEURS));
   const [commandesFournisseurs, setCommandesFournisseurs] = useState<BonCommandeFournisseur[]>(() => 
@@ -225,7 +228,8 @@ export default function Home() {
         supaFournisseurs,
         supaCommandes,
         supaPartenaires,
-        supaBonsLivraison
+        supaBonsLivraison,
+        supaAssurances
       ] = await Promise.all([
         fetchDossiersFromSupabase(),
         fetchStockFromSupabase(),
@@ -235,6 +239,7 @@ export default function Home() {
         fetchCommandesFournisseursFromSupabase(),
         fetchPartenairesFromSupabase(),
         fetchBonsLivraisonFromSupabase(),
+        fetchAssurancesFromSupabase(),
       ]);
 
       // 1. DOSSIERS : Fusion intelligente pour ne jamais perdre un dossier créé ou modifié localement
@@ -311,6 +316,20 @@ export default function Home() {
       if (supaBonsLivraison !== null) {
         setBonsLivraison(supaBonsLivraison);
         saveSharedStorage('gp_shared_bons_livraison', supaBonsLivraison);
+      }
+
+      // 9. ASSURANCES
+      if (supaAssurances !== null) {
+        if (supaAssurances.length > 0) {
+          setAssurances(supaAssurances);
+          saveSharedStorage('gp_shared_assurances', supaAssurances);
+        } else {
+          // Si la table Supabase est vide, on initialise la table Cloud avec les assurances locales
+          const currentLocalAssurances = loadSharedStorage('gp_shared_assurances', INITIAL_ASSURANCES);
+          for (const ass of currentLocalAssurances) {
+            saveAssuranceToSupabase(ass);
+          }
+        }
       }
     } catch (err) {
       console.error('Erreur chargement Supabase:', err);
@@ -690,17 +709,32 @@ export default function Home() {
 
   // CRUD Assurances
   const handleAddAssurance = (newAss: Assurance) => {
-    setAssurances((prev) => [newAss, ...prev]);
-    showToast(`Compagnie d'assurance "${newAss.nom}" ajoutée avec succès.`);
+    setAssurances((prev) => {
+      const updated = [newAss, ...prev.filter((a) => a.id !== newAss.id)];
+      saveSharedStorage('gp_shared_assurances', updated);
+      return updated;
+    });
+    saveAssuranceToSupabase(newAss);
+    showToast(`Compagnie d'assurance "${newAss.nom}" enregistrée avec succès.`);
   };
 
   const handleUpdateAssurance = (updatedAss: Assurance) => {
-    setAssurances((prev) => prev.map((a) => (a.id === updatedAss.id ? updatedAss : a)));
+    setAssurances((prev) => {
+      const updated = prev.map((a) => (a.id === updatedAss.id ? updatedAss : a));
+      saveSharedStorage('gp_shared_assurances', updated);
+      return updated;
+    });
+    saveAssuranceToSupabase(updatedAss);
     showToast(`Compagnie d'assurance "${updatedAss.nom}" mise à jour.`);
   };
 
   const handleDeleteAssurance = (assuranceId: string) => {
-    setAssurances((prev) => prev.filter((a) => a.id !== assuranceId));
+    setAssurances((prev) => {
+      const updated = prev.filter((a) => a.id !== assuranceId);
+      saveSharedStorage('gp_shared_assurances', updated);
+      return updated;
+    });
+    deleteAssuranceFromSupabase(assuranceId);
     showToast("Compagnie d'assurance supprimée.");
   };
 
@@ -1804,6 +1838,7 @@ export default function Home() {
       saveSharedStorage('gp_shared_partenaires', restoredData.partenaires);
       if (restoredData.assurances && restoredData.assurances.length > 0) {
         setAssurances(restoredData.assurances);
+        saveSharedStorage('gp_shared_assurances', restoredData.assurances);
       }
     } else {
       // MERGE MODE (Conserve l'existant et met à jour/ajoute les éléments du backup)
@@ -1901,7 +1936,9 @@ export default function Home() {
         setAssurances((prev) => {
           const map = new Map(prev.map((a) => [a.id, a]));
           restoredData.assurances.forEach((a) => map.set(a.id, a));
-          return Array.from(map.values());
+          const merged = Array.from(map.values());
+          saveSharedStorage('gp_shared_assurances', merged);
+          return merged;
         });
       }
     }

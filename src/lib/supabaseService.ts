@@ -984,3 +984,88 @@ export const deleteBonLivraisonFromSupabase = async (blId: string): Promise<bool
   }
 };
 
+// ==============================================================================
+// 10. COMPAGNIES D'ASSURANCE (CRUD SUPABASE)
+// ==============================================================================
+export const fetchAssurancesFromSupabase = async (): Promise<Assurance[] | null> => {
+  if (!isSupabaseConfigured || !supabase) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('assurances')
+      .select('*')
+      .order('nom', { ascending: true });
+
+    if (error) {
+      console.warn('Erreur ou table assurances absente Supabase:', error.message);
+      return null;
+    }
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      nom: row.nom,
+      code: row.code || '',
+      telephone: row.telephone || '',
+      email: row.email || '',
+      adresse: row.adresse || '',
+      delaiReglementMoyenJours: Number(row.delai_reglement_moyen_jours || 30),
+    }));
+  } catch (err) {
+    console.warn('Exception fetch assurances Supabase:', err);
+    return null;
+  }
+};
+
+export const saveAssuranceToSupabase = async (ass: Assurance): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const payload = {
+      id: ass.id,
+      nom: ass.nom,
+      code: ass.code || null,
+      telephone: ass.telephone || null,
+      email: ass.email || null,
+      adresse: ass.adresse || null,
+      delai_reglement_moyen_jours: ass.delaiReglementMoyenJours || 30,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('assurances')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Erreur upsert assurance Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception save assurance Supabase:', err);
+    return false;
+  }
+};
+
+export const deleteAssuranceFromSupabase = async (assuranceId: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) return false;
+
+  try {
+    const { error } = await supabase
+      .from('assurances')
+      .delete()
+      .eq('id', assuranceId);
+
+    if (error) {
+      console.warn('Erreur delete assurance Supabase:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Exception delete assurance Supabase:', err);
+    return false;
+  }
+};
+
+
