@@ -57,6 +57,22 @@ export const uploadFileToSupabase = async (
   }
 };
 
+export const deleteFileFromSupabase = async (fileUrl: string): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase || !fileUrl) return false;
+  try {
+    const match = fileUrl.match(/sinistre-documents\/(.+)$/);
+    if (match && match[1]) {
+      const filePath = decodeURIComponent(match[1].split('?')[0]);
+      await supabase.storage.from('sinistre-documents').remove([filePath]);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Erreur suppression fichier storage Supabase:', err);
+    return false;
+  }
+};
+
 // ==============================================================================
 // 2. DOSSIERS SINISTRES (CRUD SUPABASE)
 // ==============================================================================

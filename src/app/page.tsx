@@ -63,7 +63,8 @@ import {
   deleteFactureFromSupabase,
   fetchAssurancesFromSupabase,
   saveAssuranceToSupabase,
-  deleteAssuranceFromSupabase
+  deleteAssuranceFromSupabase,
+  deleteFileFromSupabase
 } from '@/lib/supabaseService';
 import { getActiveSupabaseSession, logoutSupabase } from '@/lib/authService';
 
@@ -1433,6 +1434,95 @@ export default function Home() {
     showToast(`${newPhotoUrls.length} photo(s) optimisée(s) ajoutée(s) au dossier.`);
   };
 
+  const handleDeletePhotoFromDossier = (dossierId: string, photoIndexOrUrl: number | string) => {
+    let photoUrlToDelete: string | null = null;
+
+    setDossiers((prev) => {
+      const updatedList = prev.map((d) => {
+        if (d.id === dossierId) {
+          const photosObj = (d.photos || {}) as Record<string, any>;
+          const existingGalerie: string[] = Array.isArray(photosObj.galerieUrls) && photosObj.galerieUrls.length > 0
+            ? photosObj.galerieUrls.filter((u: any): u is string => typeof u === 'string' && Boolean(u))
+            : [
+                photosObj.avantSinistreUrl,
+                photosObj.apresPoseUrl,
+                photosObj.carteGriseUrl,
+                photosObj.vinChassisUrl,
+                photosObj.compteurKmUrl,
+                photosObj.permisUrl,
+                photosObj.angle360Url,
+                photosObj.autreUrl,
+              ].filter((url): url is string => typeof url === 'string' && Boolean(url));
+
+          if (typeof photoIndexOrUrl === 'number') {
+            photoUrlToDelete = existingGalerie[photoIndexOrUrl] || null;
+          } else {
+            photoUrlToDelete = photoIndexOrUrl;
+          }
+
+          const updatedGalerie = existingGalerie.filter((u, idx) => {
+            if (typeof photoIndexOrUrl === 'number') {
+              return idx !== photoIndexOrUrl;
+            }
+            return u !== photoIndexOrUrl;
+          });
+
+          const updatedPhotos: Record<string, any> = {
+            galerieUrls: updatedGalerie,
+          };
+          for (const [key, val] of Object.entries(photosObj)) {
+            if (key !== 'galerieUrls') {
+              if (val === photoUrlToDelete) {
+                updatedPhotos[key] = undefined;
+              } else {
+                updatedPhotos[key] = val;
+              }
+            }
+          }
+
+          const updated: DossierSinistre = {
+            ...d,
+            photos: updatedPhotos,
+          };
+
+          registerLocalDossierSave(updated);
+          saveDossierToSupabase(updated);
+          return updated;
+        }
+        return d;
+      });
+
+      saveSharedStorage('gp_shared_dossiers', updatedList);
+      return updatedList;
+    });
+
+    if (photoUrlToDelete) {
+      deleteFileFromSupabase(photoUrlToDelete);
+    }
+    showToast('Photo supprimée du dossier avec succès.');
+  };
+
+  const handleDeleteDocumentFromDossier = (dossierId: string, documentId: string) => {
+    setDossiers((prev) => {
+      const updatedList = prev.map((d) => {
+        if (d.id === dossierId) {
+          const updatedDocs = (d.documents || []).filter((doc) => doc.id !== documentId);
+          const updated: DossierSinistre = {
+            ...d,
+            documents: updatedDocs,
+          };
+          registerLocalDossierSave(updated);
+          saveDossierToSupabase(updated);
+          return updated;
+        }
+        return d;
+      });
+      saveSharedStorage('gp_shared_dossiers', updatedList);
+      return updatedList;
+    });
+    showToast('Document supprimé du dossier avec succès.');
+  };
+
   const handleAddRecette = (newRecette: ReglementRecette) => {
     setRecettes([newRecette, ...recettes]);
     showToast(`Règlement ${newRecette.numeroRecu} enregistré avec succès.`);
@@ -2130,7 +2220,9 @@ export default function Home() {
             onOpenDeclarationBrisGlace={(d) => setActiveDeclarationBrisGlaceDossier(d)}
             onOpenTransmettreAzurGlass={handleOpenTransmettreAzurGlass}
             onAddDocumentToDossier={handleAddDocumentToDossier}
+            onDeleteDocumentFromDossier={handleDeleteDocumentFromDossier}
             onAddPhotosToDossier={handleAddPhotosToDossier}
+            onDeletePhotoFromDossier={handleDeletePhotoFromDossier}
             onUpdateStatut={handleUpdateStatutDossier}
             onOpenEncaisserModal={handleOpenEncaisserModalFromDossier}
             onArchiveDossier={handleArchiveDossier}

@@ -55,7 +55,9 @@ interface Props {
   onOpenDeclarationBrisGlace?: (dossier: DossierSinistre) => void;
   onOpenTransmettreAzurGlass?: (dossier: DossierSinistre) => void;
   onAddDocumentToDossier: (dossierId: string, doc: DocumentAttache) => void;
+  onDeleteDocumentFromDossier?: (dossierId: string, documentId: string) => void;
   onAddPhotosToDossier?: (dossierId: string, newPhotoUrls: string[]) => void;
+  onDeletePhotoFromDossier?: (dossierId: string, photoIndexOrUrl: number | string) => void;
   onUpdateStatut: (dossierId: string, newStatut: StatutDossier) => void;
   onOpenEncaisserModal?: (dossier: DossierSinistre) => void;
   onArchiveDossier?: (dossierId: string, motif?: string) => void;
@@ -76,7 +78,9 @@ export const DossiersView: React.FC<Props> = ({
   onOpenDeclarationBrisGlace,
   onOpenTransmettreAzurGlass,
   onAddDocumentToDossier,
+  onDeleteDocumentFromDossier,
   onAddPhotosToDossier,
+  onDeletePhotoFromDossier,
   onUpdateStatut,
   onOpenEncaisserModal,
   onArchiveDossier,
@@ -898,14 +902,30 @@ export const DossiersView: React.FC<Props> = ({
                             </span>
                           </div>
                         </div>
-                        <a
-                          href={doc.url}
-                          download={doc.nom}
-                          className="p-1 text-slate-400 hover:text-brand-600 transition-colors flex-shrink-0"
-                          title="Télécharger / Voir document"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </a>
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={doc.url}
+                            download={doc.nom}
+                            className="p-1 text-slate-400 hover:text-brand-600 transition-colors flex-shrink-0"
+                            title="Télécharger / Voir document"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                          {onDeleteDocumentFromDossier && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Supprimer définitivement le document "${doc.nom}" de ce dossier ?`)) {
+                                  onDeleteDocumentFromDossier(selectedDossier.id, doc.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 transition-colors flex-shrink-0"
+                              title="Supprimer ce document"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -976,22 +996,43 @@ export const DossiersView: React.FC<Props> = ({
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {galerieList.map((url, idx) => (
-                            <a
+                            <div
                               key={idx}
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               className="group relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100 hover:ring-2 hover:ring-brand-500 transition shadow-sm"
                             >
-                              <img
-                                src={url}
-                                alt={`Photo de voiture ${idx + 1}`}
-                                className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
-                              />
-                              <span className="absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-xs text-white text-[9px] p-0.5 text-center font-medium">
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block w-full h-full"
+                                title="Cliquer pour afficher la photo en grand format"
+                              >
+                                <img
+                                  src={url}
+                                  alt={`Photo de voiture ${idx + 1}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                                />
+                              </a>
+                              <span className="pointer-events-none absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-xs text-white text-[9px] p-0.5 text-center font-medium">
                                 Photo {idx + 1}
                               </span>
-                            </a>
+                              {onDeletePhotoFromDossier && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement la Photo ${idx + 1} de ce dossier ?`)) {
+                                      onDeletePhotoFromDossier(selectedDossier.id, idx);
+                                    }
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 absolute top-1 right-1 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md shadow-md transition z-10"
+                                  title="Supprimer cette photo du dossier"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
