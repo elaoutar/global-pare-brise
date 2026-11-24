@@ -31,7 +31,7 @@ interface Props {
   onUpdateStock: (article: ArticleStock) => void;
   onDeleteStock: (articleId: string) => void;
   onOpenBonSortie: (bonSortie: BonSortie, dossier: DossierSinistre) => void;
-  onOpenBonLivraison?: (bonLivraison: BonLivraison, dossier?: DossierSinistre) => void;
+  onOpenBonLivraison?: (bonLivraison: BonLivraison, dossier?: DossierSinistre, isEditMode?: boolean) => void;
   onOpenNewBonLivraison?: () => void;
   onDeleteBonLivraison?: (blId: string) => void;
 }
@@ -514,11 +514,19 @@ export const StockView: React.FC<Props> = ({
                       </div>
 
                       <button
-                        onClick={() => onOpenBonLivraison?.(bl, matchedDossier)}
+                        onClick={() => onOpenBonLivraison?.(bl, matchedDossier, false)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 rounded-lg text-xs font-semibold transition-colors border border-indigo-200 shadow-sm"
                         title="Voir / Imprimer le Bon de Livraison"
                       >
                         <Printer className="w-3.5 h-3.5" /> Voir / Imprimer
+                      </button>
+
+                      <button
+                        onClick={() => onOpenBonLivraison?.(bl, matchedDossier, true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-xs font-semibold transition-colors border border-amber-200 shadow-sm"
+                        title="Modifier ce Bon de Livraison"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Modifier
                       </button>
 
                       {onDeleteBonLivraison && (

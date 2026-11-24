@@ -179,7 +179,7 @@ export default function Home() {
   const [activeFactureModal, setActiveFactureModal] = useState<{ facture: Facture; dossier?: DossierSinistre | null } | null>(null);
   const [showNewDirectFactureModal, setShowNewDirectFactureModal] = useState(false);
   const [activeBonSortieModal, setActiveBonSortieModal] = useState<{ bonSortie: BonSortie; dossier: DossierSinistre } | null>(null);
-  const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier?: DossierSinistre; facture?: Facture } | null>(null);
+  const [activeBonLivraisonModal, setActiveBonLivraisonModal] = useState<{ bonLivraison: BonLivraison; dossier?: DossierSinistre; facture?: Facture; initialEdit?: boolean } | null>(null);
   const [showNewBonLivraisonModal, setShowNewBonLivraisonModal] = useState(false);
   const [activeEncaisserModal, setActiveEncaisserModal] = useState<{ dossier?: DossierSinistre | null; facture?: Facture } | null>(null);
   const [activeCommandeFournisseurModal, setActiveCommandeFournisseurModal] = useState<{ commande: BonCommandeFournisseur; fournisseur: Fournisseur } | null>(null);
@@ -1748,6 +1748,41 @@ export default function Home() {
     );
   };
 
+  const handleUpdateBonLivraison = async (updatedBL: BonLivraison) => {
+    // 1. Mettre à jour l'état local des bons de livraison
+    setBonsLivraison((prev) => {
+      const updated = prev.map((b) => (b.id === updatedBL.id ? updatedBL : b));
+      saveSharedStorage('gp_shared_bons_livraison', updated);
+      return updated;
+    });
+
+    // 2. Mettre à jour la modal active si ouverte
+    setActiveBonLivraisonModal((prev) =>
+      prev ? { ...prev, bonLivraison: updatedBL } : null
+    );
+
+    // 3. Mettre à jour le dossier rattaché si présent
+    if (updatedBL.dossierId) {
+      setDossiers((prev) => {
+        const updated = prev.map((d) => {
+          if (d.id === updatedBL.dossierId) {
+            return {
+              ...d,
+              bonLivraisonId: updatedBL.id,
+            };
+          }
+          return d;
+        });
+        saveSharedStorage('gp_shared_dossiers', updated);
+        return updated;
+      });
+    }
+
+    // 4. Sauvegarder dans Supabase Cloud
+    await saveBonLivraisonToSupabase(updatedBL);
+    showToast(`Bon de Livraison ${updatedBL.numeroBL} modifié et enregistré avec succès !`);
+  };
+
   const handleUpdateFactureObservations = (newObservations: string) => {
     if (!activeFactureModal) return;
     const facId = activeFactureModal.facture.id;
@@ -2119,10 +2154,10 @@ export default function Home() {
               const resolvedDossier = dossier || dossiers.find((d) => d.id === bs.dossierId || d.bonSortieId === bs.id);
               setActiveBonSortieModal({ bonSortie: bs, dossier: resolvedDossier });
             }}
-            onOpenBonLivraison={(bl, dossier) => {
+            onOpenBonLivraison={(bl, dossier, isEditMode) => {
               const resolvedDossier = dossier || dossiers.find((d) => d.id === bl.dossierId || d.bonLivraisonId === bl.id);
               const resolvedFacture = resolvedDossier ? factures.find((f) => f.dossierId === resolvedDossier.id) : undefined;
-              setActiveBonLivraisonModal({ bonLivraison: bl, dossier: resolvedDossier, facture: resolvedFacture });
+              setActiveBonLivraisonModal({ bonLivraison: bl, dossier: resolvedDossier, facture: resolvedFacture, initialEdit: Boolean(isEditMode) });
             }}
             onOpenNewBonLivraison={() => setShowNewBonLivraisonModal(true)}
             onDeleteBonLivraison={handleDeleteBonLivraison}
@@ -2302,8 +2337,11 @@ export default function Home() {
           bonLivraison={activeBonLivraisonModal.bonLivraison}
           dossier={activeBonLivraisonModal.dossier}
           facture={activeBonLivraisonModal.facture}
+          initialEdit={activeBonLivraisonModal.initialEdit}
+          stockArticles={stock}
           onClose={() => setActiveBonLivraisonModal(null)}
           onUpdateObservations={handleUpdateBonLivraisonObservations}
+          onUpdateBonLivraison={handleUpdateBonLivraison}
         />
       )}
 

@@ -21,6 +21,7 @@ interface Props {
   shareMessage?: string;
   badgeText?: string;
   badgeColor?: string;
+  extraActions?: React.ReactNode;
   onClose: () => void;
 }
 
@@ -33,6 +34,7 @@ export const DocumentActionBar: React.FC<Props> = ({
   shareMessage,
   badgeText,
   badgeColor = 'bg-blue-600',
+  extraActions,
   onClose,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
@@ -113,6 +115,7 @@ export const DocumentActionBar: React.FC<Props> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {extraActions}
           
           {/* Print */}
           <button
