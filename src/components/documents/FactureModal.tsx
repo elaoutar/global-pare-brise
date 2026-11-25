@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Facture, DossierSinistre } from '@/types';
 import { GARAGE_INFO, AZUR_GLASS_INFO } from '@/lib/data';
 import { formatDH, formatDate } from '@/lib/utils';
 import { formatMatricule } from '@/lib/matriculeMaroc';
+import { getNextNumeroFacture } from '@/lib/invoiceUtils';
 import { FileText, Save, Check, Pencil, X } from 'lucide-react';
 import { DocumentActionBar } from './DocumentActionBar';
 
@@ -25,24 +26,41 @@ export const FactureModal: React.FC<Props> = ({
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Numéro de facture modifiable
-  const [numeroFacture, setNumeroFacture] = useState(facture.numeroFacture);
+  const isAssuranceOrAzur =
+    facture.destinataire === 'AZUR_GLASS' ||
+    facture.destinataire === 'ASSURANCE' ||
+    dossier?.typeDossier === 'ASSURANCE';
+
+  const defaultCalculatedNumero = getNextNumeroFacture(
+    isAssuranceOrAzur ? 'AZUR_GLASS' : 'CLIENT'
+  );
+
+  // Numéro de facture modifiable avec synchronisation automatique et fallback
+  const [numeroFacture, setNumeroFacture] = useState(
+    facture.numeroFacture || defaultCalculatedNumero
+  );
   const [isEditingNumero, setIsEditingNumero] = useState(false);
   const [hasSavedNum, setHasSavedNum] = useState(false);
 
+  useEffect(() => {
+    if (facture.numeroFacture) {
+      setNumeroFacture(facture.numeroFacture);
+    }
+  }, [facture.numeroFacture]);
+
+  const displayNumeroFacture =
+    numeroFacture?.trim() ||
+    facture.numeroFacture?.trim() ||
+    defaultCalculatedNumero;
+
   const handleSaveNumero = () => {
-    const cleanNum = numeroFacture.trim();
+    const cleanNum = (numeroFacture || displayNumeroFacture).trim().toUpperCase();
     if (!cleanNum) return;
     onUpdateNumeroFacture?.(cleanNum);
     setIsEditingNumero(false);
     setHasSavedNum(true);
     setTimeout(() => setHasSavedNum(false), 2500);
   };
-
-  const isAssuranceOrAzur =
-    facture.destinataire === 'AZUR_GLASS' ||
-    facture.destinataire === 'ASSURANCE' ||
-    dossier?.typeDossier === 'ASSURANCE';
 
   // Calcul du cash (franchise non offerte + TVA exclue éventuelle) et du reste en virement
   const effectiveFranchise = dossier ? (dossier.franchiseOfferte ? 0 : (dossier.montantFranchise || 0)) : 0;
@@ -80,7 +98,7 @@ export const FactureModal: React.FC<Props> = ({
     ? (dossier?.assurance?.nom || 'AZUR GLASS / Assurance')
     : clientNomDisplay;
 
-  const shareMsg = `Bonjour ${clientNomDisplay}, voici votre Facture N° ${numeroFacture} d'un montant de ${formatDH(facture.totalTTC)} ${immatDisplay ? `pour l'intervention sur le véhicule ${immatDisplay}` : ''} chez GLOBAL PARE-BRISE.`;
+  const shareMsg = `Bonjour ${clientNomDisplay}, voici votre Facture N° ${displayNumeroFacture} d'un montant de ${formatDH(facture.totalTTC)} ${immatDisplay ? `pour l'intervention sur le véhicule ${immatDisplay}` : ''} chez GLOBAL PARE-BRISE.`;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm flex justify-center items-start">
@@ -89,8 +107,8 @@ export const FactureModal: React.FC<Props> = ({
         {/* Modern Document Action Bar */}
         <DocumentActionBar
           documentRef={printRef}
-          filename={`FACTURE-${numeroFacture}`}
-          documentTitle={`Facture Officielle #${numeroFacture}`}
+          filename={`FACTURE-${displayNumeroFacture}`}
+          documentTitle={`Facture Officielle #${displayNumeroFacture}`}
           subtitle={`Destinataire : ${destinataireNom}${immatDisplay ? ` • Véhicule : ${immatDisplay}` : ''}`}
           clientPhone={dossier?.client?.telephone || facture.clientTelephone}
           shareMessage={shareMsg}
@@ -136,7 +154,7 @@ export const FactureModal: React.FC<Props> = ({
             ) : (
               <div className="flex items-center gap-1.5">
                 <span className="font-mono font-bold text-xs text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  {numeroFacture}
+                  {displayNumeroFacture}
                 </span>
                 {onUpdateNumeroFacture && (
                   <button
@@ -210,18 +228,8 @@ export const FactureModal: React.FC<Props> = ({
                 <p className="text-xs text-slate-600">Email : {GARAGE_INFO.email}</p>
               </div>
               <div className="text-right">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-300 rounded font-bold text-xs uppercase tracking-wider mb-2">
-                  <span>FACTURE N° {numeroFacture}</span>
-                  {onUpdateNumeroFacture && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingNumero(true)}
-                      className="no-print p-0.5 text-slate-400 hover:text-emerald-700 rounded transition"
-                      title="Modifier le numéro"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                  )}
+                <div className="inline-block px-3.5 py-1.5 bg-slate-100 text-slate-900 border border-slate-300 rounded font-black text-xs uppercase tracking-wider mb-2 text-center">
+                  FACTURE N° <span className="font-mono">{displayNumeroFacture}</span>
                 </div>
                 <p className="text-xs text-slate-600">
                   Date émission : <span className="font-medium text-slate-900">{formatDate(facture.dateEmission)}</span>

@@ -24,6 +24,10 @@ export async function generatePdfBlobFromElement(element: HTMLElement): Promise<
       clonedEl.style.maxWidth = '794px';
       clonedEl.style.minHeight = 'auto';
       clonedEl.style.margin = '0';
+      const noPrintEls = clonedEl.querySelectorAll('.no-print');
+      noPrintEls.forEach((el) => {
+        (el as HTMLElement).style.display = 'none';
+      });
     },
   });
 
@@ -72,6 +76,10 @@ export async function generateCompactPdfBase64FromElement(element: HTMLElement):
       clonedEl.style.maxWidth = '794px';
       clonedEl.style.minHeight = 'auto';
       clonedEl.style.margin = '0';
+      const noPrintEls = clonedEl.querySelectorAll('.no-print');
+      noPrintEls.forEach((el) => {
+        (el as HTMLElement).style.display = 'none';
+      });
     },
   });
 
@@ -117,6 +125,10 @@ export async function printElementSinglePage(element: HTMLElement, documentTitle
       clonedEl.style.maxWidth = '794px';
       clonedEl.style.minHeight = 'auto';
       clonedEl.style.margin = '0';
+      const noPrintEls = clonedEl.querySelectorAll('.no-print');
+      noPrintEls.forEach((el) => {
+        (el as HTMLElement).style.display = 'none';
+      });
     },
   });
 
